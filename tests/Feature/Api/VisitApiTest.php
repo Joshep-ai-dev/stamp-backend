@@ -49,6 +49,20 @@ class VisitApiTest extends TestCase
         $this->deleteJson('/api/v1/visits/'.$visit->id)->assertNotFound();
     }
 
+    public function test_user_cannot_add_the_same_city_twice(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $payload = ['cityId' => '3530597', 'visitedAt' => '2026-08-04'];
+
+        $this->postJson('/api/v1/visits', $payload)->assertCreated();
+        $this->postJson('/api/v1/visits', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('cityId')
+            ->assertJsonPath('errors.cityId.0', 'You have already added this city to your visits.');
+
+        $this->assertDatabaseCount('visits', 1);
+    }
+
     public function test_visits_require_authentication(): void
     {
         $this->getJson('/api/v1/visits')->assertUnauthorized();

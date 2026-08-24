@@ -88,7 +88,11 @@ class ReferenceContentApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/me/friends/scan', ['code' => 'stampo://friend/friend-token'])->assertOk()->assertJsonPath('id', $friend->id);
-        $this->getJson('/api/v1/community/leaderboard?scope=friends')->assertOk()->assertJsonCount(2);
+        $this->getJson('/api/v1/community/leaderboard?scope=friends')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonPath('0.level', 'Wanderer')
+            ->assertJsonStructure(['0' => ['score', 'level', 'stats' => ['countries', 'continents', 'cities', 'collections']]]);
         $this->assertDatabaseCount('friends', 1);
     }
 }

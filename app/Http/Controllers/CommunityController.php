@@ -18,7 +18,7 @@ class CommunityController extends Controller
             $ids = Friend::where('user_id', $request->user()->id)->pluck('friend_id')->merge(Friend::where('friend_id', $request->user()->id)->pluck('user_id'))->push($request->user()->id);
             $query->whereIn('id', $ids);
         }
-        $items = $query->with(['visits', 'completions'])->get()->map(fn ($user) => $this->profile($user))->sortByDesc('score')->values()->take(10);
+        $items = $query->with(['visits', 'completions', 'collectionProgress'])->get()->map(fn ($user) => $this->profile($user))->sortByDesc('score')->values()->take(10);
 
         return response()->json($items);
     }
@@ -43,16 +43,36 @@ class CommunityController extends Controller
         $second = max($request->user()->id, $friend->id);
         Friend::firstOrCreate(['user_id' => $first, 'friend_id' => $second]);
 
-        return response()->json($this->profile($friend->load(['visits', 'completions'])));
+        return response()->json($this->profile($friend->load(['visits', 'completions', 'collectionProgress'])));
     }
 
     private function profile(User $user): array
     {
         $countries = $user->visits->pluck('country_code')->unique()->count();
+        $continents = $user->visits->pluck('continent_code')->filter()->unique()->count();
         $cities = $user->visits->pluck('city_id')->unique()->count();
         $sights = $user->completions->pluck('sight_id')->unique()->count();
+        $collections = $user->collectionProgress->where('progress', 100)->count();
         $score = round(min(100, $countries * .25 + $cities * .005 + $sights * .002), 3);
 
-        return ['id' => $user->id, 'name' => $user->name, 'photoUri' => $user->photo_uri, 'plan' => $user->plan, 'score' => $score, 'countries' => $countries, 'cities' => $cities, 'sights' => $sights];
+        return [
+            'id' => $user->id, 'name' => $user->name, 'photoUri' => $user->photo_uri,
+            'plan' => $user->plan, 'score' => $score, 'level' => $this->level($score),
+            'stats' => ['countries' => $countries, 'continents' => $continents, 'cities' => $cities, 'collections' => $collections],
+            'countries' => $countries, 'continents' => $continents, 'cities' => $cities,
+            'collections' => $collections, 'sights' => $sights,
+        ];
+    }
+
+    private function level(float $score): string
+    {
+        return match (true) {
+            $score >= 75 => 'Kroo Master',
+            $score >= 50 => 'Voyager',
+            $score >= 30 => 'Wayfarer',
+            $score >= 15 => 'Explorer',
+            $score >= 5 => 'Traveler',
+            default => 'Wanderer',
+        };
     }
 }

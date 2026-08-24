@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 
 class VisitController extends Controller
 {
@@ -20,6 +21,11 @@ class VisitController extends Controller
     public function store(VisitRequest $request): JsonResponse
     {
         [$data, $city] = $this->authoritativeData($request);
+        if ($request->user()->visits()->where('city_id', $city->id)->exists()) {
+            throw ValidationException::withMessages([
+                'cityId' => ['You have already added this city to your visits.'],
+            ]);
+        }
         $visit = $request->user()->visits()->create($data);
         $visit->setRelation('city', $city);
 
