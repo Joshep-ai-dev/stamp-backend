@@ -19,17 +19,21 @@ class VisitController extends Controller
 
     public function store(VisitRequest $request): JsonResponse
     {
-        $visit = $request->user()->visits()->create($this->authoritativeData($request));
+        [$data, $city] = $this->authoritativeData($request);
+        $visit = $request->user()->visits()->create($data);
+        $visit->setRelation('city', $city);
 
-        return (new VisitResource($visit->load('city')))->response()->setStatusCode(201);
+        return (new VisitResource($visit))->response()->setStatusCode(201);
     }
 
     public function update(VisitRequest $request, string $visit): VisitResource
     {
         $model = $request->user()->visits()->findOrFail($visit);
-        $model->update($this->authoritativeData($request));
+        [$data, $city] = $this->authoritativeData($request);
+        $model->update($data);
+        $model->setRelation('city', $city);
 
-        return new VisitResource($model->load('city'));
+        return new VisitResource($model);
     }
 
     public function destroy(Request $request, string $visit): Response
@@ -43,6 +47,11 @@ class VisitController extends Controller
     {
         $city = City::with('country')->where('geoname_id', $request->string('cityId'))->firstOrFail();
 
-        return ['city_id' => $city->id, 'city_name' => $city->name, 'country' => $city->country->name, 'country_code' => $city->country_code, 'continent_code' => $city->country->continent_code, 'subcountry' => $city->subcountry, 'visited_at' => $request->date('visitedAt')->format('Y-m-d'), 'note' => $request->input('note'), 'places' => $request->input('places', [])];
+        return [[
+            'city_id' => $city->id, 'city_name' => $city->name, 'country' => $city->country->name,
+            'country_code' => $city->country_code, 'continent_code' => $city->country->continent_code,
+            'subcountry' => $city->subcountry, 'visited_at' => $request->date('visitedAt')->format('Y-m-d'),
+            'note' => $request->input('note'), 'places' => $request->input('places', []),
+        ], $city];
     }
 }

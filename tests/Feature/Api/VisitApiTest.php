@@ -30,6 +30,16 @@ class VisitApiTest extends TestCase
         $this->postJson('/api/v1/visits', ['cityId' => '3530597', 'cityName' => 'Fake', 'country' => 'Fake', 'countryCode' => 'US', 'continentCode' => 'EU', 'visitedAt' => '2026-08-04', 'note' => 'Great'])->assertCreated()->assertJsonPath('cityName', 'Mexico City')->assertJsonPath('countryCode', 'MX')->assertJsonPath('continentCode', 'NA');
     }
 
+    public function test_visit_only_requires_catalog_city_id_and_date(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/v1/visits', ['cityId' => '3530597', 'visitedAt' => '2026-08-04'])
+            ->assertCreated()
+            ->assertJsonPath('cityName', 'Mexico City')
+            ->assertJsonPath('countryCode', 'MX');
+    }
+
     public function test_user_cannot_mutate_another_users_visit(): void
     {
         $owner = User::factory()->create();
