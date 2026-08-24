@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'stampo' => [
+        'admin_key' => env('ADMIN_API_KEY', 'stampo-local-admin'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

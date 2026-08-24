@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(WorldCitiesSeeder::class);
+        $this->call(ReferenceContentSeeder::class);
+
         // User::factory(10)->create();
 
         User::factory()->create([

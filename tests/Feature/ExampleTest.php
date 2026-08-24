@@ -15,5 +15,8 @@ class ExampleTest extends TestCase
         $response = $this->get('/');
 
         $response->assertStatus(200);
+        $website = file_get_contents(public_path('kroo-website.html'));
+        $this->assertStringContainsString('Kroo is the ultimate travel app for explorers.', $website);
+        $this->assertStringContainsString('assets/kroo-logo.png', $website);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CollectionKind;
 use App\Models\CollectionProgress;
 use App\Services\CollectionCatalog;
 use Illuminate\Http\JsonResponse;
@@ -40,7 +41,7 @@ class TravelStateController extends Controller
 
     public function updateCollection(Request $request, string $collectionId): JsonResponse
     {
-        abort_unless(isset(CollectionCatalog::ITEMS[$collectionId]), 404);
+        abort_unless(isset(CollectionCatalog::ITEMS[$collectionId]) || CollectionKind::where('is_published', true)->whereKey($collectionId)->exists(), 404);
         $progress = $request->validate(['progress' => ['required', 'integer', 'between:0,100']])['progress'];
         $record = $request->user()->collectionProgress()->updateOrCreate(['collection_id' => $collectionId], ['progress' => $progress]);
 
@@ -81,13 +82,19 @@ class TravelStateController extends Controller
 
     private function collectionItems($progress): array
     {
-        return collect(CollectionCatalog::ITEMS)->map(fn ($definition, $id) => $this->collection($id, $progress->firstWhere('collection_id', $id)))->values()->all();
+        $managed = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('display_order')->get();
+        $legacy = collect(CollectionCatalog::ITEMS)
+            ->except($managed->pluck('id'))
+            ->map(fn ($definition, $id) => $this->collection($id, $progress->firstWhere('collection_id', $id)));
+
+        return $managed->map(fn ($definition) => $this->collection($definition->id, $progress->firstWhere('collection_id', $definition->id), $definition))->concat($legacy)->values()->all();
     }
 
-    private function collection(string $id, ?CollectionProgress $progress): array
+    private function collection(string $id, ?CollectionProgress $progress, ?CollectionKind $definition = null): array
     {
         $value = $progress?->progress ?? 0;
-        $item = ['id' => $id, ...CollectionCatalog::ITEMS[$id], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $legacy = CollectionCatalog::ITEMS[$id] ?? [];
+        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->image, 'places' => $definition?->lists?->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access]) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }

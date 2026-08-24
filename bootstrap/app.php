@@ -16,13 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(prepend: [AssignRequestId::class]);
+        $middleware->validateCsrfTokens(except: ['admin/api/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*', 'admin/api/*'),
         );
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/*') || config('app.debug')) {
+            if (! $request->is('api/*', 'admin/api/*') || config('app.debug')) {
                 return null;
             }
             if ($exception instanceof HttpExceptionInterface) {

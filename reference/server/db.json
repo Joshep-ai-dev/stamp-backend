@@ -1,0 +1,716 @@
+{
+  "visits": [
+    {
+      "cityId": "12032531",
+      "cityName": "Chinatown",
+      "country": "Canada",
+      "countryCode": "CA",
+      "continentCode": "NA",
+      "subcountry": "British Columbia",
+      "visitedAt": "2026-08-06",
+      "note": "What beautiful!",
+      "places": [],
+      "id": "0c04f3ad-8c6e-4a1d-8c64-3fca980ae930",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3573374",
+      "cityName": "The Valley",
+      "country": "Anguilla",
+      "countryCode": "AI",
+      "continentCode": "NA",
+      "subcountry": "The Valley",
+      "visitedAt": "2026-08-06",
+      "note": "hello",
+      "places": [],
+      "id": "a6375787-293d-48a1-b611-a87275949c88",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3384983",
+      "cityName": "Vitorino Freire",
+      "country": "Brazil",
+      "countryCode": "BR",
+      "continentCode": "SA",
+      "subcountry": "Maranhao",
+      "visitedAt": "2026-08-09",
+      "note": "Beautiful city",
+      "places": [],
+      "id": "50363a64-414f-464e-95ac-77ab59a0ce17",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "340754",
+      "cityName": "Chinahsen",
+      "country": "Ethiopia",
+      "countryCode": "ET",
+      "continentCode": "AF",
+      "subcountry": "Somali",
+      "visitedAt": "2026-08-09",
+      "note": "",
+      "places": [],
+      "id": "8d2af66a-5c76-4d7e-aee2-cdaaa94a3632",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "1529594",
+      "cityName": "Beitun",
+      "country": "China",
+      "countryCode": "CN",
+      "continentCode": "AS",
+      "subcountry": "Xinjiang",
+      "visitedAt": "2026-08-09",
+      "note": "",
+      "places": [],
+      "id": "fac4839c-eb51-4607-95e6-93331690553a",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "2967245",
+      "cityName": "Yerres",
+      "country": "France",
+      "countryCode": "FR",
+      "continentCode": "EU",
+      "subcountry": "Ile-de-France",
+      "visitedAt": "2026-08-10",
+      "note": "",
+      "places": [],
+      "id": "45045352-d899-4228-949a-3f02876663e4",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "4046704",
+      "cityName": "Fort Hunt",
+      "country": "United States",
+      "countryCode": "US",
+      "continentCode": "NA",
+      "subcountry": "Virginia",
+      "visitedAt": "2026-08-10",
+      "note": "",
+      "places": [],
+      "id": "d998c64a-1705-4a45-8dca-b52a027ac581",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "461698",
+      "cityName": "Sosnovka",
+      "country": "Russian Federation",
+      "countryCode": "RU",
+      "continentCode": "AS",
+      "subcountry": "St.-Petersburg",
+      "visitedAt": "2026-08-10",
+      "note": "",
+      "places": [],
+      "id": "48b98c6b-d74e-42d7-a3e5-57bcf660d578",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "2077454",
+      "cityName": "Australind",
+      "country": "Australia",
+      "countryCode": "AU",
+      "continentCode": "OC",
+      "subcountry": "Western Australia",
+      "visitedAt": "2026-08-10",
+      "note": "",
+      "places": [],
+      "id": "1b9c401c-9c2e-4950-90eb-708218db520c",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "1142170",
+      "cityName": "Fayzabad",
+      "country": "Afghanistan",
+      "countryCode": "AF",
+      "continentCode": "AS",
+      "subcountry": "Badakhshan",
+      "visitedAt": "2026-08-10",
+      "note": "",
+      "places": [],
+      "id": "1a9fcb60-7ad4-47bd-ae94-6920a781e8dc",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3472177",
+      "cityName": "Angra dos Reis",
+      "country": "Brazil",
+      "countryCode": "BR",
+      "continentCode": "SA",
+      "subcountry": "Rio de Janeiro",
+      "visitedAt": "2026-08-11",
+      "note": "",
+      "places": [],
+      "id": "c97d5d29-af97-4c7b-9103-a493040e08f4",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "1529594",
+      "cityName": "Beitun",
+      "country": "China",
+      "countryCode": "CN",
+      "continentCode": "AS",
+      "subcountry": "Xinjiang",
+      "visitedAt": "2026-08-11",
+      "note": "",
+      "places": [],
+      "id": "1f316779-83f8-4786-842f-78d4ca99ec17",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3408270",
+      "cityName": "Afrânio",
+      "country": "Brazil",
+      "countryCode": "BR",
+      "continentCode": "SA",
+      "subcountry": "Pernambuco",
+      "visitedAt": "2026-08-11",
+      "note": "",
+      "places": [],
+      "id": "b30847dc-e8c2-447e-97dc-c335e83b1a36",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3384983",
+      "cityName": "Vitorino Freire",
+      "country": "Brazil",
+      "countryCode": "BR",
+      "continentCode": "SA",
+      "subcountry": "Maranhao",
+      "visitedAt": "2026-08-11",
+      "note": "",
+      "places": [],
+      "id": "cfdb85f6-7d9c-4588-9724-cb18841b57ba",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "2968748",
+      "cityName": "Villefranche-sur-Saône",
+      "country": "France",
+      "countryCode": "FR",
+      "continentCode": "EU",
+      "subcountry": "Rhone-Alpes",
+      "visitedAt": "2026-08-12",
+      "note": "",
+      "places": [],
+      "id": "47239b77-dc7d-4b73-b185-59a2334ebeb0",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "1847947",
+      "cityName": "Shingū",
+      "country": "Japan",
+      "countryCode": "JP",
+      "continentCode": "AS",
+      "subcountry": "Wakayama",
+      "visitedAt": "2026-08-12",
+      "note": "",
+      "places": [],
+      "id": "a4f8e39a-0490-4def-9c1f-98b68fca17a0",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "2968748",
+      "cityName": "Villefranche-sur-Saône",
+      "country": "France",
+      "countryCode": "FR",
+      "continentCode": "EU",
+      "subcountry": "Rhone-Alpes",
+      "visitedAt": "2026-08-12",
+      "note": "",
+      "places": [],
+      "id": "d7d31410-be89-47a2-99a8-ab5c72366682",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    },
+    {
+      "cityId": "3369157",
+      "cityName": "Cape Town",
+      "country": "South Africa",
+      "countryCode": "ZA",
+      "continentCode": "AF",
+      "subcountry": "Western Cape",
+      "visitedAt": "2026-08-17",
+      "note": "",
+      "places": [],
+      "id": "1185ed52-583f-44c2-b5c1-c9dc6c3bb4aa",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c"
+    }
+  ],
+  "profile": {
+    "id": "local-profile",
+    "name": "Robb",
+    "language": "English"
+  },
+  "users": [
+    {
+      "id": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "name": "Robb",
+      "email": "darkhorse9372@gmail.com",
+      "password": "kc9372KC!123",
+      "language": "English",
+      "nationality": "",
+      "dateOfBirth": "",
+      "photoUri": "file:///data/user/0/com.darkhorse9372.Stampo/cache/ImagePicker/441ce091-0528-4b26-953b-7bee579b1390.png",
+      "plan": "pro",
+      "friendCode": "sXlr13IOQty1jQ8cG3QVEPL4"
+    },
+    {
+      "id": "2fbe9dd7-c46d-4c8e-8922-847d9aeb3998",
+      "name": "Jacobux",
+      "email": "jacobux30@gmail.com",
+      "password": "ddc903d3c1f8c699379ef63033293f0e:8b419f2dafc0e73dd8213c7b5dee4d726682312435cfad2291cba4aad34fe9f8e81bbdaabc4b63f3bfb7b2129d97cdb432c8a4c25c06ed5830cac6807a89b1e6",
+      "language": "English",
+      "plan": "free",
+      "nationality": "",
+      "dateOfBirth": "",
+      "photoUri": null,
+      "friendCode": "vcgARWITV7L9oHcmlL7QVUZ2"
+    },
+    {
+      "id": "c8faf308-d328-4e5f-a9b5-239f10e01eed",
+      "name": "Fastleopard9372",
+      "email": "fastleopard9372@gmail.com",
+      "password": "9ad620d7698cf44a3000c9194971232b:5e2291cbe8fd074aed02b391f2b6b810c07f88cc8881c9f0c4808273c71aeda6fd42c6f6c292a89714f2355a2f8948ccb5c216bc5fc01fb4dbcc488008d6a9fd",
+      "language": "English",
+      "plan": "free",
+      "nationality": "",
+      "dateOfBirth": "",
+      "photoUri": null,
+      "friendCode": "lzsXFh-h1kzkkBwBfb62WZW3"
+    }
+  ],
+  "completions": [
+    {
+      "id": "a5f50798-6252-4f32-aa65-665a6b9017d7",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "sightId": "versailles",
+      "completedAt": "2026-08-12T11:36:57.105Z"
+    },
+    {
+      "id": "f29a17d1-bbee-4c6b-83b6-cb3a1698b3e8",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "sightId": "louvre",
+      "completedAt": "2026-08-12T12:22:37.341Z"
+    },
+    {
+      "id": "b6077d20-9a52-4384-a3b2-f4a51822d154",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "sightId": "collection-wonders-chichen-itza",
+      "completedAt": "2026-08-19T01:26:21.892Z"
+    }
+  ],
+  "wishlists": [],
+  "rewards": [],
+  "collectionProgress": [],
+  "importCache": [],
+  "importRuns": [],
+  "cities": [],
+  "sights": [],
+  "countries": [],
+  "imageCredits": [],
+  "collections": [],
+  "countryCollections": [],
+  "friends": [
+    {
+      "id": "db7144a2-d32c-49ed-95a5-6f19b6b8b253",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "friendId": "2fbe9dd7-c46d-4c8e-8922-847d9aeb3998",
+      "createdAt": "2026-08-21T19:09:31.478Z"
+    },
+    {
+      "id": "df9650fb-a27a-4714-a5dc-c802eb7e06f0",
+      "userId": "d19f0298-a0be-4b72-8b48-6cf59a232f1c",
+      "friendId": "c8faf308-d328-4e5f-a9b5-239f10e01eed",
+      "createdAt": "2026-08-21T19:20:22.137Z"
+    }
+  ],
+  "managedCollections": [
+    {
+      "id": "wonders",
+      "title": "Seven Wonders",
+      "detail": "Visit all 7 wonders",
+      "defaultProgress": 12,
+      "imageUrl": "",
+      "description": "Visit all 7 wonders",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 0,
+      "places": [
+        {
+          "id": "great-wall",
+          "name": "Great Wall of China",
+          "city": "Beijing",
+          "country": "China",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "petra",
+          "name": "Petra",
+          "city": "Ma'an",
+          "country": "Jordan",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "colosseum",
+          "name": "Colosseum",
+          "city": "Rome",
+          "country": "Italy",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "chichen-itza",
+          "name": "Chichén Itzá",
+          "city": "Yucatán",
+          "country": "Mexico",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "machu-picchu",
+          "name": "Machu Picchu",
+          "city": "Cusco",
+          "country": "Peru",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "taj-mahal",
+          "name": "Taj Mahal",
+          "city": "Agra",
+          "country": "India",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "christ-redeemer",
+          "name": "Christ the Redeemer",
+          "city": "Rio de Janeiro",
+          "country": "Brazil",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        }
+      ],
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    },
+    {
+      "id": "seas",
+      "title": "Seven Seas",
+      "detail": "Sail or visit all 7 seas",
+      "defaultProgress": 8,
+      "imageUrl": "",
+      "description": "Sail or visit all 7 seas",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 1,
+      "places": [
+        {
+          "id": "arctic-ocean",
+          "name": "Arctic Ocean",
+          "city": "Tromsø",
+          "country": "Norway",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "north-atlantic",
+          "name": "North Atlantic Ocean",
+          "city": "Reykjavík",
+          "country": "Iceland",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "south-atlantic",
+          "name": "South Atlantic Ocean",
+          "city": "Cape Town",
+          "country": "South Africa",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "north-pacific",
+          "name": "North Pacific Ocean",
+          "city": "Honolulu",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "south-pacific",
+          "name": "South Pacific Ocean",
+          "city": "Suva",
+          "country": "Fiji",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "indian-ocean",
+          "name": "Indian Ocean",
+          "city": "Malé",
+          "country": "Maldives",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "southern-ocean",
+          "name": "Southern Ocean",
+          "city": "Ushuaia",
+          "country": "Argentina",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        }
+      ],
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    },
+    {
+      "id": "unesco",
+      "title": "UNESCO Explorer",
+      "detail": "Visit heritage sites",
+      "defaultProgress": 14,
+      "imageUrl": "",
+      "description": "Visit heritage sites",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 2,
+      "places": [
+        {
+          "id": "angkor-wat",
+          "name": "Angkor Wat",
+          "city": "Siem Reap",
+          "country": "Cambodia",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "acropolis",
+          "name": "Acropolis of Athens",
+          "city": "Athens",
+          "country": "Greece",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "alhambra",
+          "name": "Alhambra",
+          "city": "Granada",
+          "country": "Spain",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "mont-saint-michel",
+          "name": "Mont-Saint-Michel",
+          "city": "Normandy",
+          "country": "France",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "moai",
+          "name": "Rapa Nui National Park",
+          "city": "Easter Island",
+          "country": "Chile",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "serengeti",
+          "name": "Serengeti National Park",
+          "city": "Mara",
+          "country": "Tanzania",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        }
+      ],
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    },
+    {
+      "id": "parks",
+      "title": "National Parks",
+      "detail": "Visit national parks",
+      "defaultProgress": 16,
+      "imageUrl": "",
+      "description": "Visit national parks",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 3,
+      "places": [
+        {
+          "id": "yellowstone",
+          "name": "Yellowstone National Park",
+          "city": "Wyoming",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "banff",
+          "name": "Banff National Park",
+          "city": "Alberta",
+          "country": "Canada",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "fiordland",
+          "name": "Fiordland National Park",
+          "city": "Te Anau",
+          "country": "New Zealand",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "torres-del-paine",
+          "name": "Torres del Paine",
+          "city": "Patagonia",
+          "country": "Chile",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "kruger",
+          "name": "Kruger National Park",
+          "city": "Mpumalanga",
+          "country": "South Africa",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "fuji-hakone",
+          "name": "Fuji-Hakone-Izu National Park",
+          "city": "Hakone",
+          "country": "Japan",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        }
+      ],
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    },
+    {
+      "id": "usa",
+      "title": "United States Explorer",
+      "detail": "Visit all 50 states",
+      "defaultProgress": 0,
+      "imageUrl": "",
+      "description": "Visit all 50 states",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 4,
+      "places": [
+        {
+          "id": "statue-liberty",
+          "name": "Statue of Liberty",
+          "city": "New York City",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "grand-canyon",
+          "name": "Grand Canyon",
+          "city": "Arizona",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "golden-gate",
+          "name": "Golden Gate Bridge",
+          "city": "San Francisco",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "national-mall",
+          "name": "National Mall",
+          "city": "Washington, D.C.",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "french-quarter",
+          "name": "French Quarter",
+          "city": "New Orleans",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        },
+        {
+          "id": "waikiki",
+          "name": "Waikīkī Beach",
+          "city": "Honolulu",
+          "country": "United States",
+          "imageUrl": "",
+          "content": "",
+          "isPremium": false
+        }
+      ],
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    }
+  ],
+  "dailyDestinations": [
+    {
+      "id": "daily-france-louvre",
+      "country": "France",
+      "city": "Paris",
+      "name": "The Louvre",
+      "content": "The Louvre in Paris is the most visited art museum on Earth, drawing millions of visitors every year.",
+      "imageUrl": "",
+      "icon": "🖼️",
+      "question": "Which museum in Paris is the most visited art museum in the world?",
+      "options": [
+        "The Louvre",
+        "The Uffizi",
+        "The British Museum",
+        "The Prado"
+      ],
+      "correctAnswer": 0,
+      "publishDate": "",
+      "isPublished": true,
+      "isPremium": false,
+      "displayOrder": 0,
+      "createdAt": "2026-08-24T11:08:18.130Z",
+      "updatedAt": "2026-08-24T11:08:18.130Z"
+    }
+  ]
+}

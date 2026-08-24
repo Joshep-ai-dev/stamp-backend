@@ -3,6 +3,8 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CityController;
+use App\Http\Controllers\CommunityController;
+use App\Http\Controllers\ContentController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
@@ -29,6 +31,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/me/plan', [TravelStateController::class, 'plan']);
         Route::get('/collections', [TravelStateController::class, 'collections']);
         Route::put('/me/collections/{collectionId}', [TravelStateController::class, 'updateCollection']);
+        Route::get('/community/leaderboard', [CommunityController::class, 'leaderboard']);
+        Route::get('/me/friend-code', [CommunityController::class, 'friendCode']);
+        Route::post('/me/friends/scan', [CommunityController::class, 'scan']);
     });
     Route::middleware('throttle:catalog')->group(function (): void {
         Route::get('/countries', [CountryController::class, 'index']);
@@ -36,4 +41,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/cities/{geonameId}', [CityController::class, 'show']);
         Route::get('/catalog/version', [CatalogController::class, 'version']);
     });
+    Route::get('/daily-destinations', [ContentController::class, 'dailyDestinations']);
+    Route::get('/catalog/countries/{code}', [ContentController::class, 'country']);
+    Route::get('/catalog/countries/{code}/cities', [ContentController::class, 'countryCities']);
+    Route::get('/collections/{id}', [ContentController::class, 'collection']);
+    Route::get('/sights/{id}', [ContentController::class, 'sight']);
+    Route::get('/catalog/cities/{id}', [ContentController::class, 'city']);
+    Route::get('/catalog/cities/{id}/sights', [ContentController::class, 'citySights']);
 });
