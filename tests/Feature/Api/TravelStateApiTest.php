@@ -3,8 +3,11 @@
 namespace Tests\Feature\Api;
 
 use App\Models\City;
+use App\Models\CollectionKind;
+use App\Models\CollectionList;
 use App\Models\Country;
 use App\Models\Reward;
+use App\Models\Sight;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -50,6 +53,42 @@ class TravelStateApiTest extends TestCase
             ->assertJsonPath('counts.sights', 1)
             ->assertJsonPath('score', 2.067)
             ->assertJsonPath('level', 'Wanderer');
+    }
+
+    public function test_completing_catalog_items_creates_or_updates_the_city_visit(): void
+    {
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
+        $city = City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
+        Sight::create(['id' => 'eiffel-tower', 'country_code' => 'FR', 'city_id' => $city->id, 'name' => 'Eiffel Tower', 'slug' => 'eiffel-tower']);
+        $kind = CollectionKind::create(['id' => 'icons', 'title' => 'World Icons', 'is_published' => true]);
+        CollectionList::create(['id' => 'louvre', 'collectionkind_id' => $kind->id, 'title' => 'The Louvre', 'city_id' => $city->id]);
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => true])->assertOk();
+        $this->putJson('/api/v1/me/completions/collection-icons-louvre', ['completed' => true])->assertOk();
+
+        $visit = $user->visits()->firstOrFail();
+        $this->assertSame('2988507', $visit->city->geoname_id);
+        $this->assertEqualsCanonicalizing(['eiffel-tower', 'collection-icons-louvre'], collect($visit->places)->pluck('id')->all());
+        $this->assertDatabaseCount('visits', 1);
+
+        $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => false])->assertOk();
+        $this->assertSame(['collection-icons-louvre'], collect($visit->fresh()->places)->pluck('id')->all());
+        $this->assertDatabaseMissing('completions', ['user_id' => $user->id, 'sight_id' => 'eiffel-tower']);
+    }
+
+    public function test_cityless_collection_item_saves_without_creating_a_visit(): void
+    {
+        $kind = CollectionKind::create(['id' => 'seas', 'title' => 'Seven Seas', 'is_published' => true]);
+        CollectionList::create(['id' => 'arctic-ocean', 'collectionkind_id' => $kind->id, 'title' => 'Arctic Ocean', 'city_id' => null]);
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/v1/me/completions/collection-seas-arctic-ocean', ['completed' => true])->assertOk();
+
+        $this->assertDatabaseHas('completions', ['user_id' => $user->id, 'sight_id' => 'collection-seas-arctic-ocean']);
+        $this->assertDatabaseCount('visits', 0);
     }
 
     public function test_profile_and_password_follow_contract(): void

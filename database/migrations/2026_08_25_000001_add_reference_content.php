@@ -11,13 +11,12 @@ return new class extends Migration
         Schema::table('users', fn (Blueprint $table) => $table->string('friend_code', 64)->nullable()->unique());
 
         Schema::create('sights', function (Blueprint $table): void {
-            $table->string('id')->primary();
+            $table->id();
             $table->char('country_code', 2)->index();
             $table->foreignId('city_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('slug')->index();
             $table->text('description')->nullable();
-            $table->string('category')->default('attraction');
             $table->text('image_url')->nullable();
             $table->boolean('is_featured')->default(true);
             $table->boolean('is_premium')->default(false);

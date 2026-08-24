@@ -8,6 +8,7 @@ use App\Models\CollectionList;
 use App\Models\Country;
 use App\Models\DailyDestination;
 use App\Models\Sight;
+use App\Services\ImageStorage;
 use App\Services\ImageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -27,17 +28,11 @@ class AdminController extends Controller
         return response()->json(['countries' => Country::orderBy('name')->get()->map(fn ($x) => ['id' => $x->code, 'code' => $x->code, 'name' => $x->name]), 'cities' => $cities->map(fn ($x) => ['id' => $x->geoname_id, 'countryId' => $x->country_code, 'name' => $x->name, 'subcountry' => $x->subcountry]), 'collectionKinds' => CollectionKind::orderBy('title')->get(['id', 'title'])]);
     }
 
-    public function upload(Request $request): JsonResponse
+    public function upload(Request $request, ImageStorage $images): JsonResponse
     {
         $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240']]);
-        $directory = public_path('images');
-        if (! is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
-        $filename = Str::uuid().'.'.$data['image']->guessExtension();
-        $data['image']->move($directory, $filename);
 
-        return response()->json(['imageUrl' => '/images/'.$filename], 201);
+        return response()->json(['imageUrl' => $images->store($data['image'])], 201);
     }
 
     public function index(string $type): JsonResponse
@@ -68,18 +63,23 @@ class AdminController extends Controller
     public function destroy(string $type, string $id): Response
     {
         $class = $this->classFor($type);
-        $class::findOrFail($id)->delete();
+        $model = $class::findOrFail($id);
+        $image = $this->modelImage($model);
+        $model->delete();
+        app(ImageStorage::class)->delete($image);
 
         return response()->noContent();
     }
 
     private function save(Request $request, string $type, ?Model $model = null): Model
     {
+        $oldImage = $this->modelImage($model);
         if ($type === 'sights') {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('sights')->ignore($model)], 'name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'category' => ['nullable', 'string'], 'displayOrder' => ['nullable', 'integer'], 'isFeatured' => ['boolean'], 'unlocked' => ['boolean']]);
+            $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'displayOrder' => ['nullable', 'integer'], 'isFeatured' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])], 'unlocked' => ['sometimes', 'boolean']]);
             $city = City::where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
-            $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'category' => $data['category'] ?? 'attraction', 'display_order' => $data['displayOrder'] ?? 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => ! ($data['unlocked'] ?? true)];
-            $model ??= new Sight(['id' => $data['id'] ?? (string) Str::uuid()]);
+            $premium = isset($data['access']) ? $data['access'] === 'pro' : ! ($data['unlocked'] ?? true);
+            $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => $data['displayOrder'] ?? 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => $premium];
+            $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
             $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'displayOrder' => ['integer'], 'isPublished' => ['boolean']]);
             $values = ['title' => $data['title'], 'detail' => $data['detail'] ?? '', 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'display_order' => $data['displayOrder'] ?? 0, 'is_published' => $data['isPublished'] ?? true];
@@ -99,6 +99,10 @@ class AdminController extends Controller
             abort(404);
         }
         $model->fill($values)->save();
+        $newImage = $this->modelImage($model);
+        if ($oldImage && $oldImage !== $newImage) {
+            app(ImageStorage::class)->delete($oldImage);
+        }
 
         return $model->fresh();
     }
@@ -119,11 +123,20 @@ class AdminController extends Controller
 
     private function adminSight(Sight $x): array
     {
-        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'city' => $x->city?->name, 'unlocked' => ! $x->is_premium];
+        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'city' => $x->city?->name, 'access' => $x->is_premium ? 'pro' : 'free', 'unlocked' => ! $x->is_premium];
     }
 
     private function collectionList(CollectionList $item): array
     {
         return ['id' => $item->id, 'collectionKindId' => $item->collectionkind_id, 'collectionKind' => $item->kind?->title, 'imageUrl' => ImageUrl::public($item->image), 'title' => $item->title, 'cityId' => $item->city?->geoname_id, 'countryId' => $item->city?->country_code, 'location' => $item->location, 'detail' => $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
+    }
+
+    private function modelImage(?Model $model): ?string
+    {
+        if (! $model) {
+            return null;
+        }
+
+        return $model->getAttribute('image_url') ?? $model->getAttribute('image');
     }
 }

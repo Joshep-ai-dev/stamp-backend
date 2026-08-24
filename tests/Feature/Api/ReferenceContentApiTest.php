@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\City;
+use App\Models\CollectionKind;
 use App\Models\Country;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,15 +31,32 @@ class ReferenceContentApiTest extends TestCase
         $this->withHeaders($headers)->deleteJson('/admin/api/collections/food-tour')->assertNoContent();
     }
 
+    public function test_editing_a_collection_kind_twice_updates_one_database_record(): void
+    {
+        $headers = $this->adminHeaders();
+        $id = $this->withHeaders($headers)->postJson('/admin/api/collections', ['title' => 'Original', 'detail' => 'First'])
+            ->assertCreated()->json('id');
+
+        $this->withHeaders($headers)->putJson('/admin/api/collections/'.$id, ['title' => 'Edited once', 'detail' => 'Second'])->assertOk();
+        $this->withHeaders($headers)->putJson('/admin/api/collections/'.$id, ['title' => 'Edited twice', 'detail' => 'Third'])->assertOk()->assertJsonPath('title', 'Edited twice');
+
+        $this->assertSame(1, CollectionKind::count());
+        $this->assertDatabaseHas('collectionkind', ['id' => $id, 'title' => 'Edited twice', 'detail' => 'Third']);
+    }
+
     public function test_admin_can_manage_sights_using_catalog_country_and_city_ids(): void
     {
         Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
         City::create(['geoname_id' => '1609350', 'name' => 'Bangkok', 'normalized_name' => 'bangkok', 'country_code' => 'TH']);
         $headers = $this->adminHeaders();
 
-        $this->withHeaders($headers)->postJson('/admin/api/sights', ['id' => 'wat-arun', 'name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn', 'unlocked' => true])
-            ->assertCreated()->assertJsonPath('country', 'Thailand')->assertJsonPath('city', 'Bangkok');
-        $this->getJson('/api/sights/wat-arun')->assertOk()->assertJsonPath('description', 'Temple of Dawn');
+        $sightId = $this->withHeaders($headers)->postJson('/admin/api/sights', ['name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn', 'unlocked' => true])
+            ->assertCreated()->assertJsonPath('country', 'Thailand')->assertJsonPath('city', 'Bangkok')->json('id');
+        $this->assertIsInt($sightId);
+        $this->getJson('/api/sights/'.$sightId)->assertOk()->assertJsonPath('description', 'Temple of Dawn');
+
+        $this->withHeaders($headers)->putJson('/admin/api/sights/'.$sightId, ['name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn', 'access' => 'pro'])
+            ->assertOk()->assertJsonPath('access', 'pro')->assertJsonPath('isPremium', true);
     }
 
     public function test_invalid_top_sight_save_returns_json_instead_of_an_html_error_page(): void
@@ -79,6 +97,27 @@ class ReferenceContentApiTest extends TestCase
         $file = public_path('images/'.basename($path));
         $this->assertFileExists($file);
         unlink($file);
+    }
+
+    public function test_replacing_admin_and_user_images_removes_previous_server_files(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $headers = $this->adminHeaders();
+        $old = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('old.png', $png)])->assertCreated()->json('imageUrl');
+        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['title' => 'Images', 'imageUrl' => $old])->assertCreated();
+        $new = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('new.png', $png)])->assertCreated()->json('imageUrl');
+        $this->withHeaders($headers)->putJson('/admin/api/collections/'.$kind->json('id'), ['title' => 'Images', 'imageUrl' => $new])->assertOk();
+        $this->assertFileDoesNotExist(public_path(ltrim($old, '/')));
+        $this->assertFileExists(public_path(ltrim($new, '/')));
+
+        Sanctum::actingAs(User::factory()->create());
+        $first = $this->post('/api/v1/profile/image', ['image' => UploadedFile::fake()->createWithContent('user-old.png', $png)])->assertCreated()->json('photoUri');
+        $second = $this->post('/api/v1/profile/image', ['image' => UploadedFile::fake()->createWithContent('user-new.png', $png)])->assertCreated()->json('photoUri');
+        $this->assertFileDoesNotExist(public_path(ltrim($first, '/')));
+        $this->assertFileExists(public_path(ltrim($second, '/')));
+
+        unlink(public_path(ltrim($new, '/')));
+        unlink(public_path(ltrim($second, '/')));
     }
 
     public function test_friend_codes_add_friends_and_filter_the_leaderboard(): void

@@ -23,6 +23,7 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/auth/password', [AuthController::class, 'password']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
+        Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
         Route::apiResource('visits', VisitController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::get('/me/travel-state', [TravelStateController::class, 'show']);
         Route::get('/me/home', [HomeController::class, 'show']);
