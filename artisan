@@ -1,0 +1,31 @@
+#!/usr/bin/env php
+<?php
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+
+// Artisan reserves --version globally. Preserve the public import contract by
+// translating that option only for this command before Symfony parses argv.
+if (($argv[1] ?? null) === 'cities:import') {
+    foreach ($argv as &$argument) {
+        if ($argument === '--version') {
+            $argument = '--dataset-version';
+        } elseif (str_starts_with($argument, '--version=')) {
+            $argument = '--dataset-version='.substr($argument, 10);
+        }
+    }
+    unset($argument);
+}
+
+// Register the Composer autoloader...
+require __DIR__.'/vendor/autoload.php';
+
+// Bootstrap Laravel and handle the command...
+/** @var Application $app */
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+$status = $app->handleCommand(new ArgvInput);
+
+exit($status);
