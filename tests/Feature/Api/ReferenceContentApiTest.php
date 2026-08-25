@@ -56,7 +56,30 @@ class ReferenceContentApiTest extends TestCase
         $this->getJson('/api/sights/'.$sightId)->assertOk()->assertJsonPath('description', 'Temple of Dawn');
 
         $this->withHeaders($headers)->putJson('/admin/api/sights/'.$sightId, ['name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn'])
-            ->assertOk()->assertJsonPath('isPremium', false);
+            ->assertOk()->assertJsonMissingPath('isPremium');
+    }
+
+    public function test_country_returns_all_ordered_sights_without_premium_fields(): void
+    {
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
+        City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
+
+        foreach (['Arc de Triomphe', 'Eiffel Tower', 'Louvre Museum', 'Notre Dame'] as $name) {
+            $this->withHeaders($this->adminHeaders())->postJson('/admin/api/sights', [
+                'name' => $name,
+                'countryId' => 'FR',
+                'cityId' => '2988507',
+                'content' => $name,
+            ])->assertCreated();
+        }
+
+        $this->getJson('/api/countries/FR')
+            ->assertOk()
+            ->assertJsonCount(4, 'sights')
+            ->assertJsonPath('sights.0.name', 'Arc de Triomphe')
+            ->assertJsonPath('sights.3.name', 'Notre Dame')
+            ->assertJsonMissingPath('sights.0.isPremium')
+            ->assertJsonMissingPath('stats.premiumSights');
     }
 
     public function test_invalid_top_sight_save_returns_json_instead_of_an_html_error_page(): void

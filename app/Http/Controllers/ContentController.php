@@ -22,7 +22,6 @@ class ContentController extends Controller
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', $country->code)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
-        $visibleSights = $user?->plan === 'pro' ? $sights : $sights->take(3);
 
         return response()->json([
             'isEnriching' => false,
@@ -30,9 +29,12 @@ class ContentController extends Controller
             'featuredIn' => [],
             'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry]),
             'states' => $country->cities->pluck('subcountry')->filter()->unique()->sort()->values(),
-            'sights' => $visibleSights->values()->map(fn ($sight, $index) => [...$this->sightItem($sight, $index >= 3), 'completed' => $completed->contains($sight->id)]),
+            // Always return the ordered catalog so clients can render locked
+            // previews. Access to items after the first three is enforced by
+            // the app entitlement and by the individual sight endpoint.
+            'sights' => $sights->values()->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
-            'stats' => ['cities' => $visits->pluck('city_id')->unique()->count(), 'totalCities' => $cities->count(), 'sights' => $completed->intersect($sights->pluck('id'))->count(), 'totalSights' => $sights->count(), 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count(), 'premiumSights' => max(0, $sights->count() - 3)],
+            'stats' => ['cities' => $visits->pluck('city_id')->unique()->count(), 'totalCities' => $cities->count(), 'sights' => $completed->intersect($sights->pluck('id'))->count(), 'totalSights' => $sights->count(), 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count()],
             'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name])->values(),
         ]);
     }
@@ -101,7 +103,7 @@ class ContentController extends Controller
     {
         $sight = Sight::with(['country', 'city'])->findOrFail($id);
         $item = $this->sightItem($sight);
-        abort_if($item['isPremium'] && $request->user('sanctum')?->plan !== 'pro', 403, 'Kroo+ membership is required.');
+        abort_if($this->requiresKrooPlus($sight) && $request->user('sanctum')?->plan !== 'pro', 403, 'Kroo+ membership is required.');
 
         return response()->json($item);
     }
@@ -131,14 +133,21 @@ class ContentController extends Controller
     {
         return $request->user('sanctum')?->plan === 'pro'
             ? $sights
-            : $sights->filter(fn ($sight) => ! $this->sightItem($sight)['isPremium'])->values();
+            : $sights->filter(fn ($sight) => ! $this->requiresKrooPlus($sight))->values();
     }
 
-    public function sightItem(Sight $item, ?bool $premium = null): array
+    private function requiresKrooPlus(Sight $item): bool
     {
-        $premium ??= Sight::where('country_code', $item->country_code)->where('is_featured', true)->where(fn ($query) => $query->where('name', '<', $item->name)->orWhere(fn ($same) => $same->where('name', $item->name)->where('id', '<', $item->id)))->count() >= 3;
+        return Sight::where('country_code', $item->country_code)
+            ->where('is_featured', true)
+            ->where(fn ($query) => $query->where('name', '<', $item->name)
+                ->orWhere(fn ($same) => $same->where('name', $item->name)->where('id', '<', $item->id)))
+            ->count() >= 3;
+    }
 
-        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city?->geoname_id, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'isPremium' => $premium, 'displayOrder' => $item->display_order];
+    public function sightItem(Sight $item): array
+    {
+        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city?->geoname_id, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
     }
 
     public function collectionItem(CollectionKind $item): array
