@@ -59,23 +59,23 @@ class TravelStateApiTest extends TestCase
     {
         Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
         $city = City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
-        Sight::create(['id' => 'eiffel-tower', 'country_code' => 'FR', 'city_id' => $city->id, 'name' => 'Eiffel Tower', 'slug' => 'eiffel-tower']);
+        $sight = Sight::create(['country_code' => 'FR', 'city_id' => $city->id, 'name' => 'Eiffel Tower', 'slug' => 'eiffel-tower']);
         $kind = CollectionKind::create(['id' => 'icons', 'title' => 'World Icons', 'is_published' => true]);
         CollectionList::create(['id' => 'louvre', 'collectionkind_id' => $kind->id, 'title' => 'The Louvre', 'city_id' => $city->id]);
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
-        $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => true])->assertOk();
+        $this->putJson("/api/v1/me/completions/{$sight->id}", ['completed' => true])->assertOk();
         $this->putJson('/api/v1/me/completions/collection-icons-louvre', ['completed' => true])->assertOk();
 
         $visit = $user->visits()->firstOrFail();
         $this->assertSame('2988507', $visit->city->geoname_id);
-        $this->assertEqualsCanonicalizing(['eiffel-tower', 'collection-icons-louvre'], collect($visit->places)->pluck('id')->all());
+        $this->assertEqualsCanonicalizing([(string) $sight->id, 'collection-icons-louvre'], collect($visit->places)->pluck('id')->all());
         $this->assertDatabaseCount('visits', 1);
 
-        $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => false])->assertOk();
+        $this->putJson("/api/v1/me/completions/{$sight->id}", ['completed' => false])->assertOk();
         $this->assertSame(['collection-icons-louvre'], collect($visit->fresh()->places)->pluck('id')->all());
-        $this->assertDatabaseMissing('completions', ['user_id' => $user->id, 'sight_id' => 'eiffel-tower']);
+        $this->assertDatabaseMissing('completions', ['user_id' => $user->id, 'sight_id' => (string) $sight->id]);
     }
 
     public function test_cityless_collection_item_saves_without_creating_a_visit(): void

@@ -30,9 +30,9 @@ class AdminController extends Controller
 
     public function upload(Request $request, ImageStorage $images): JsonResponse
     {
-        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240']]);
+        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['sights', 'collection', 'daily-destinations'])]]);
 
-        return response()->json(['imageUrl' => $images->store($data['image'])], 201);
+        return response()->json(['imageUrl' => $images->store($data['image'], $data['folder'])], 201);
     }
 
     public function index(string $type): JsonResponse

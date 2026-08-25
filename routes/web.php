@@ -1,25 +1,17 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminPageController;
 use App\Http\Controllers\ContentController;
+use App\Http\Controllers\LegacyImageController;
+use App\Http\Controllers\WebsiteController;
 use App\Http\Middleware\RequireAdminKey;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    $html = file_get_contents(public_path('kroo-website.html'));
-    abort_if($html === false, 500, 'The Kroo website could not be loaded.');
-
-    return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
-});
-
-Route::get('/storage/images/{filename}', function (string $filename) {
-    abort_unless(preg_match('/^[A-Za-z0-9._-]+$/', $filename), 404);
-    $file = storage_path('app/public/images/'.$filename);
-    abort_unless(is_file($file), 404);
-
-    return response()->file($file);
-});
-Route::get('/admin', fn () => response(file_get_contents(base_path('reference/server/admin.html')))->header('Content-Type', 'text/html; charset=UTF-8'));
+Route::get('/', [WebsiteController::class, 'index'])->name('website.home');
+Route::get('/kroo-website', [WebsiteController::class, 'index'])->name('website.legacy');
+Route::get('/storage/images/{filename}', [LegacyImageController::class, 'show'])->name('images.legacy');
+Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
     Route::get('/meta', [AdminController::class, 'meta']);
     Route::post('/images', [AdminController::class, 'upload']);

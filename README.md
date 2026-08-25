@@ -16,7 +16,7 @@ cp .env.example .env
 composer install
 php artisan key:generate
 php artisan migrate
-php artisan cities:import reference/world-cities.csv --dataset-version=reference
+php artisan cities:import storage/app/imports/world-cities.csv --dataset-version=reference
 php artisan serve
 ```
 
@@ -34,7 +34,7 @@ Use `10.0.2.2` instead of `localhost` from the Android emulator.
 cp .env.example .env
 docker compose up -d --build
 docker compose exec app php artisan migrate --force
-docker compose exec app php artisan cities:import reference/world-cities.csv --dataset-version=reference
+docker compose exec app php artisan cities:import storage/app/imports/world-cities.csv --dataset-version=reference
 ```
 
 The PostgreSQL port is intentionally not published. Change all default passwords before deploying.
@@ -44,8 +44,8 @@ The PostgreSQL port is intentionally not published. Change all default passwords
 The CSV must remain under private storage, never `public/`. The importer validates the exact header, streams rows, normalizes search text, upserts in 750-row transactions, records its SHA-256 checksum and version, and skips an already imported checksum.
 
 ```bash
-php artisan cities:import reference/world-cities.csv --dataset-version=reference
-php artisan cities:import reference/world-cities.csv --dataset-version=reference --force
+php artisan cities:import storage/app/imports/world-cities.csv --dataset-version=reference
+php artisan cities:import storage/app/imports/world-cities.csv --dataset-version=reference --force
 ```
 
 `--prune` removes absent cities and is intentionally explicit. Back up PostgreSQL first. `--max-rejected=N` controls the rejected-row failure threshold (default `0`).

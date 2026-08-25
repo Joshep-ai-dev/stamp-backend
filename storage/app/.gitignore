@@ -1,4 +1,6 @@
 *
+!imports/
+!imports/world-cities.csv
 !private/
 !public/
 !.gitignore

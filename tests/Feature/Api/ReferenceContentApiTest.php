@@ -90,11 +90,11 @@ class ReferenceContentApiTest extends TestCase
 
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/meta')->assertOk()->assertJsonCount(1, 'cities');
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
-        $response = $this->withHeaders($this->adminHeaders())->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('place.png', $png)]);
+        $response = $this->withHeaders($this->adminHeaders())->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('place.png', $png), 'folder' => 'sights']);
         $response->assertCreated();
         $path = parse_url($response->json('imageUrl'), PHP_URL_PATH);
-        $this->assertStringStartsWith('/images/', $path);
-        $file = public_path('images/'.basename($path));
+        $this->assertStringStartsWith('/images/sights/', $path);
+        $file = public_path(ltrim($path, '/'));
         $this->assertFileExists($file);
         unlink($file);
     }
@@ -103,9 +103,9 @@ class ReferenceContentApiTest extends TestCase
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
         $headers = $this->adminHeaders();
-        $old = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('old.png', $png)])->assertCreated()->json('imageUrl');
+        $old = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('old.png', $png), 'folder' => 'collection'])->assertCreated()->json('imageUrl');
         $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['title' => 'Images', 'imageUrl' => $old])->assertCreated();
-        $new = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('new.png', $png)])->assertCreated()->json('imageUrl');
+        $new = $this->withHeaders($headers)->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('new.png', $png), 'folder' => 'collection'])->assertCreated()->json('imageUrl');
         $this->withHeaders($headers)->putJson('/admin/api/collections/'.$kind->json('id'), ['title' => 'Images', 'imageUrl' => $new])->assertOk();
         $this->assertFileDoesNotExist(public_path(ltrim($old, '/')));
         $this->assertFileExists(public_path(ltrim($new, '/')));
@@ -113,6 +113,7 @@ class ReferenceContentApiTest extends TestCase
         Sanctum::actingAs(User::factory()->create());
         $first = $this->post('/api/v1/profile/image', ['image' => UploadedFile::fake()->createWithContent('user-old.png', $png)])->assertCreated()->json('photoUri');
         $second = $this->post('/api/v1/profile/image', ['image' => UploadedFile::fake()->createWithContent('user-new.png', $png)])->assertCreated()->json('photoUri');
+        $this->assertStringStartsWith('/images/users/', $second);
         $this->assertFileDoesNotExist(public_path(ltrim($first, '/')));
         $this->assertFileExists(public_path(ltrim($second, '/')));
 

@@ -12,7 +12,7 @@ class ReferenceContentSeeder extends Seeder
 {
     public function run(CatalogLocationResolver $locations): void
     {
-        $file = base_path('reference/server/db.json');
+        $file = database_path('data/reference-content.json');
         if (! is_file($file)) {
             return;
         }
