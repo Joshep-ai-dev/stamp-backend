@@ -86,6 +86,22 @@
       margin-bottom: 24px
     }
 
+    .summarybar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .summarybar select {
+      min-width: 220px;
+      padding: 7px 34px 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      color: var(--ink)
+    }
+
     h1 {
       font: 700 30px Georgia;
       margin: 0
@@ -362,7 +378,7 @@
     </div>
   </div>
   <script>
-    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'sights', rows: [], meta: { countries: [], collectionKinds: [] }, cities: {}, edit: null };
+    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'sights', rows: [], meta: { countries: [], collectionKinds: [] }, cities: {}, filters: { sights: '', 'collection-lists': '' }, edit: null };
     const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), fields = document.querySelector('#fields');
     const cropModal = document.querySelector('#cropModal'), cropCanvas = document.querySelector('#cropCanvas'), cropRatio = document.querySelector('#cropRatio'), cropZoom = document.querySelector('#cropZoom'), cropCtx = cropCanvas.getContext('2d');
     const croppedFiles = new WeakMap(); let crop = { input: null, image: null, url: '', x: 0, y: 0, dragging: false, px: 0, py: 0 };
@@ -377,7 +393,8 @@
     function logout() { sessionStorage.removeItem('stampoAdminKey'); location.reload() }
     async function load() { try { state.rows = await call(`/admin/api/${state.tab}`); render(); note('') } catch (e) { note(e.message, true) } }
     function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
-    function render() { const names = { 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Daily destinations' }; title.textContent = names[state.tab]; summary.textContent = `${state.rows.length} records`; const cols = state.tab === 'sights' ? ['image', 'name', 'country', 'city', 'access'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'city', 'publishDate', 'access']; table.innerHTML = `<table><thead><tr>${cols.map(x => `<th>${esc(x)}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${state.rows.map((r, i) => `<tr>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button><button class="danger" onclick="removeRow(${i})">Delete</button></div></td></tr>`).join('')}</tbody></table>` }
+    function render() { const names = { 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Daily destinations' }; title.textContent = names[state.tab]; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'sights' ? !filter || row.countryCode === filter : state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; summary.innerHTML = `<div class="summarybar"><span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}</div>`; const cols = state.tab === 'sights' ? ['image', 'name', 'country', 'city', 'access'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'city', 'publishDate', 'access']; table.innerHTML = `<table><thead><tr>${cols.map(x => `<th>${esc(x)}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }) => `<tr>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button><button class="danger" onclick="removeRow(${i})">Delete</button></div></td></tr>`).join('')}</tbody></table>` }
+    function setTableFilter(value) { state.filters[state.tab] = value; render() }
     function cell(r, c) { if (c === 'image' || c === 'imageUrl') { const u = r.image || r.imageUrl; return `<td>${u ? `<img src="${esc(u)}" alt="">` : '—'}</td>` } if (c === 'access') return `<td><span class="badge">${r.access === 'pro' || r.isPremium ? 'Kroo+ locked' : 'Unlocked'}</span></td>`; return `<td>${esc(r[c] || '—')}</td>` }
     function note(message, bad = false) { notice.innerHTML = message ? `<div class="notice ${bad ? 'error' : ''}">${esc(message)}</div>` : '' }
     function fieldHtml(f, row) { const [key, label, type, wide] = f; let value = row?.[key]; if (key === 'image') value = row?.image || row?.imageUrl; if (key === 'content') value = row?.content || row?.description; if (key === 'unlocked') value = row ? row.isPremium !== true : true; if (key === 'options' && Array.isArray(value)) value = value.join('\n'); const cls = `field ${wide ? 'wide' : ''}`; if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`; if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" required onchange="renderCities()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" required><option value="">Select a country first…</option></select></label>`; if (type === 'kind') return `<label class="${cls}">${label}<select name="${key}" required><option value="">Select…</option>${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>`; if (type === 'access') return `<label class="${cls}">${label}<select name="${key}" required><option value="free" ${value !== 'pro' ? 'selected' : ''}>Free</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+</option></select></label>`; if (type === 'image') return `<label class="${cls}">${label}${value ? `<img src="${esc(value)}" alt="" style="width:120px;height:80px;object-fit:cover;margin:6px 0;border-radius:8px">` : ''}<input name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="openCrop(this)"><small>JPG, PNG, WebP or GIF; maximum 10 MB. Images can be cropped before upload.</small></label>`; if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${f[3] ? 'required' : ''}>${esc(value || '')}</textarea></label>`; return `<label class="${cls}">${label}<input name="${key}" type="${type}" value="${esc(value ?? '')}" ${f[3] ? 'required' : ''} ${key === 'id' && row ? 'disabled' : ''}></label>` }

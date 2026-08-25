@@ -31,6 +31,9 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('id="cropCanvas"', $admin);
         $this->assertStringContainsString('function applyCrop()', $admin);
         $this->assertStringContainsString('croppedFiles.get(el)', $admin);
+        $this->assertStringContainsString('function setTableFilter(value)', $admin);
+        $this->assertStringContainsString("row.collectionKindId === filter", $admin);
+        $this->assertStringContainsString("row.countryCode === filter", $admin);
     }
 
     public function test_uploaded_public_images_can_be_served_through_laravel(): void

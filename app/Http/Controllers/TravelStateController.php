@@ -89,16 +89,20 @@ class TravelStateController extends Controller
 
     private function completionPlace(string $targetId): array
     {
-        $sight = Sight::with('city.country')->find($targetId);
-        if ($sight) {
-            return [$sight->city, ['id' => $targetId, 'name' => $sight->name, 'type' => 'sight']];
+        if (! str_starts_with($targetId, 'collection-')) {
+            $sight = Sight::with('city.country')->find($targetId);
+            if ($sight) {
+                return [$sight->city, ['id' => $targetId, 'name' => $sight->name, 'type' => 'sight']];
+            }
         }
 
         $list = CollectionList::with(['kind', 'city.country'])->get()->first(
             fn ($item) => "collection-{$item->collectionkind_id}-{$item->id}" === $targetId
         );
 
-        return [$list?->city, ['id' => $targetId, 'name' => $list?->title ?? $targetId, 'type' => 'sight']];
+        $city = $list?->collectionkind_id === 'seas' ? null : $list?->city;
+
+        return [$city, ['id' => $targetId, 'name' => $list?->title ?? $targetId, 'type' => 'sight']];
     }
 
     public function wishlist(Request $request, string $targetId): JsonResponse

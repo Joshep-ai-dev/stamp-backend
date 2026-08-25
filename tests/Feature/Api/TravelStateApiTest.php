@@ -80,8 +80,10 @@ class TravelStateApiTest extends TestCase
 
     public function test_cityless_collection_item_saves_without_creating_a_visit(): void
     {
+        Country::create(['code' => 'NO', 'name' => 'Norway', 'normalized_name' => 'norway', 'continent_code' => 'EU']);
+        $city = City::create(['geoname_id' => '3133895', 'name' => 'Tromsø', 'normalized_name' => 'tromso', 'country_code' => 'NO']);
         $kind = CollectionKind::create(['id' => 'seas', 'title' => 'Seven Seas', 'is_published' => true]);
-        CollectionList::create(['id' => 'arctic-ocean', 'collectionkind_id' => $kind->id, 'title' => 'Arctic Ocean', 'city_id' => null]);
+        CollectionList::create(['id' => 'arctic-ocean', 'collectionkind_id' => $kind->id, 'title' => 'Arctic Ocean', 'city_id' => $city->id]);
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
