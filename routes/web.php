@@ -14,10 +14,6 @@ Route::get('/images/{folder}/{filename}', [LegacyImageController::class, 'public
     ->where('folder', 'sights|users|collection|daily-destinations')
     ->where('filename', '[A-Za-z0-9._-]+')
     ->name('images.public');
-Route::get('/media/{folder}/{filename}', [LegacyImageController::class, 'public'])
-    ->where('folder', 'sights|users|collection|daily-destinations')
-    ->where('filename', '[A-Za-z0-9._-]+')
-    ->name('media.public');
 Route::get('/storage/images/{filename}', [LegacyImageController::class, 'show'])->name('images.legacy');
 Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {

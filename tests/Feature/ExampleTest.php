@@ -43,7 +43,6 @@ class ExampleTest extends TestCase
         try {
             $response = $this->get('/images/collection/route-test.png')->assertOk();
             $this->assertStringContainsString('max-age=31536000', (string) $response->headers->get('cache-control'));
-            $this->get('/media/collection/route-test.png')->assertOk();
         } finally {
             File::delete($file);
         }
