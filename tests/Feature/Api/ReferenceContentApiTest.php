@@ -88,7 +88,8 @@ class ReferenceContentApiTest extends TestCase
         City::create(['geoname_id' => '1', 'name' => 'Springfield', 'normalized_name' => 'springfield', 'country_code' => 'US', 'subcountry' => 'Illinois']);
         City::create(['geoname_id' => '2', 'name' => 'Springfield', 'normalized_name' => 'springfield', 'country_code' => 'US', 'subcountry' => 'Missouri']);
 
-        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/meta')->assertOk()->assertJsonCount(1, 'cities');
+        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/meta')->assertOk()->assertJsonMissingPath('cities');
+        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US')->assertOk()->assertJsonCount(1);
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
         $response = $this->withHeaders($this->adminHeaders())->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('place.png', $png), 'folder' => 'sights']);
         $response->assertCreated();

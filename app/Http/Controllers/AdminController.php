@@ -21,11 +21,28 @@ class AdminController extends Controller
 {
     public function meta(): JsonResponse
     {
-        $cities = City::orderBy('country_code')->orderBy('name')->get()
-            ->unique(fn (City $city) => $city->country_code.':'.$city->normalized_name)
-            ->values();
+        return response()->json([
+            'countries' => Country::orderBy('name')->get(['code', 'name'])->map(fn ($x) => ['id' => $x->code, 'code' => $x->code, 'name' => $x->name]),
+            'collectionKinds' => CollectionKind::orderBy('title')->get(['id', 'title']),
+        ]);
+    }
 
-        return response()->json(['countries' => Country::orderBy('name')->get()->map(fn ($x) => ['id' => $x->code, 'code' => $x->code, 'name' => $x->name]), 'cities' => $cities->map(fn ($x) => ['id' => $x->geoname_id, 'countryId' => $x->country_code, 'name' => $x->name, 'subcountry' => $x->subcountry]), 'collectionKinds' => CollectionKind::orderBy('title')->get(['id', 'title'])]);
+    public function cities(Request $request): JsonResponse
+    {
+        $country = $request->validate(['country' => ['required', 'string', 'size:2']])['country'];
+        $cities = City::where('country_code', strtoupper($country))
+            ->orderBy('name')
+            ->get(['geoname_id', 'country_code', 'name', 'normalized_name', 'subcountry'])
+            ->unique('normalized_name')
+            ->values()
+            ->map(fn (City $city) => [
+                'id' => $city->geoname_id,
+                'countryId' => $city->country_code,
+                'name' => $city->name,
+                'subcountry' => $city->subcountry,
+            ]);
+
+        return response()->json($cities);
     }
 
     public function upload(Request $request, ImageStorage $images): JsonResponse

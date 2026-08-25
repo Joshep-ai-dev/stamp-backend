@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -30,5 +31,21 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('id="cropCanvas"', $admin);
         $this->assertStringContainsString('function applyCrop()', $admin);
         $this->assertStringContainsString('croppedFiles.get(el)', $admin);
+    }
+
+    public function test_uploaded_public_images_can_be_served_through_laravel(): void
+    {
+        $directory = public_path('images/collection');
+        File::ensureDirectoryExists($directory);
+        $file = $directory.'/route-test.png';
+        File::put($file, 'image-content');
+
+        try {
+            $response = $this->get('/images/collection/route-test.png')->assertOk();
+            $this->assertStringContainsString('max-age=31536000', (string) $response->headers->get('cache-control'));
+            $this->get('/media/collection/route-test.png')->assertOk();
+        } finally {
+            File::delete($file);
+        }
     }
 }

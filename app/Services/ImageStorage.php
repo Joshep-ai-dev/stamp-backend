@@ -23,6 +23,9 @@ class ImageStorage
     public function delete(?string $url): void
     {
         $path = rawurldecode((string) (parse_url((string) $url, PHP_URL_PATH) ?? ''));
+        if (str_starts_with($path, '/media/')) {
+            $path = '/images/'.substr($path, strlen('/media/'));
+        }
         if (! str_starts_with($path, '/images/') || str_contains($path, '..')) {
             return;
         }
