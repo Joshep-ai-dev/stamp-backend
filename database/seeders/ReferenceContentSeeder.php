@@ -20,12 +20,12 @@ class ReferenceContentSeeder extends Seeder
         foreach ($data['managedCollections'] ?? [] as $item) {
             $kind = CollectionKind::updateOrCreate(['id' => $item['id']], [
                 'title' => $item['title'], 'detail' => $item['detail'] ?? $item['description'] ?? '',
-                'image' => $item['imageUrl'] ?? '', 'is_published' => $item['isPublished'] ?? true,
+                'image' => $item['imageUrl'] ?? '', 'access' => ($item['isPremium'] ?? false) ? 'pro' : 'free', 'is_published' => $item['isPublished'] ?? true,
                 'display_order' => $item['displayOrder'] ?? 0,
             ]);
             foreach ($item['places'] ?? [] as $order => $place) {
                 $city = $locations->find((string) ($place['country'] ?? ''), (string) ($place['city'] ?? ''));
-                CollectionList::updateOrCreate(['id' => $place['id']], ['collectionkind_id' => $kind->id, 'image' => $place['imageUrl'] ?? '', 'title' => $place['name'] ?? $place['title'], 'city_id' => $city?->id, 'location' => collect([$city?->name ?? ($place['city'] ?? null), $city?->country?->name ?? ($place['country'] ?? null)])->filter()->join(', '), 'detail' => $place['content'] ?? $place['detail'] ?? '', 'access' => ($place['isPremium'] ?? false) ? 'pro' : 'free', 'display_order' => $order]);
+                CollectionList::updateOrCreate(['id' => $place['id']], ['collectionkind_id' => $kind->id, 'image' => $place['imageUrl'] ?? '', 'title' => $place['name'] ?? $place['title'], 'city_id' => $city?->id, 'location' => collect([$city?->name ?? ($place['city'] ?? null), $city?->country?->name ?? ($place['country'] ?? null)])->filter()->join(', '), 'detail' => $place['content'] ?? $place['detail'] ?? '', 'display_order' => $order]);
             }
         }
         foreach ($data['dailyDestinations'] ?? [] as $item) {

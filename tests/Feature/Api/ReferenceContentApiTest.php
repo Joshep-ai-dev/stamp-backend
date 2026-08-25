@@ -55,8 +55,8 @@ class ReferenceContentApiTest extends TestCase
         $this->assertIsInt($sightId);
         $this->getJson('/api/sights/'.$sightId)->assertOk()->assertJsonPath('description', 'Temple of Dawn');
 
-        $this->withHeaders($headers)->putJson('/admin/api/sights/'.$sightId, ['name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn', 'access' => 'pro'])
-            ->assertOk()->assertJsonPath('access', 'pro')->assertJsonPath('isPremium', true);
+        $this->withHeaders($headers)->putJson('/admin/api/sights/'.$sightId, ['name' => 'Wat Arun', 'countryId' => 'TH', 'cityId' => '1609350', 'content' => 'Temple of Dawn'])
+            ->assertOk()->assertJsonPath('isPremium', false);
     }
 
     public function test_invalid_top_sight_save_returns_json_instead_of_an_html_error_page(): void
@@ -73,10 +73,12 @@ class ReferenceContentApiTest extends TestCase
         City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
         $headers = $this->adminHeaders();
 
-        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'paris-icons', 'title' => 'Paris Icons', 'detail' => 'Essential Paris locations'])
-            ->assertCreated()->assertJsonPath('title', 'Paris Icons');
-        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', ['collectionKindId' => $kind->json('id'), 'title' => 'The Louvre', 'cityId' => '2988507', 'detail' => 'Museum', 'access' => 'free'])
+        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'paris-icons', 'title' => 'Paris Icons', 'detail' => 'Essential Paris locations', 'access' => 'pro'])
+            ->assertCreated()->assertJsonPath('title', 'Paris Icons')->assertJsonPath('access', 'pro');
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', ['collectionKindId' => $kind->json('id'), 'title' => 'The Louvre', 'cityId' => '2988507', 'detail' => 'Museum'])
             ->assertCreated()->assertJsonPath('location', 'Paris, France')->assertJsonPath('collectionKindId', 'paris-icons');
+        $this->getJson('/api/collections/paris-icons')->assertForbidden();
+        Sanctum::actingAs(User::factory()->create(['plan' => 'pro']));
         $this->getJson('/api/collections/paris-icons')->assertOk()->assertJsonPath('places.0.city', 'Paris')->assertJsonPath('places.0.countryId', 'FR');
         $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['name' => 'The Louvre', 'countryId' => 'FR', 'cityId' => '2988507', 'content' => 'Museum lesson', 'question' => 'Where is it?', 'options' => ['Paris', 'Rome'], 'correctAnswer' => 0])
             ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('city', 'Paris')->assertJsonPath('cityId', '2988507');
@@ -90,6 +92,9 @@ class ReferenceContentApiTest extends TestCase
 
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/meta')->assertOk()->assertJsonMissingPath('cities');
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US')->assertOk()->assertJsonCount(1);
+        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/states?country=US')->assertOk()->assertJsonCount(2);
+        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US&state=Illinois')->assertOk()->assertJsonCount(1)->assertJsonPath('0.subcountry', 'Illinois');
+        $this->getJson('/api/v1/catalog/countries/US/states/Illinois')->assertOk()->assertJsonPath('name', 'Illinois');
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
         $response = $this->withHeaders($this->adminHeaders())->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('place.png', $png), 'folder' => 'sights']);
         $response->assertCreated();

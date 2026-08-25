@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['id', 'image', 'title', 'detail', 'is_published', 'display_order'])]
+#[Fillable(['id', 'image', 'title', 'detail', 'access', 'is_published', 'display_order'])]
 class CollectionKind extends Model
 {
     protected $table = 'collectionkind';
@@ -22,6 +22,6 @@ class CollectionKind extends Model
 
     public function lists(): HasMany
     {
-        return $this->hasMany(CollectionList::class, 'collectionkind_id')->orderBy('display_order');
+        return $this->hasMany(CollectionList::class, 'collectionkind_id')->orderBy('title');
     }
 }

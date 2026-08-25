@@ -127,7 +127,7 @@ class TravelStateController extends Controller
 
     private function collectionItems($progress): array
     {
-        $managed = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('display_order')->get();
+        $managed = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('title')->get();
         $legacy = collect(CollectionCatalog::ITEMS)
             ->except($managed->pluck('id'))
             ->map(fn ($definition, $id) => $this->collection($id, $progress->firstWhere('collection_id', $id)));
@@ -139,7 +139,7 @@ class TravelStateController extends Controller
     {
         $value = $progress?->progress ?? 0;
         $legacy = CollectionCatalog::ITEMS[$id] ?? [];
-        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->image, 'places' => $definition?->lists?->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access]) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->image, 'access' => $definition?->access ?? 'free', 'isPremium' => ($definition?->access ?? 'free') === 'pro', 'places' => $definition?->lists?->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail]) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }

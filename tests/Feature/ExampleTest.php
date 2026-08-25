@@ -23,17 +23,18 @@ class ExampleTest extends TestCase
         $this->get('/kroo-website')->assertStatus(200);
     }
 
-    public function test_admin_includes_image_crop_controls(): void
+    public function test_admin_normalizes_images_and_includes_location_filters(): void
     {
         $this->get('/admin')->assertStatus(200);
         $admin = file_get_contents(resource_path('views/admin/index.php'));
 
-        $this->assertStringContainsString('id="cropCanvas"', $admin);
-        $this->assertStringContainsString('function applyCrop()', $admin);
-        $this->assertStringContainsString('croppedFiles.get(el)', $admin);
+        $this->assertStringNotContainsString('id="cropCanvas"', $admin);
+        $this->assertStringContainsString('async function normalizeImage(input)', $admin);
+        $this->assertStringContainsString('canvas.width = 1200', $admin);
+        $this->assertStringContainsString('async function renderStates()', $admin);
         $this->assertStringContainsString('function setTableFilter(value)', $admin);
-        $this->assertStringContainsString("row.collectionKindId === filter", $admin);
-        $this->assertStringContainsString("row.countryCode === filter", $admin);
+        $this->assertStringContainsString('row.collectionKindId === filter', $admin);
+        $this->assertStringContainsString('row.countryCode === filter', $admin);
     }
 
     public function test_uploaded_public_images_can_be_served_through_laravel(): void

@@ -29,8 +29,10 @@ class AdminController extends Controller
 
     public function cities(Request $request): JsonResponse
     {
-        $country = $request->validate(['country' => ['required', 'string', 'size:2']])['country'];
+        $data = $request->validate(['country' => ['required', 'string', 'size:2'], 'state' => ['nullable', 'string', 'max:150']]);
+        $country = $data['country'];
         $cities = City::where('country_code', strtoupper($country))
+            ->when($data['state'] ?? null, fn ($query, $state) => $query->where('subcountry', $state))
             ->orderBy('name')
             ->get(['geoname_id', 'country_code', 'name', 'normalized_name', 'subcountry'])
             ->unique('normalized_name')
@@ -45,6 +47,15 @@ class AdminController extends Controller
         return response()->json($cities);
     }
 
+    public function states(Request $request): JsonResponse
+    {
+        $country = $request->validate(['country' => ['required', 'string', 'size:2']])['country'];
+
+        return response()->json(City::where('country_code', strtoupper($country))
+            ->whereNotNull('subcountry')->where('subcountry', '!=', '')
+            ->distinct()->orderBy('subcountry')->pluck('subcountry')->values());
+    }
+
     public function upload(Request $request, ImageStorage $images): JsonResponse
     {
         $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['sights', 'collection', 'daily-destinations'])]]);
@@ -55,10 +66,10 @@ class AdminController extends Controller
     public function index(string $type): JsonResponse
     {
         return response()->json(match ($type) {
-            'sights' => Sight::with(['country', 'city'])->orderBy('display_order')->get()->map(fn ($x) => $this->adminSight($x)),
-            'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('display_order')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
-            'collection-lists' => CollectionList::with(['kind', 'city.country'])->orderBy('display_order')->get()->map(fn ($x) => $this->collectionList($x)),
-            'daily-destinations' => DailyDestination::orderBy('display_order')->get()->map(fn ($x) => (new ContentController)->daily($x)),
+            'sights' => Sight::with(['country', 'city'])->orderBy('name')->get()->map(fn ($x) => $this->adminSight($x)),
+            'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
+            'collection-lists' => CollectionList::with(['kind', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
+            'daily-destinations' => DailyDestination::orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
             default => abort(404),
         });
     }
@@ -92,25 +103,27 @@ class AdminController extends Controller
     {
         $oldImage = $this->modelImage($model);
         if ($type === 'sights') {
-            $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'displayOrder' => ['nullable', 'integer'], 'isFeatured' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])], 'unlocked' => ['sometimes', 'boolean']]);
+            $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'isFeatured' => ['boolean']]);
             $city = City::where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
-            $premium = isset($data['access']) ? $data['access'] === 'pro' : ! ($data['unlocked'] ?? true);
-            $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => $data['displayOrder'] ?? 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => $premium];
+            abort_if(($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
+            $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => false];
             $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'displayOrder' => ['integer'], 'isPublished' => ['boolean']]);
-            $values = ['title' => $data['title'], 'detail' => $data['detail'] ?? '', 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'display_order' => $data['displayOrder'] ?? 0, 'is_published' => $data['isPublished'] ?? true];
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'access' => ['sometimes', Rule::in(['free', 'pro'])], 'isPublished' => ['boolean']]);
+            $values = ['title' => $data['title'], 'detail' => $data['detail'] ?? '', 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
             $model ??= new CollectionKind(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'collection-lists') {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionlist')->ignore($model)], 'collectionKindId' => ['required', 'exists:collectionkind,id'], 'title' => ['required', 'string'], 'imageUrl' => ['nullable', 'string'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'detail' => ['nullable', 'string'], 'access' => ['required', Rule::in(['free', 'pro'])], 'displayOrder' => ['integer']]);
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionlist')->ignore($model)], 'collectionKindId' => ['required', 'exists:collectionkind,id'], 'title' => ['required', 'string'], 'imageUrl' => ['nullable', 'string'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'detail' => ['nullable', 'string']]);
             $city = City::with('country')->where('geoname_id', $data['cityId'])->firstOrFail();
-            $values = ['collectionkind_id' => $data['collectionKindId'], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city->id, 'location' => $city->name.', '.$city->country->name, 'detail' => $data['detail'] ?? '', 'access' => $data['access'], 'display_order' => $data['displayOrder'] ?? 0];
+            abort_if(($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
+            $values = ['collectionkind_id' => $data['collectionKindId'], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city->id, 'location' => collect([$city->name, $city->subcountry, $city->country->name])->filter()->join(', '), 'detail' => $data['detail'] ?? '', 'display_order' => 0];
             $model ??= new CollectionList(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'daily-destinations') {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('daily_destinations')->ignore($model)], 'name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'imageUrl' => ['nullable', 'string'], 'icon' => ['nullable', 'string'], 'content' => ['required', 'string'], 'question' => ['required', 'string'], 'options' => ['required', 'array', 'min:2'], 'correctAnswer' => ['required', 'integer', 'min:0'], 'publishDate' => ['nullable', 'date_format:Y-m-d'], 'displayOrder' => ['integer'], 'isPublished' => ['boolean'], 'unlocked' => ['boolean']]);
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('daily_destinations')->ignore($model)], 'name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'imageUrl' => ['nullable', 'string'], 'icon' => ['nullable', 'string'], 'content' => ['required', 'string'], 'question' => ['required', 'string'], 'options' => ['required', 'array', 'min:2'], 'correctAnswer' => ['required', 'integer', 'min:0'], 'publishDate' => ['nullable', 'date_format:Y-m-d'], 'isPublished' => ['boolean']]);
             $city = City::with('country')->where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
+            abort_if(($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
             abort_if($data['correctAnswer'] >= count($data['options']), 422, 'Correct answer index is invalid.');
-            $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => $data['displayOrder'] ?? 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => ! ($data['unlocked'] ?? true)];
+            $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
             $model ??= new DailyDestination(['id' => $data['id'] ?? (string) Str::uuid()]);
         } else {
             abort(404);
@@ -140,12 +153,12 @@ class AdminController extends Controller
 
     private function adminSight(Sight $x): array
     {
-        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'city' => $x->city?->name, 'access' => $x->is_premium ? 'pro' : 'free', 'unlocked' => ! $x->is_premium];
+        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'state' => $x->city?->subcountry, 'city' => $x->city?->name];
     }
 
     private function collectionList(CollectionList $item): array
     {
-        return ['id' => $item->id, 'collectionKindId' => $item->collectionkind_id, 'collectionKind' => $item->kind?->title, 'imageUrl' => ImageUrl::public($item->image), 'title' => $item->title, 'cityId' => $item->city?->geoname_id, 'countryId' => $item->city?->country_code, 'location' => $item->location, 'detail' => $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'collectionKindId' => $item->collectionkind_id, 'collectionKind' => $item->kind?->title, 'imageUrl' => ImageUrl::public($item->image), 'title' => $item->title, 'cityId' => $item->city?->geoname_id, 'countryId' => $item->city?->country_code, 'state' => $item->city?->subcountry, 'location' => $item->location, 'detail' => $item->detail, 'displayOrder' => $item->display_order];
     }
 
     private function modelImage(?Model $model): ?string
