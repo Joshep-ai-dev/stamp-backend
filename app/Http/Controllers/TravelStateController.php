@@ -139,7 +139,7 @@ class TravelStateController extends Controller
     {
         $value = $progress?->progress ?? 0;
         $legacy = CollectionCatalog::ITEMS[$id] ?? [];
-        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->image, 'access' => $definition?->access ?? 'free', 'isPremium' => ($definition?->access ?? 'free') === 'pro', 'places' => $definition?->lists?->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail]) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->image, 'places' => $definition?->lists?->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }

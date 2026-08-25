@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['id', 'collectionkind_id', 'image', 'title', 'city_id', 'location', 'detail', 'display_order'])]
+#[Fillable(['id', 'collectionkind_id', 'image', 'title', 'city_id', 'location', 'detail', 'access', 'display_order'])]
 class CollectionList extends Model
 {
     protected $table = 'collectionlist';

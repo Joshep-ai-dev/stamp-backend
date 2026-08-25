@@ -93,7 +93,6 @@ class ContentController extends Controller
     public function collection(Request $request, string $id): JsonResponse
     {
         $item = CollectionKind::with('lists.city.country')->where('is_published', true)->findOrFail($id);
-        abort_if($item->access === 'pro' && $request->user('sanctum')?->plan !== 'pro', 403, 'Kroo+ membership is required.');
 
         return response()->json($this->collectionItem($item));
     }
@@ -146,7 +145,7 @@ class ContentController extends Controller
     {
         $item->loadMissing('lists.city.country');
 
-        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->image), 'access' => $item->access, 'isPremium' => $item->access === 'pro', 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail]), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->image), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 
     public function daily(DailyDestination $item): array

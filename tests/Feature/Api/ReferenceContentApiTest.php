@@ -73,13 +73,14 @@ class ReferenceContentApiTest extends TestCase
         City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
         $headers = $this->adminHeaders();
 
-        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'paris-icons', 'title' => 'Paris Icons', 'detail' => 'Essential Paris locations', 'access' => 'pro'])
-            ->assertCreated()->assertJsonPath('title', 'Paris Icons')->assertJsonPath('access', 'pro');
-        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', ['collectionKindId' => $kind->json('id'), 'title' => 'The Louvre', 'cityId' => '2988507', 'detail' => 'Museum'])
-            ->assertCreated()->assertJsonPath('location', 'Paris, France')->assertJsonPath('collectionKindId', 'paris-icons');
-        $this->getJson('/api/collections/paris-icons')->assertForbidden();
-        Sanctum::actingAs(User::factory()->create(['plan' => 'pro']));
-        $this->getJson('/api/collections/paris-icons')->assertOk()->assertJsonPath('places.0.city', 'Paris')->assertJsonPath('places.0.countryId', 'FR');
+        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'paris-icons', 'title' => 'Paris Icons', 'detail' => 'Essential Paris locations'])
+            ->assertCreated()->assertJsonPath('title', 'Paris Icons')->assertJsonMissingPath('access');
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', ['collectionKindId' => $kind->json('id'), 'title' => 'The Louvre', 'cityId' => '2988507', 'detail' => 'Museum', 'access' => 'pro'])
+            ->assertCreated()->assertJsonPath('location', 'Paris, France')->assertJsonPath('collectionKindId', 'paris-icons')->assertJsonPath('access', 'pro');
+        $this->getJson('/api/collections/paris-icons')->assertOk()
+            ->assertJsonMissingPath('access')->assertJsonPath('places.0.city', 'Paris')
+            ->assertJsonPath('places.0.countryId', 'FR')->assertJsonPath('places.0.access', 'pro')
+            ->assertJsonPath('places.0.isPremium', true);
         $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['name' => 'The Louvre', 'countryId' => 'FR', 'cityId' => '2988507', 'content' => 'Museum lesson', 'question' => 'Where is it?', 'options' => ['Paris', 'Rome'], 'correctAnswer' => 0])
             ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('city', 'Paris')->assertJsonPath('cityId', '2988507');
     }
