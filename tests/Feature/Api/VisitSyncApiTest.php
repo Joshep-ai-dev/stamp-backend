@@ -17,15 +17,16 @@ class VisitSyncApiTest extends TestCase
         $user = User::factory()->create();
         Country::create(['code' => 'MY', 'name' => 'Malaysia', 'normalized_name' => 'malaysia', 'continent_code' => 'AS', 'flag' => '🇲🇾']);
         $city = City::create(['geoname_id' => '1734934', 'name' => 'Cameron Highlands', 'normalized_name' => 'cameron highlands', 'country_code' => 'MY', 'subcountry' => 'Pahang', 'normalized_subcountry' => 'pahang']);
+        $user->visits()->create(['city_id' => $city->id, 'city_name' => $city->name, 'country' => 'Malaysia', 'country_code' => 'MY', 'continent_code' => 'AS', 'subcountry' => 'Pahang', 'visited_at' => '2026-08-25', 'places' => [['id' => 'kul', 'name' => 'KUL Airport', 'type' => 'airport']]]);
         $payload = ['visits' => [[
             'cityId' => $city->geoname_id,
             'visitedAt' => '2026-08-26',
             'note' => 'Saved offline',
-            'places' => [],
+            'places' => [['id' => 'tea', 'name' => 'Tea Plantation', 'type' => 'sight']],
         ]]];
 
         $this->actingAs($user)->postJson('/api/v1/me/sync/visits', $payload)
-            ->assertOk()->assertJsonCount(1);
+            ->assertOk()->assertJsonCount(1)->assertJsonCount(2, '0.places');
         $this->actingAs($user)->postJson('/api/v1/me/sync/visits', $payload)
             ->assertOk()->assertJsonCount(1);
         $this->assertDatabaseCount('visits', 1);

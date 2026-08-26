@@ -50,19 +50,24 @@ class VisitController extends Controller
                 if (! $city) {
                     continue;
                 }
-                $request->user()->visits()->updateOrCreate(
-                    ['city_id' => $city->id],
-                    [
+                $existing = $request->user()->visits()->where('city_id', $city->id)->lockForUpdate()->first();
+                $localPlaces = collect($item['places'] ?? []);
+                $places = collect($existing?->places ?? [])->merge($localPlaces)
+                    ->unique(fn ($place) => ($place['type'] ?? '').':'.(($place['id'] ?? null) ?: mb_strtolower($place['name'] ?? '')))
+                    ->values()->all();
+                $values = [
                         'city_name' => $city->name,
                         'country' => $city->country->name,
                         'country_code' => $city->country_code,
                         'continent_code' => $city->country->continent_code,
                         'subcountry' => $city->subcountry,
-                        'visited_at' => $item['visitedAt'],
-                        'note' => $item['note'] ?? null,
-                        'places' => $item['places'] ?? [],
-                    ],
-                );
+                        'visited_at' => $existing && $existing->visited_at->format('Y-m-d') < $item['visitedAt']
+                            ? $existing->visited_at->format('Y-m-d') : $item['visitedAt'],
+                        'note' => ($item['note'] ?? null) ?: $existing?->note,
+                        'places' => $places,
+                    ];
+                if ($existing) $existing->update($values);
+                else $request->user()->visits()->create(['city_id' => $city->id, ...$values]);
             }
         });
 
