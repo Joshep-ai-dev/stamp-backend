@@ -25,14 +25,16 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
         Route::apiResource('visits', VisitController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::post('/me/sync/visits', [VisitController::class, 'sync']);
         Route::get('/me/travel-state', [TravelStateController::class, 'show']);
+        Route::post('/me/sync/travel-state', [TravelStateController::class, 'sync']);
         Route::get('/me/home', [HomeController::class, 'show']);
         Route::put('/me/completions/{sightId}', [TravelStateController::class, 'completion']);
         Route::put('/me/wishlist/{targetId}', [TravelStateController::class, 'wishlist']);
         Route::put('/me/plan', [TravelStateController::class, 'plan']);
         Route::get('/collections', [TravelStateController::class, 'collections']);
         Route::put('/me/collections/{collectionId}', [TravelStateController::class, 'updateCollection']);
-        Route::get('/community/leaderboard', [CommunityController::class, 'leaderboard']);
+        Route::get('/me/community/leaderboard', [CommunityController::class, 'leaderboard']);
         Route::get('/me/friend-code', [CommunityController::class, 'friendCode']);
         Route::post('/me/friends/scan', [CommunityController::class, 'scan']);
     });
@@ -43,6 +45,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/catalog/version', [CatalogController::class, 'version']);
     });
     Route::get('/daily-destinations', [ContentController::class, 'dailyDestinations']);
+    Route::get('/community/leaderboard', [CommunityController::class, 'leaderboard']);
     Route::get('/catalog/countries/{code}', [ContentController::class, 'country']);
     Route::get('/catalog/countries/{code}/cities', [ContentController::class, 'countryCities']);
     Route::get('/catalog/countries/{code}/states', [ContentController::class, 'countryStates']);

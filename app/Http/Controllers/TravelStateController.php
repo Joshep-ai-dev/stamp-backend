@@ -13,6 +13,30 @@ use Illuminate\Support\Facades\DB;
 
 class TravelStateController extends Controller
 {
+    public function sync(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'completedSightIds' => ['present', 'array', 'max:5000'],
+            'completedSightIds.*' => ['string', 'max:255'],
+            'wishlistIds' => ['present', 'array', 'max:5000'],
+            'wishlistIds.*' => ['string', 'max:255'],
+        ]);
+
+        foreach (array_unique($data['completedSightIds']) as $sightId) {
+            $syncRequest = Request::create('/', 'PUT', ['completed' => true]);
+            $syncRequest->setUserResolver(fn () => $request->user());
+            $this->completion($syncRequest, $sightId);
+        }
+        foreach (array_unique($data['wishlistIds']) as $targetId) {
+            $request->user()->wishlists()->firstOrCreate(
+                ['target_id' => $targetId],
+                ['saved_at' => now()],
+            );
+        }
+
+        return $this->show($request);
+    }
+
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();

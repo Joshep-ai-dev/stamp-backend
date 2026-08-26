@@ -14,6 +14,9 @@ class CommunityController extends Controller
     public function leaderboard(Request $request): JsonResponse
     {
         $scope = $request->validate(['scope' => ['sometimes', 'in:global,friends']])['scope'] ?? 'global';
+        if ($scope === 'friends') {
+            abort_unless($request->user(), 401, 'Sign in to view friends.');
+        }
         $query = User::query();
         if ($scope === 'friends') {
             $ids = Friend::where('user_id', $request->user()->id)->pluck('friend_id')->merge(Friend::where('friend_id', $request->user()->id)->pluck('user_id'))->push($request->user()->id);

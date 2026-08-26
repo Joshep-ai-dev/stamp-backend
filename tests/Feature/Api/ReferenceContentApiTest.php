@@ -158,11 +158,25 @@ class ReferenceContentApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/me/friends/scan', ['code' => 'stampo://friend/friend-token'])->assertOk()->assertJsonPath('id', $friend->id);
-        $this->getJson('/api/v1/community/leaderboard?scope=friends')
+        $this->getJson('/api/v1/me/community/leaderboard?scope=friends')
             ->assertOk()
             ->assertJsonCount(2)
             ->assertJsonPath('0.level', 'Wanderer')
             ->assertJsonStructure(['0' => ['score', 'level', 'stats' => ['countries', 'continents', 'cities', 'collections']]]);
         $this->assertDatabaseCount('friends', 1);
+    }
+
+    public function test_global_leaderboard_is_public_but_friends_are_private(): void
+    {
+        User::factory()->count(2)->create();
+
+        $this->getJson('/api/v1/community/leaderboard')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonMissingPath('0.email');
+        $this->getJson('/api/v1/community/leaderboard?scope=friends')
+            ->assertUnauthorized();
+        $this->getJson('/api/v1/me/community/leaderboard?scope=friends')
+            ->assertUnauthorized();
     }
 }

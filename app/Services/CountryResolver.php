@@ -40,6 +40,7 @@ class CountryResolver
             foreach (array_unique(explode(' ', $codes)) as $code) {
                 $name = Locale::getDisplayRegion('-'.$code, 'en');
                 $map[$this->normalize($name)] = ['code' => $code, 'name' => $name, 'continent_code' => $continent, 'flag' => $this->flag($code)];
+                $map[strtolower($code)] = $map[$this->normalize($name)];
             }
         }
         $aliases = [
@@ -79,6 +80,7 @@ class CountryResolver
         }
         $kosovo = ['code' => 'XK', 'name' => 'Kosovo', 'continent_code' => 'EU', 'flag' => '🇽🇰'];
         $map['kosovo'] = $kosovo;
+        $map['xk'] = $kosovo;
         $map['no country found for alpha-2 code: xk'] = $kosovo;
 
         return $this->lookup = $map;

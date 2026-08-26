@@ -14,7 +14,23 @@ class CityController extends Controller
     {
         $data = $request->validate(['query' => ['required', 'string', 'min:2', 'max:150'], 'limit' => ['sometimes', 'integer', 'min:1', 'max:50']]);
         $query = Str::lower(Str::ascii(trim($data['query'])));
-        $cities = City::with('country')->where('normalized_name', 'like', '%'.$query.'%')->orderByRaw('CASE WHEN normalized_name LIKE ? THEN 0 ELSE 1 END', [$query.'%'])->orderBy('name')->limit($data['limit'] ?? 10)->get();
+        $terms = preg_split('/\s+/', $query, -1, PREG_SPLIT_NO_EMPTY);
+        $limit = $data['limit'] ?? 10;
+        $cities = City::with('country')->where(function ($builder) use ($terms): void {
+            foreach ($terms as $term) {
+                $builder->where(function ($part) use ($term): void {
+                    $like = '%'.$term.'%';
+                    $part->where('normalized_name', 'like', $like)
+                        ->orWhere('normalized_subcountry', 'like', $like)
+                        ->orWhereRaw('LOWER(country_code) LIKE ?', [$like])
+                        ->orWhereHas('country', fn ($country) => $country->where('normalized_name', 'like', $like));
+                    if ($term === 'usa' || $term === 'america') $part->orWhere('country_code', 'US');
+                    if ($term === 'uk' || $term === 'britain') $part->orWhere('country_code', 'GB');
+                });
+            }
+        })->orderByRaw('CASE WHEN normalized_name = ? THEN 0 WHEN normalized_name LIKE ? THEN 1 ELSE 2 END', [$query, $query.'%'])->orderByDesc('population')->orderBy('name')->limit($limit * 4)->get()
+            ->unique(fn (City $city) => implode('|', [$city->country_code, $city->normalized_name, $city->normalized_subcountry]))
+            ->take($limit)->values();
 
         return CityResource::collection($cities);
     }

@@ -17,8 +17,19 @@ class ImportCitiesCommandTest extends TestCase
         $this->artisan('cities:import', ['path' => $path, '--dataset-version' => '2026-08-04'])
             ->assertSuccessful();
 
-        $this->assertDatabaseCount('cities', 34065);
-        $this->assertSame(34065, CatalogVersion::firstOrFail()->row_count);
+        $this->assertDatabaseCount('cities', 50250);
+        $this->assertSame(50250, CatalogVersion::firstOrFail()->row_count);
+        $this->assertDatabaseHas('cities', [
+            'name' => 'San Francisco',
+            'country_code' => 'US',
+            'subcountry' => 'California',
+            'population' => 3417736,
+        ]);
+        $this->assertDatabaseHas('cities', [
+            'name' => 'Cameron Highlands',
+            'country_code' => 'MY',
+            'subcountry' => 'Pahang',
+        ]);
 
         $this->artisan('cities:import', ['path' => $path, '--dataset-version' => '2026-08-04'])
             ->expectsOutputToContain('Already imported checksum')

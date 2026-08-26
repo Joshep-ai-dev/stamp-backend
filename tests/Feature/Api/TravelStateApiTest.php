@@ -36,6 +36,25 @@ class TravelStateApiTest extends TestCase
         $this->assertDatabaseCount('completions', 1);
     }
 
+    public function test_guest_travel_state_merges_with_existing_account_state(): void
+    {
+        $user = User::factory()->create();
+        $user->completions()->create(['sight_id' => 'server-sight', 'completed_at' => now()]);
+        $user->wishlists()->create(['target_id' => 'server-list', 'saved_at' => now()]);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/v1/me/sync/travel-state', [
+            'completedSightIds' => ['local-sight'],
+            'wishlistIds' => ['local-list'],
+        ])->assertOk();
+
+        $this->assertEqualsCanonicalizing(['local-sight', 'server-sight'], $response->json('completedSightIds'));
+        $this->assertEqualsCanonicalizing(['local-list', 'server-list'], $response->json('wishlistIds'));
+
+        $this->assertDatabaseCount('completions', 2);
+        $this->assertDatabaseCount('wishlists', 2);
+    }
+
     public function test_home_calculates_unique_counts_and_score(): void
     {
         Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);

@@ -38,9 +38,11 @@ class ImportCities extends Command
         $file = new SplFileObject($path, 'r');
         $file->setCsvControl(',', '"', '');
         $file->setFlags(SplFileObject::READ_CSV | SplFileObject::DROP_NEW_LINE);
-        $header = $file->fgetcsv();
-        if ($header !== ['name', 'country', 'subcountry', 'geonameid']) {
-            $this->error('Invalid CSV header. Expected: name,country,subcountry,geonameid');
+        $header = array_map(fn ($value) => trim((string) $value), $file->fgetcsv());
+        $columns = array_flip($header);
+        $simpleMaps = isset($columns['city'], $columns['iso2'], $columns['id']);
+        if (! $simpleMaps && $header !== ['name', 'country', 'subcountry', 'geonameid']) {
+            $this->error('Invalid CSV header. Expected the legacy GeoNames or current SimpleMaps world-cities schema.');
 
             return self::FAILURE;
         }
@@ -56,14 +58,20 @@ class ImportCities extends Command
             if ($row === [null] || $row === false) {
                 continue;
             } try {
-                if (count($row) !== 4) {
-                    throw new RuntimeException('wrong column count');
-                } [$name,$countryName,$subcountry,$geonameId] = array_map(fn ($v) => trim((string) $v), $row);
-                if ($name === '' || $countryName === '' || $geonameId === '' || ! ctype_digit($geonameId)) {
+                if (count($row) !== count($header)) throw new RuntimeException('wrong column count');
+                $value = fn (string $key): string => trim((string) ($row[$columns[$key]] ?? ''));
+                $name = $value($simpleMaps ? 'city' : 'name');
+                $countryName = $value('country');
+                $subcountry = $value($simpleMaps ? 'admin_name' : 'subcountry');
+                $geonameId = $value($simpleMaps ? 'id' : 'geonameid');
+                if ($simpleMaps && $geonameId === '') $geonameId = 'coord:'.$value('lat').':'.$value('lng');
+                if ($name === '' || $countryName === '' || $geonameId === '' || (! $simpleMaps && ! ctype_digit($geonameId))) {
                     throw new RuntimeException('required field invalid');
-                } $country = $resolver->resolve($countryName);
+                }
+                $datasetCode = ['XG' => 'PS', 'XW' => 'PS', 'XR' => 'SJ'][$value('iso2')] ?? $value('iso2');
+                $country = $resolver->resolve($simpleMaps ? $datasetCode : $countryName);
                 $countries[$country['code']] = array_merge($country, ['normalized_name' => $this->normalize($country['name']), 'created_at' => $now, 'updated_at' => $now]);
-                $chunk[] = ['geoname_id' => $geonameId, 'name' => $name, 'normalized_name' => $this->normalize($name), 'country_code' => $country['code'], 'subcountry' => $subcountry ?: null, 'normalized_subcountry' => $subcountry ? $this->normalize($subcountry) : null, 'created_at' => $now, 'updated_at' => $now];
+                $chunk[] = ['geoname_id' => $geonameId, 'name' => $name, 'ascii_name' => $simpleMaps ? ($value('city_ascii') ?: null) : null, 'normalized_name' => $this->normalize($name), 'country_code' => $country['code'], 'iso3' => $simpleMaps ? ($value('iso3') ?: null) : null, 'subcountry' => $subcountry ?: null, 'normalized_subcountry' => $subcountry ? $this->normalize($subcountry) : null, 'latitude' => $simpleMaps && is_numeric($value('lat')) ? $value('lat') : null, 'longitude' => $simpleMaps && is_numeric($value('lng')) ? $value('lng') : null, 'population' => $simpleMaps && is_numeric($value('population')) ? (int) $value('population') : null, 'capital' => $simpleMaps ? ($value('capital') ?: null) : null, 'created_at' => $now, 'updated_at' => $now];
                 if ($this->option('prune')) {
                     $seen[] = $geonameId;
                 } $processed++;
@@ -85,7 +93,14 @@ class ImportCities extends Command
         if ($chunk) {
             $updated += $this->flush($countries, $chunk);
         } if ($this->option('prune')) {
-            City::whereNotIn('geoname_id', $seen)->delete();
+            // Replace obsolete catalog rows while retaining legacy cities that
+            // are still referenced by user or editorial content.
+            City::whereNotIn('geoname_id', $seen)
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('visits')->whereColumn('visits.city_id', 'cities.id'))
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('sights')->whereColumn('sights.city_id', 'cities.id'))
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('collectionlist')->whereColumn('collectionlist.city_id', 'cities.id'))
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('daily_destinations')->whereColumn('daily_destinations.city_id', 'cities.id'))
+                ->delete();
         }
         CatalogVersion::updateOrCreate(['checksum' => $checksum], ['dataset' => basename($path), 'version' => $this->option('dataset-version') ?: now()->toDateString(), 'row_count' => $processed, 'imported_at' => $now]);
         Cache::forget('catalog:countries');
@@ -100,7 +115,7 @@ class ImportCities extends Command
     {
         DB::transaction(function () use ($countries, $cities) {
             Country::upsert(array_values($countries), ['code'], ['name', 'normalized_name', 'continent_code', 'flag', 'updated_at']);
-            City::upsert($cities, ['geoname_id'], ['name', 'normalized_name', 'country_code', 'subcountry', 'normalized_subcountry', 'updated_at']);
+            City::upsert($cities, ['geoname_id'], ['name', 'ascii_name', 'normalized_name', 'country_code', 'iso3', 'subcountry', 'normalized_subcountry', 'latitude', 'longitude', 'population', 'capital', 'updated_at']);
         });
 
         return count($cities);

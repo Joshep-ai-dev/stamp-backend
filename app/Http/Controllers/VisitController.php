@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class VisitController extends Controller
 {
@@ -30,6 +31,44 @@ class VisitController extends Controller
         $visit->setRelation('city', $city);
 
         return (new VisitResource($visit))->response()->setStatusCode(201);
+    }
+
+    /** Merge device-local visits into the account without deleting cloud data. */
+    public function sync(Request $request): AnonymousResourceCollection
+    {
+        $payload = $request->validate([
+            'visits' => ['present', 'array', 'max:1000'],
+            'visits.*.cityId' => ['required', 'string', 'max:32'],
+            'visits.*.visitedAt' => ['required', 'date_format:Y-m-d'],
+            'visits.*.note' => ['nullable', 'string', 'max:140'],
+            'visits.*.places' => ['sometimes', 'array'],
+        ]);
+
+        DB::transaction(function () use ($request, $payload): void {
+            foreach ($payload['visits'] as $item) {
+                $city = City::with('country')->where('geoname_id', $item['cityId'])->first();
+                if (! $city) {
+                    continue;
+                }
+                $request->user()->visits()->updateOrCreate(
+                    ['city_id' => $city->id],
+                    [
+                        'city_name' => $city->name,
+                        'country' => $city->country->name,
+                        'country_code' => $city->country_code,
+                        'continent_code' => $city->country->continent_code,
+                        'subcountry' => $city->subcountry,
+                        'visited_at' => $item['visitedAt'],
+                        'note' => $item['note'] ?? null,
+                        'places' => $item['places'] ?? [],
+                    ],
+                );
+            }
+        });
+
+        return VisitResource::collection(
+            $request->user()->visits()->with('city')->latest('visited_at')->latest('created_at')->get(),
+        );
     }
 
     public function update(VisitRequest $request, string $visit): VisitResource
