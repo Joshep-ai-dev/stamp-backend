@@ -24,6 +24,8 @@ class LegacyImageController extends Controller
         $file = storage_path('app/public/images/'.$filename);
         abort_unless(is_file($file), 404);
 
-        return response()->file($file);
+        return response()->file($file, [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
     }
 }

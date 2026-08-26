@@ -9,7 +9,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
 class VisitController extends Controller
@@ -22,11 +21,6 @@ class VisitController extends Controller
     public function store(VisitRequest $request): JsonResponse
     {
         [$data, $city] = $this->authoritativeData($request);
-        if ($request->user()->visits()->where('city_id', $city->id)->exists()) {
-            throw ValidationException::withMessages([
-                'cityId' => ['You have already added this city to your visits.'],
-            ]);
-        }
         $visit = $request->user()->visits()->create($data);
         $visit->setRelation('city', $city);
 
@@ -38,6 +32,7 @@ class VisitController extends Controller
     {
         $payload = $request->validate([
             'visits' => ['present', 'array', 'max:1000'],
+            'visits.*.id' => ['required', 'string', 'max:191'],
             'visits.*.cityId' => ['required', 'string', 'max:32'],
             'visits.*.visitedAt' => ['required', 'date_format:Y-m-d'],
             'visits.*.note' => ['nullable', 'string', 'max:140'],
@@ -50,21 +45,20 @@ class VisitController extends Controller
                 if (! $city) {
                     continue;
                 }
-                $existing = $request->user()->visits()->where('city_id', $city->id)->lockForUpdate()->first();
-                $localPlaces = collect($item['places'] ?? []);
-                $places = collect($existing?->places ?? [])->merge($localPlaces)
-                    ->unique(fn ($place) => ($place['type'] ?? '').':'.(($place['id'] ?? null) ?: mb_strtolower($place['name'] ?? '')))
-                    ->values()->all();
+                $sourceId = $item['id'];
+                $existing = $request->user()->visits()
+                    ->where(fn ($query) => $query->where('id', $sourceId)->orWhere('source_id', $sourceId))
+                    ->lockForUpdate()->first();
                 $values = [
+                        'source_id' => $existing?->source_id ?? ($existing ? null : $sourceId),
                         'city_name' => $city->name,
                         'country' => $city->country->name,
                         'country_code' => $city->country_code,
                         'continent_code' => $city->country->continent_code,
                         'subcountry' => $city->subcountry,
-                        'visited_at' => $existing && $existing->visited_at->format('Y-m-d') < $item['visitedAt']
-                            ? $existing->visited_at->format('Y-m-d') : $item['visitedAt'],
-                        'note' => ($item['note'] ?? null) ?: $existing?->note,
-                        'places' => $places,
+                        'visited_at' => $item['visitedAt'],
+                        'note' => $item['note'] ?? null,
+                        'places' => $item['places'] ?? [],
                     ];
                 if ($existing) $existing->update($values);
                 else $request->user()->visits()->create(['city_id' => $city->id, ...$values]);

@@ -49,18 +49,52 @@ class VisitApiTest extends TestCase
         $this->deleteJson('/api/v1/visits/'.$visit->id)->assertNotFound();
     }
 
-    public function test_user_cannot_add_the_same_city_twice(): void
+    public function test_user_can_record_separate_visits_to_the_same_city(): void
     {
         Sanctum::actingAs(User::factory()->create());
         $payload = ['cityId' => '3530597', 'visitedAt' => '2026-08-04'];
 
         $this->postJson('/api/v1/visits', $payload)->assertCreated();
-        $this->postJson('/api/v1/visits', $payload)
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('cityId')
-            ->assertJsonPath('errors.cityId.0', 'You have already added this city to your visits.');
+        $this->postJson('/api/v1/visits', [
+            ...$payload,
+            'visitedAt' => '2026-08-12',
+            'note' => 'Return trip',
+        ])->assertCreated()->assertJsonPath('note', 'Return trip');
 
-        $this->assertDatabaseCount('visits', 1);
+        $this->assertDatabaseCount('visits', 2);
+    }
+
+    public function test_user_can_edit_their_visit_date_and_note(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $visit = $user->visits()->create([
+            'city_id' => $this->city->id,
+            'city_name' => 'Mexico City',
+            'country' => 'Mexico',
+            'country_code' => 'MX',
+            'continent_code' => 'NA',
+            'subcountry' => 'Mexico City',
+            'visited_at' => '2026-08-04',
+            'note' => 'First note',
+            'places' => [],
+        ]);
+
+        $this->putJson('/api/v1/visits/'.$visit->id, [
+            'cityId' => '3530597',
+            'visitedAt' => '2026-08-19',
+            'note' => 'Updated note',
+            'places' => [],
+        ])->assertOk()
+            ->assertJsonPath('id', $visit->id)
+            ->assertJsonPath('visitedAt', '2026-08-19')
+            ->assertJsonPath('note', 'Updated note');
+
+        $this->assertDatabaseHas('visits', [
+            'id' => $visit->id,
+            'visited_at' => '2026-08-19',
+            'note' => 'Updated note',
+        ]);
     }
 
     public function test_visits_require_authentication(): void
