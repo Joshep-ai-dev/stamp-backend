@@ -58,7 +58,7 @@ class AdminController extends Controller
 
     public function upload(Request $request, ImageStorage $images): JsonResponse
     {
-        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['sights', 'collection', 'daily-destinations'])]]);
+        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['countries', 'sights', 'collection', 'daily-destinations'])]]);
 
         return response()->json(['imageUrl' => $images->store($data['image'], $data['folder'])], 201);
     }
@@ -66,6 +66,7 @@ class AdminController extends Controller
     public function index(string $type): JsonResponse
     {
         return response()->json(match ($type) {
+            'countries' => Country::orderBy('name')->get()->map(fn ($x) => $this->adminCountry($x)),
             'sights' => Sight::with(['country', 'city'])->orderBy('name')->get()->map(fn ($x) => $this->adminSight($x)),
             'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
             'collection-lists' => CollectionList::with(['kind', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
@@ -102,7 +103,11 @@ class AdminController extends Controller
     private function save(Request $request, string $type, ?Model $model = null): Model
     {
         $oldImage = $this->modelImage($model);
-        if ($type === 'sights') {
+        if ($type === 'countries') {
+            abort_unless($model instanceof Country, 404);
+            $data = $request->validate(['heroImage' => ['nullable', 'string']]);
+            $values = ['hero_image' => $data['heroImage'] ?? $model->hero_image];
+        } elseif ($type === 'sights') {
             $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'isFeatured' => ['boolean']]);
             $city = City::where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
             abort_if(($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
@@ -140,15 +145,20 @@ class AdminController extends Controller
     private function classFor(string $type): string
     {
         return match ($type) {
-            'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
+            'countries' => Country::class, 'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
         };
     }
 
     private function present(string $type, Model $model): array
     {
         return match ($type) {
-            'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model), 'collection-lists' => $this->collectionList($model->load(['kind', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
+            'countries' => $this->adminCountry($model), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model), 'collection-lists' => $this->collectionList($model->load(['kind', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
         };
+    }
+
+    private function adminCountry(Country $country): array
+    {
+        return ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'heroImage' => ImageUrl::public($country->hero_image)];
     }
 
     private function adminSight(Sight $x): array
@@ -167,6 +177,6 @@ class AdminController extends Controller
             return null;
         }
 
-        return $model->getAttribute('image_url') ?? $model->getAttribute('image');
+        return $model->getAttribute('hero_image') ?? $model->getAttribute('image_url') ?? $model->getAttribute('image');
     }
 }

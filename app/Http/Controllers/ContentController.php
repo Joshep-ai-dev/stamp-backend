@@ -25,7 +25,7 @@ class ContentController extends Controller
 
         return response()->json([
             'isEnriching' => false,
-            'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code],
+            'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image)],
             'featuredIn' => [],
             'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry]),
             'states' => $country->cities->pluck('subcountry')->filter()->unique()->sort()->values(),

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\ImageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,6 @@ class CountryResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        return ['code' => $this->code, 'name' => $this->name, 'continentCode' => $this->continent_code, 'flag' => $this->flag];
+        return ['code' => $this->code, 'name' => $this->name, 'continentCode' => $this->continent_code, 'flag' => $this->flag, 'heroImage' => ImageUrl::public($this->hero_image)];
     }
 }
