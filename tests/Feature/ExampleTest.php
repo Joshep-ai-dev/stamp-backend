@@ -59,4 +59,18 @@ class ExampleTest extends TestCase
             File::delete($file);
         }
     }
+
+    public function test_uploaded_city_images_can_be_served_through_laravel(): void
+    {
+        $directory = public_path('images/cities');
+        File::ensureDirectoryExists($directory);
+        $file = $directory.'/city-route-test.png';
+        File::put($file, 'image-content');
+
+        try {
+            $this->get('/images/cities/city-route-test.png')->assertOk();
+        } finally {
+            File::delete($file);
+        }
+    }
 }
