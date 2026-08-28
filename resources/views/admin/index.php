@@ -86,16 +86,15 @@
       margin-bottom: 24px
     }
 
-    .top>div:first-child {
-      flex: 1;
-      min-width: 0
-    }
-
     .summarybar {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap
+    }
+
+    #summary {
+      margin-bottom: 24px
     }
 
     .city-tools {
@@ -139,6 +138,11 @@
       background: var(--panel);
       color: var(--ink);
       cursor: pointer
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45
     }
 
     .primary {
@@ -367,11 +371,10 @@
     </aside>
     <main>
       <div class="top">
-        <div>
-          <h1 id="title">Country hero images</h1>
-          <div id="summary" style="color:var(--muted);margin-top:5px"></div>
-        </div><button id="addButton" class="primary" onclick="openEditor()">+ Add new</button>
+        <h1 id="title">Country hero images</h1>
+        <button id="addButton" class="primary" onclick="openEditor()">+ Add new</button>
       </div>
+      <div id="summary" style="color:var(--muted)"></div>
       <div id="notice"></div>
       <div id="table" class="table"></div>
     </main>
