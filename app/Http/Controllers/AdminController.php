@@ -6,6 +6,7 @@ use App\Models\City;
 use App\Models\CollectionKind;
 use App\Models\CollectionList;
 use App\Models\Country;
+use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageStorage;
@@ -82,9 +83,27 @@ class AdminController extends Controller
     {
         $country = $request->validate(['country' => ['required', 'string', 'size:2']])['country'];
 
-        return response()->json(City::where('country_code', strtoupper($country))
-            ->whereNotNull('subcountry')->where('subcountry', '!=', '')
-            ->distinct()->orderBy('subcountry')->pluck('subcountry')->values());
+        $saved = CountryState::where('country_code', strtoupper($country))->pluck('name');
+        $legacy = City::where('country_code', strtoupper($country))
+            ->whereNotNull('subcountry')->where('subcountry', '!=', '')->distinct()->pluck('subcountry');
+
+        return response()->json($saved->merge($legacy)->unique()->sort()->values());
+    }
+
+    public function storeState(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'countryId' => ['required', 'string', 'size:2', 'exists:countries,code'],
+            'name' => ['required', 'string', 'max:150'],
+        ]);
+        $name = Str::of($data['name'])->squish()->toString();
+        $normalized = Str::of($name)->ascii()->lower()->toString();
+        $state = CountryState::firstOrCreate(
+            ['country_code' => strtoupper($data['countryId']), 'normalized_name' => $normalized],
+            ['name' => $name],
+        );
+
+        return response()->json(['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name], $state->wasRecentlyCreated ? 201 : 200);
     }
 
     public function upload(Request $request, ImageStorage $images): JsonResponse
@@ -176,6 +195,12 @@ class AdminController extends Controller
                 'population' => $data['population'] ?? null,
                 'image_url' => $data['imageUrl'] ?? $model?->image_url,
             ];
+            if (filled($data['state'] ?? null)) {
+                CountryState::firstOrCreate(
+                    ['country_code' => strtoupper($data['countryId']), 'normalized_name' => $normalizedState],
+                    ['name' => $data['state']],
+                );
+            }
             $model ??= new City;
         } elseif ($type === 'sights') {
             $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'isFeatured' => ['boolean']]);

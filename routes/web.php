@@ -19,6 +19,7 @@ Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
     Route::get('/meta', [AdminController::class, 'meta']);
     Route::get('/states', [AdminController::class, 'states']);
+    Route::post('/states', [AdminController::class, 'storeState']);
     Route::get('/cities', [AdminController::class, 'cities']);
     Route::post('/images', [AdminController::class, 'upload']);
     Route::get('/{type}', [AdminController::class, 'index'])->whereIn('type', ['countries', 'cities', 'sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);

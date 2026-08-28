@@ -40,7 +40,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('<th>No.</th>', $admin);
         $this->assertStringContainsString('function changeCityPage(offset)', $admin);
         $this->assertStringContainsString("['population', 'latitude', 'longitude']", $admin);
-        $this->assertStringContainsString("'state-entry'", $admin);
+        $this->assertStringContainsString('function addState()', $admin);
+        $this->assertStringContainsString('+ Add state', $admin);
         $this->assertStringContainsString("state.tab === 'countries' ? ''", $admin);
         $this->assertStringContainsString('This cannot be undone.', $admin);
     }
