@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['geoname_id', 'name', 'ascii_name', 'normalized_name', 'country_code', 'iso3', 'subcountry', 'normalized_subcountry', 'latitude', 'longitude', 'population', 'capital'])]
+#[Fillable(['geoname_id', 'name', 'ascii_name', 'normalized_name', 'country_code', 'iso3', 'subcountry', 'normalized_subcountry', 'latitude', 'longitude', 'population', 'capital', 'image_url'])]
 class City extends Model
 {
     protected function casts(): array

@@ -35,6 +35,10 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('function setTableFilter(value)', $admin);
         $this->assertStringContainsString('row.collectionKindId === filter', $admin);
         $this->assertStringContainsString('row.countryCode === filter', $admin);
+        $this->assertStringContainsString('function searchCities(value)', $admin);
+        $this->assertStringContainsString('function changeCityPage(offset)', $admin);
+        $this->assertStringContainsString("['population', 'latitude', 'longitude']", $admin);
+        $this->assertStringContainsString("'state-entry'", $admin);
     }
 
     public function test_uploaded_public_images_can_be_served_through_laravel(): void

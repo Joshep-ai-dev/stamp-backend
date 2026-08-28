@@ -29,7 +29,38 @@ class AdminController extends Controller
 
     public function cities(Request $request): JsonResponse
     {
-        $data = $request->validate(['country' => ['required', 'string', 'size:2'], 'state' => ['nullable', 'string', 'max:150']]);
+        $data = $request->validate([
+            'country' => ['sometimes', 'string', 'size:2'],
+            'state' => ['nullable', 'string', 'max:150'],
+            'query' => ['nullable', 'string', 'max:150'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:10', 'max:100'],
+        ]);
+        if (! isset($data['country'])) {
+            $search = Str::of($data['query'] ?? '')->ascii()->lower()->squish()->toString();
+            $cities = City::query()->with('country')
+                ->when($search !== '', function ($query) use ($search): void {
+                    $like = '%'.$search.'%';
+                    $query->where(function ($query) use ($like): void {
+                        $query->where('normalized_name', 'like', $like)
+                            ->orWhere('normalized_subcountry', 'like', $like)
+                            ->orWhere('country_code', 'like', strtoupper($like))
+                            ->orWhereHas('country', fn ($country) => $country->where('normalized_name', 'like', $like));
+                    });
+                })
+                ->orderBy('country_code')->orderBy('normalized_name')
+                ->paginate($data['per_page'] ?? 50);
+
+            return response()->json([
+                'data' => $cities->getCollection()->map(fn ($city) => $this->adminCity($city)),
+                'meta' => [
+                    'currentPage' => $cities->currentPage(),
+                    'lastPage' => $cities->lastPage(),
+                    'perPage' => $cities->perPage(),
+                    'total' => $cities->total(),
+                ],
+            ]);
+        }
         $country = $data['country'];
         $cities = City::where('country_code', strtoupper($country))
             ->when($data['state'] ?? null, fn ($query, $state) => $query->where('subcountry', $state))
@@ -58,7 +89,7 @@ class AdminController extends Controller
 
     public function upload(Request $request, ImageStorage $images): JsonResponse
     {
-        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['countries', 'sights', 'collection', 'daily-destinations'])]]);
+        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['countries', 'cities', 'sights', 'collection', 'daily-destinations'])]]);
 
         return response()->json(['imageUrl' => $images->store($data['image'], $data['folder'])], 201);
     }
@@ -67,6 +98,7 @@ class AdminController extends Controller
     {
         return response()->json(match ($type) {
             'countries' => Country::orderBy('name')->get()->map(fn ($x) => $this->adminCountry($x)),
+            'cities' => City::with('country')->orderBy('name')->get()->map(fn ($x) => $this->adminCity($x)),
             'sights' => Sight::with(['country', 'city'])->orderBy('name')->get()->map(fn ($x) => $this->adminSight($x)),
             'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
             'collection-lists' => CollectionList::with(['kind', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
@@ -85,8 +117,11 @@ class AdminController extends Controller
     public function update(Request $request, string $type, string $id): JsonResponse
     {
         $class = $this->classFor($type);
+        $model = $type === 'cities'
+            ? City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail()
+            : $class::findOrFail($id);
 
-        return response()->json($this->present($type, $this->save($request, $type, $class::findOrFail($id))));
+        return response()->json($this->present($type, $this->save($request, $type, $model)));
     }
 
     public function destroy(string $type, string $id): Response
@@ -107,6 +142,39 @@ class AdminController extends Controller
             abort_unless($model instanceof Country, 404);
             $data = $request->validate(['heroImage' => ['nullable', 'string']]);
             $values = ['hero_image' => $data['heroImage'] ?? $model->hero_image];
+        } elseif ($type === 'cities') {
+            $cityIdRule = Rule::unique('cities', 'geoname_id');
+            if ($model) {
+                $cityIdRule->ignore($model);
+            }
+            $data = $request->validate([
+                'id' => ['sometimes', 'string', 'max:32', $cityIdRule],
+                'name' => ['required', 'string', 'max:150'],
+                'countryId' => ['required', 'exists:countries,code'],
+                'state' => ['nullable', 'string', 'max:150'],
+                'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+                'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+                'population' => ['nullable', 'integer', 'min:0'],
+                'imageUrl' => ['nullable', 'string'],
+            ]);
+            $normalizedName = Str::of($data['name'])->ascii()->lower()->squish()->toString();
+            $normalizedState = filled($data['state'] ?? null)
+                ? Str::of($data['state'])->ascii()->lower()->squish()->toString()
+                : null;
+            $values = [
+                'geoname_id' => $model?->geoname_id ?? ($data['id'] ?? 'admin-'.Str::uuid()),
+                'name' => $data['name'],
+                'ascii_name' => Str::ascii($data['name']),
+                'normalized_name' => $normalizedName,
+                'country_code' => strtoupper($data['countryId']),
+                'subcountry' => $data['state'] ?? null,
+                'normalized_subcountry' => $normalizedState,
+                'latitude' => $data['latitude'] ?? null,
+                'longitude' => $data['longitude'] ?? null,
+                'population' => $data['population'] ?? null,
+                'image_url' => $data['imageUrl'] ?? $model?->image_url,
+            ];
+            $model ??= new City;
         } elseif ($type === 'sights') {
             $data = $request->validate(['name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'content' => ['nullable', 'string'], 'image' => ['nullable', 'string'], 'isFeatured' => ['boolean']]);
             $city = City::where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
@@ -145,20 +213,25 @@ class AdminController extends Controller
     private function classFor(string $type): string
     {
         return match ($type) {
-            'countries' => Country::class, 'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
+            'countries' => Country::class, 'cities' => City::class, 'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
         };
     }
 
     private function present(string $type, Model $model): array
     {
         return match ($type) {
-            'countries' => $this->adminCountry($model), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model), 'collection-lists' => $this->collectionList($model->load(['kind', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
+            'countries' => $this->adminCountry($model), 'cities' => $this->adminCity($model->load('country')), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model), 'collection-lists' => $this->collectionList($model->load(['kind', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
         };
     }
 
     private function adminCountry(Country $country): array
     {
         return ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'heroImage' => ImageUrl::public($country->hero_image)];
+    }
+
+    private function adminCity(City $city): array
+    {
+        return ['id' => $city->geoname_id, 'countryId' => $city->country_code, 'country' => $city->country?->name, 'state' => $city->subcountry, 'name' => $city->name, 'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'imageUrl' => ImageUrl::public($city->image_url)];
     }
 
     private function adminSight(Sight $x): array

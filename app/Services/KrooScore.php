@@ -35,6 +35,7 @@ class KrooScore
     private static function level(float $score): string
     {
         return match (true) {
+            $score >= 100 => 'Kroo Legend',
             $score >= 75 => 'Kroo Master',
             $score >= 50 => 'Voyager',
             $score >= 30 => 'Wayfarer',

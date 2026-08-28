@@ -27,7 +27,7 @@ class ContentController extends Controller
             'isEnriching' => false,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image)],
             'featuredIn' => [],
-            'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry]),
+            'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]),
             'states' => $country->cities->pluck('subcountry')->filter()->unique()->sort()->values(),
             // Always return the ordered catalog so clients can render locked
             // previews. Access to items after the first three is enforced by
@@ -43,7 +43,7 @@ class ContentController extends Controller
     {
         $country = Country::with('cities')->findOrFail(strtoupper($code));
 
-        return response()->json($country->cities->sortBy('name')->values()->take(10)->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry]));
+        return response()->json($country->cities->sortBy('name')->values()->take(10)->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]));
     }
 
     public function countryStates(string $code): JsonResponse
@@ -61,7 +61,7 @@ class ContentController extends Controller
 
         return response()->json(City::where('country_code', $country->code)->where('subcountry', $state)
             ->orderBy('name')->get()->unique('normalized_name')->values()
-            ->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'state' => $city->subcountry, 'name' => $city->name]));
+            ->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'state' => $city->subcountry, 'name' => $city->name, 'image' => ImageUrl::public($city->image_url)]));
     }
 
     public function state(Request $request, string $code, string $state): JsonResponse
@@ -77,7 +77,7 @@ class ContentController extends Controller
             'id' => $state,
             'name' => $state,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
-            'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code]),
+            'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
             'sights' => $visibleSights->map(fn ($sight) => $this->sightItem($sight)),
         ]);
     }
@@ -116,6 +116,7 @@ class ContentController extends Controller
             'id' => $city->geoname_id, 'name' => $city->name, 'countryId' => $city->country_code,
             'country' => $city->country->name, 'countryCode' => $city->country_code,
             'continentCode' => $city->country->continent_code, 'subcountry' => $city->subcountry,
+            'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url),
             'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
         ]);
     }

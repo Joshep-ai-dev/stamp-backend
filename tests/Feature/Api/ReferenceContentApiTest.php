@@ -115,6 +115,11 @@ class ReferenceContentApiTest extends TestCase
         City::create(['geoname_id' => '2', 'name' => 'Springfield', 'normalized_name' => 'springfield', 'country_code' => 'US', 'subcountry' => 'Missouri']);
 
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/meta')->assertOk()->assertJsonMissingPath('cities');
+        $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?query=missouri&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.currentPage', 1)
+            ->assertJsonPath('data.0.state', 'Missouri');
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US')->assertOk()->assertJsonCount(1);
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/states?country=US')->assertOk()->assertJsonCount(2);
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US&state=Illinois')->assertOk()->assertJsonCount(1)->assertJsonPath('0.subcountry', 'Illinois');
