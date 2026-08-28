@@ -24,7 +24,7 @@ Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function 
     Route::get('/{type}', [AdminController::class, 'index'])->whereIn('type', ['countries', 'cities', 'sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);
     Route::post('/{type}', [AdminController::class, 'store'])->whereIn('type', ['cities', 'sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);
     Route::put('/{type}/{id}', [AdminController::class, 'update'])->whereIn('type', ['countries', 'cities', 'sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);
-    Route::delete('/{type}/{id}', [AdminController::class, 'destroy'])->whereIn('type', ['sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);
+    Route::delete('/{type}/{id}', [AdminController::class, 'destroy'])->whereIn('type', ['cities', 'sights', 'collections', 'collection-kinds', 'collection-lists', 'daily-destinations']);
 });
 Route::get('/daily-destinations', [ContentController::class, 'dailyDestinations']);
 Route::get('/api/collections/{id}', [ContentController::class, 'collection']);

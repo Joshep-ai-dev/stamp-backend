@@ -35,10 +35,14 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('function setTableFilter(value)', $admin);
         $this->assertStringContainsString('row.collectionKindId === filter', $admin);
         $this->assertStringContainsString('row.countryCode === filter', $admin);
-        $this->assertStringContainsString('function searchCities(value)', $admin);
+        $this->assertStringContainsString('function submitCitySearch()', $admin);
+        $this->assertStringContainsString('>Search</button>', $admin);
+        $this->assertStringContainsString('<th>No.</th>', $admin);
         $this->assertStringContainsString('function changeCityPage(offset)', $admin);
         $this->assertStringContainsString("['population', 'latitude', 'longitude']", $admin);
         $this->assertStringContainsString("'state-entry'", $admin);
+        $this->assertStringContainsString("state.tab === 'countries' ? ''", $admin);
+        $this->assertStringContainsString('This cannot be undone.', $admin);
     }
 
     public function test_uploaded_public_images_can_be_served_through_laravel(): void

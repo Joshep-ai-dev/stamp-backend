@@ -127,7 +127,9 @@ class AdminController extends Controller
     public function destroy(string $type, string $id): Response
     {
         $class = $this->classFor($type);
-        $model = $class::findOrFail($id);
+        $model = $type === 'cities'
+            ? City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail()
+            : $class::findOrFail($id);
         $image = $this->modelImage($model);
         $model->delete();
         app(ImageStorage::class)->delete($image);

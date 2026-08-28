@@ -124,6 +124,8 @@ class ReferenceContentApiTest extends TestCase
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/states?country=US')->assertOk()->assertJsonCount(2);
         $this->withHeaders($this->adminHeaders())->getJson('/admin/api/cities?country=US&state=Illinois')->assertOk()->assertJsonCount(1)->assertJsonPath('0.subcountry', 'Illinois');
         $this->getJson('/api/v1/catalog/countries/US/states/Illinois')->assertOk()->assertJsonPath('name', 'Illinois');
+        $this->withHeaders($this->adminHeaders())->deleteJson('/admin/api/cities/2')->assertNoContent();
+        $this->assertDatabaseMissing('cities', ['geoname_id' => '2']);
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
         $response = $this->withHeaders($this->adminHeaders())->post('/admin/api/images', ['image' => UploadedFile::fake()->createWithContent('place.png', $png), 'folder' => 'sights']);
         $response->assertCreated();

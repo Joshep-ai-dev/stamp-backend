@@ -86,11 +86,35 @@
       margin-bottom: 24px
     }
 
+    .top>div:first-child {
+      flex: 1;
+      min-width: 0
+    }
+
     .summarybar {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap
+    }
+
+    .city-tools {
+      display: grid;
+      gap: 10px;
+      width: 100%
+    }
+
+    .city-search-row,
+    .city-pagination {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .city-search-row input {
+      flex: 1;
+      min-width: 220px
     }
 
     .summarybar select,
@@ -337,14 +361,14 @@
   <div id="app" class="shell hidden">
     <aside class="side">
       <div class="brand">Kroo Admin</div>
-      <nav class="nav"><button data-tab="countries">Country heroes</button><button data-tab="cities">Cities</button><button data-tab="sights" class="active">Top sights</button><button
+      <nav class="nav"><button data-tab="countries" class="active">Country heroes</button><button data-tab="cities">Cities</button><button data-tab="sights">Top sights</button><button
           data-tab="collections">Collection kinds</button><button data-tab="collection-lists">Collection list</button><button data-tab="daily-destinations">Daily
           destinations</button><button class="logout" onclick="logout()">Lock</button></nav>
     </aside>
     <main>
       <div class="top">
         <div>
-          <h1 id="title">Top sights</h1>
+          <h1 id="title">Country hero images</h1>
           <div id="summary" style="color:var(--muted);margin-top:5px"></div>
         </div><button id="addButton" class="primary" onclick="openEditor()">+ Add new</button>
       </div>
@@ -361,7 +385,7 @@
     </form>
   </div>
   <script>
-    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'sights', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, citySearchTimer: null, edit: null };
+    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, edit: null };
     const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), fields = document.querySelector('#fields');
     const normalizedFiles = new WeakMap();
     const schemas = {
@@ -372,14 +396,15 @@
       'collection-lists': [['collectionKindId', 'Collection kind', 'kind', 1], ['title', 'Title', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City / location', 'city', 1], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea', 1], ['access', 'Access', 'access']],
       'daily-destinations': [['name', 'Name', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City', 'city', 1], ['imageUrl', 'Image', 'image'], ['icon', 'Fallback emoji', 'text'], ['content', 'Lesson content', 'textarea', 1], ['question', 'Question', 'textarea', 1], ['options', 'Answer options (one per line)', 'textarea'], ['correctAnswer', 'Correct answer index (starts at 0)', 'number', 1], ['publishDate', 'Publish date (blank = every day)', 'date'], ['isPublished', 'Published', 'check']]
     };
-    async function call(path, options = {}) { const r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }); if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
+    async function call(path, options = {}) { let r; try { r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }) } catch (error) { throw new Error(`Could not reach the server for ${path}. Check the connection and try again.`) } if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
     async function login() { state.key = document.querySelector('#key').value.trim(); try { state.meta = await call('/admin/api/meta'); sessionStorage.stampoAdminKey = state.key; document.querySelector('#login').classList.add('hidden'); document.querySelector('#app').classList.remove('hidden'); await load() } catch (e) { document.querySelector('#loginError').textContent = e.message } }
     function logout() { sessionStorage.removeItem('stampoAdminKey'); location.reload() }
     async function load() { try { const cityParams = state.tab === 'cities' ? `?page=${state.paging.currentPage}&per_page=${state.paging.perPage}&query=${encodeURIComponent(state.filters.cities || '')}` : ''; const result = await call(`/admin/api/${state.tab}${cityParams}`); if (state.tab === 'cities') { state.rows = result.data; state.paging = result.meta } else state.rows = result; render(); note('') } catch (e) { note(e.message, true) } }
     function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
-    function render() { const names = { 'countries': 'Country hero images', 'cities': 'Cities', 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Daily destinations' }; title.textContent = names[state.tab]; document.querySelector('#addButton').style.display = state.tab === 'countries' ? 'none' : ''; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'sights' ? !filter || row.countryCode === filter : state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; const cityTools = state.tab === 'cities' ? `<input type="search" value="${esc(filter)}" placeholder="Search city, state, or country" aria-label="Search cities" oninput="searchCities(this.value)"><span>${state.paging.total} records</span><button ${state.paging.currentPage <= 1 ? 'disabled' : ''} onclick="changeCityPage(-1)">Previous</button><span>Page ${state.paging.currentPage} of ${state.paging.lastPage}</span><button ${state.paging.currentPage >= state.paging.lastPage ? 'disabled' : ''} onclick="changeCityPage(1)">Next</button>` : ''; summary.innerHTML = `<div class="summarybar">${cityTools || `<span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}`}</div>`; const cols = state.tab === 'countries' ? ['heroImage', 'code', 'name'] : state.tab === 'cities' ? ['imageUrl', 'name', 'country', 'state', 'population', 'latitude', 'longitude'] : state.tab === 'sights' ? ['image', 'name', 'country', 'state', 'city'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'state', 'city', 'publishDate']; table.innerHTML = `<table><thead><tr>${cols.map(x => `<th>${esc(x)}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }) => `<tr>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button>${state.tab === 'countries' || state.tab === 'cities' ? '' : `<button class="danger" onclick="removeRow(${i})">Delete</button>`}</div></td></tr>`).join('')}</tbody></table>` }
+    function render() { const names = { 'countries': 'Country hero images', 'cities': 'Cities', 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Daily destinations' }; title.textContent = names[state.tab]; document.querySelector('#addButton').style.display = state.tab === 'countries' ? 'none' : ''; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'sights' ? !filter || row.countryCode === filter : state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; const cityTools = state.tab === 'cities' ? `<div class="city-tools"><div class="city-search-row"><input id="citySearch" type="search" value="${esc(filter)}" placeholder="Search city, state, or country" aria-label="Search cities" onkeydown="if(event.key === 'Enter'){event.preventDefault();submitCitySearch()}"><button class="primary" onclick="submitCitySearch()">Search</button>${filter ? `<button onclick="clearCitySearch()">Clear</button>` : ''}</div><div class="city-pagination"><span>${state.paging.total} records</span><button ${state.paging.currentPage <= 1 ? 'disabled' : ''} onclick="changeCityPage(-1)">Previous</button><span>Page ${state.paging.currentPage} of ${state.paging.lastPage}</span><button ${state.paging.currentPage >= state.paging.lastPage ? 'disabled' : ''} onclick="changeCityPage(1)">Next</button></div></div>` : ''; summary.innerHTML = `<div class="summarybar">${cityTools || `<span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}`}</div>`; const cols = state.tab === 'countries' ? ['heroImage', 'code', 'name'] : state.tab === 'cities' ? ['imageUrl', 'name', 'country', 'state', 'population', 'latitude', 'longitude'] : state.tab === 'sights' ? ['image', 'name', 'country', 'state', 'city'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'state', 'city', 'publishDate']; const numberOffset = state.tab === 'cities' ? (state.paging.currentPage - 1) * state.paging.perPage : 0; table.innerHTML = `<table><thead><tr><th>No.</th>${cols.map(x => `<th>${esc(x)}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }, displayIndex) => `<tr><td>${numberOffset + displayIndex + 1}</td>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button>${state.tab === 'countries' ? '' : `<button class="danger" onclick="removeRow(${i})">Delete</button>`}</div></td></tr>`).join('')}</tbody></table>` }
     function setTableFilter(value) { state.filters[state.tab] = value; render() }
-    function searchCities(value) { state.filters.cities = value; state.paging.currentPage = 1; clearTimeout(state.citySearchTimer); state.citySearchTimer = setTimeout(load, 300) }
+    async function submitCitySearch() { state.filters.cities = document.querySelector('#citySearch')?.value.trim() || ''; state.paging.currentPage = 1; await load() }
+    async function clearCitySearch() { state.filters.cities = ''; state.paging.currentPage = 1; await load() }
     async function changeCityPage(offset) { state.paging.currentPage += offset; await load() }
     async function countryChanged() { const region = form.elements.state; if (region) { region.value = ''; region.dataset.value = '' } await renderStates() }
     function cell(r, c) { if (c === 'image' || c === 'imageUrl' || c === 'heroImage') { const u = r.heroImage || r.image || r.imageUrl; return `<td>${u ? `<img src="${esc(u)}" alt="">` : '—'}</td>` } if (c === 'access') return `<td><span class="badge">${r.access === 'pro' || r.isPremium ? 'Kroo+ locked' : 'Unlocked'}</span></td>`; return `<td>${esc(r[c] || '—')}</td>` }
@@ -392,7 +417,7 @@
     async function normalizeImage(input) { const file = input.files?.[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800; const context = canvas.getContext('2d'); context.fillStyle = '#061f18'; context.fillRect(0, 0, 1200, 800); const ratio = form.dataset.resource === 'countries' ? Math.max : Math.min; const scale = ratio(1200 / bitmap.width, 800 / bitmap.height), width = bitmap.width * scale, height = bitmap.height * scale; context.drawImage(bitmap, (1200 - width) / 2, (800 - height) / 2, width, height); bitmap.close(); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .9)); if (!blob) throw new Error('The image could not be resized.'); normalizedFiles.set(input, new File([blob], `${crypto.randomUUID()}.jpg`, { type: 'image/jpeg' })); note(form.dataset.resource === 'countries' ? 'Image center-cropped to 1200 × 800 pixels.' : 'Image resized to 1200 × 800 pixels.') } catch (error) { input.value = ''; note(error.message || 'The image could not be resized.', true) } }
     async function uploadImage(el) { const file = normalizedFiles.get(el) || el.files?.[0]; if (!file) return el.dataset.current || ''; const folders = { countries: 'countries', cities: 'cities', sights: 'sights', collections: 'collection', 'collection-lists': 'collection', 'daily-destinations': 'daily-destinations' }, body = new FormData(); body.append('image', file); body.append('folder', folders[form.dataset.resource]); const r = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Image upload returned an invalid server response (${r.status}).`); const result = await r.json(); if (!r.ok) { const validation = Object.values(result.errors || {}).flat().join(' '); throw new Error(validation || result.message || 'Image upload failed.') } return result.imageUrl }
     form.onsubmit = async e => { e.preventDefault(); const data = {}, resource = form.dataset.resource, editId = form.dataset.editId; try { for (const f of schemas[resource]) { const el = form.elements[f[0]]; if (!el || el.disabled) continue; data[f[0]] = f[2] === 'image' ? await uploadImage(el) : f[2] === 'check' ? el.checked : f[2] === 'number' ? Number(el.value || 0) : el.value.trim() } if (resource === 'daily-destinations') data.options = data.options.split('\n').map(x => x.trim()).filter(Boolean); const path = `/admin/api/${resource}${editId ? '/' + encodeURIComponent(editId) : ''}`; await call(path, { method: editId ? 'PUT' : 'POST', body: JSON.stringify(data) }); closeEditor(); if (resource === 'collections') state.meta = await call('/admin/api/meta'); if (resource === 'cities') delete state.states[data.countryId]; await load(); note(editId ? 'Updated successfully.' : 'Created successfully.') } catch (err) { note(err.message, true) } };
-    async function removeRow(i) { const row = state.rows[i]; if (!confirm(`Delete “${row.name || row.title}”? This cannot be undone.`)) return; try { await call(`/admin/api/${state.tab}/${encodeURIComponent(row.id)}`, { method: 'DELETE' }); await load(); note('Deleted successfully.') } catch (e) { note(e.message, true) } }
+    async function removeRow(i) { const row = state.rows[i]; if (!confirm(`Delete “${row.name || row.title}”? This cannot be undone.`)) return; try { await call(`/admin/api/${state.tab}/${encodeURIComponent(row.id)}`, { method: 'DELETE' }); await load(); note('Deleted successfully.') } catch (e) { note(state.tab === 'cities' ? `Could not delete this city. It may still be used by visits or content. ${e.message}` : e.message, true) } }
     document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active')); b.classList.add('active'); state.tab = b.dataset.tab; await load() });
     if (state.key) { document.querySelector('#key').value = state.key; login() }
   </script>
