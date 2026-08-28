@@ -207,8 +207,8 @@
     }
 
     td img {
-      width: 120px;
-      height: 80px;
+      width: 72px;
+      height: 48px;
       border-radius: 8px;
       object-fit: cover;
       background: #123f30
@@ -224,7 +224,16 @@
 
     .actions {
       display: flex;
-      gap: 7px
+      gap: 7px;
+      white-space: nowrap
+    }
+
+    th:last-child,
+    td:last-child {
+      position: sticky;
+      right: 0;
+      background: var(--bg);
+      box-shadow: -8px 0 12px rgba(0, 0, 0, .12)
     }
 
     .modal {

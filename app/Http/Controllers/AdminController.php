@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -83,7 +84,9 @@ class AdminController extends Controller
     {
         $country = $request->validate(['country' => ['required', 'string', 'size:2']])['country'];
 
-        $saved = CountryState::where('country_code', strtoupper($country))->pluck('name');
+        $saved = Schema::hasTable('country_states')
+            ? CountryState::where('country_code', strtoupper($country))->pluck('name')
+            : collect();
         $legacy = City::where('country_code', strtoupper($country))
             ->whereNotNull('subcountry')->where('subcountry', '!=', '')->distinct()->pluck('subcountry');
 
@@ -92,6 +95,7 @@ class AdminController extends Controller
 
     public function storeState(Request $request): JsonResponse
     {
+        abort_unless(Schema::hasTable('country_states'), 503, 'Run php artisan migrate before adding states.');
         $data = $request->validate([
             'countryId' => ['required', 'string', 'size:2', 'exists:countries,code'],
             'name' => ['required', 'string', 'max:150'],
@@ -137,7 +141,7 @@ class AdminController extends Controller
     {
         $class = $this->classFor($type);
         $model = $type === 'cities'
-            ? City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail()
+            ? $this->findCity($id)
             : $class::findOrFail($id);
 
         return response()->json($this->present($type, $this->save($request, $type, $model)));
@@ -147,7 +151,7 @@ class AdminController extends Controller
     {
         $class = $this->classFor($type);
         $model = $type === 'cities'
-            ? City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail()
+            ? $this->findCity($id)
             : $class::findOrFail($id);
         $image = $this->modelImage($model);
         $model->delete();
@@ -195,7 +199,7 @@ class AdminController extends Controller
                 'population' => $data['population'] ?? null,
                 'image_url' => $data['imageUrl'] ?? $model?->image_url,
             ];
-            if (filled($data['state'] ?? null)) {
+            if (filled($data['state'] ?? null) && Schema::hasTable('country_states')) {
                 CountryState::firstOrCreate(
                     ['country_code' => strtoupper($data['countryId']), 'normalized_name' => $normalizedState],
                     ['name' => $data['state']],
@@ -242,6 +246,18 @@ class AdminController extends Controller
         return match ($type) {
             'countries' => Country::class, 'cities' => City::class, 'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
         };
+    }
+
+    private function findCity(string $id): City
+    {
+        $city = City::where('geoname_id', $id)->first();
+        if ($city) {
+            return $city;
+        }
+
+        abort_unless(ctype_digit($id), 404);
+
+        return City::findOrFail($id);
     }
 
     private function present(string $type, Model $model): array
