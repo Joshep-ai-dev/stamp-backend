@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\City;
 use App\Models\CollectionKind;
 use App\Models\Country;
+use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageUrl;
@@ -28,7 +29,10 @@ class ContentController extends Controller
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image)],
             'featuredIn' => [],
             'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]),
-            'states' => $country->cities->pluck('subcountry')->filter()->unique()->sort()->values(),
+            'states' => $country->code === 'US'
+                ? CountryState::where('country_code', 'US')->orderBy('name')->get()
+                    ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url)])
+                : [],
             // Always return the ordered catalog so clients can render locked
             // previews. Access to items after the first three is enforced by
             // the app entitlement and by the individual sight endpoint.
@@ -49,10 +53,10 @@ class ContentController extends Controller
     public function countryStates(string $code): JsonResponse
     {
         $country = Country::findOrFail(strtoupper($code));
-        $states = City::where('country_code', $country->code)->whereNotNull('subcountry')
-            ->where('subcountry', '!=', '')->distinct()->orderBy('subcountry')->pluck('subcountry');
+        abort_unless($country->code === 'US', 404);
 
-        return response()->json($states->map(fn ($state) => ['id' => $state, 'name' => $state, 'countryId' => $country->code]));
+        return response()->json(CountryState::where('country_code', 'US')->orderBy('name')->get()
+            ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url)]));
     }
 
     public function stateCities(string $code, string $state): JsonResponse

@@ -93,6 +93,14 @@ class AdminController extends Controller
         return response()->json($saved->merge($legacy)->unique()->sort()->values());
     }
 
+    public function stateList(): JsonResponse
+    {
+        abort_unless(Schema::hasTable('country_states'), 503, 'Run php artisan migrate before managing states.');
+
+        return response()->json(CountryState::where('country_code', 'US')->orderBy('name')->get()
+            ->map(fn ($state) => $this->adminState($state)));
+    }
+
     public function storeState(Request $request): JsonResponse
     {
         abort_unless(Schema::hasTable('country_states'), 503, 'Run php artisan migrate before adding states.');
@@ -110,9 +118,22 @@ class AdminController extends Controller
         return response()->json(['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name], $state->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function updateState(Request $request, string $id): JsonResponse
+    {
+        $state = CountryState::where('country_code', 'US')->findOrFail($id);
+        $data = $request->validate(['imageUrl' => ['nullable', 'string']]);
+        $oldImage = $state->image_url;
+        $state->update(['image_url' => $data['imageUrl'] ?? null]);
+        if ($oldImage && $oldImage !== $state->image_url) {
+            app(ImageStorage::class)->delete($oldImage);
+        }
+
+        return response()->json($this->adminState($state));
+    }
+
     public function upload(Request $request, ImageStorage $images): JsonResponse
     {
-        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['countries', 'cities', 'sights', 'collection', 'daily-destinations'])]]);
+        $data = $request->validate(['image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'], 'folder' => ['required', Rule::in(['countries', 'states', 'cities', 'sights', 'collection', 'daily-destinations'])]]);
 
         return response()->json(['imageUrl' => $images->store($data['image'], $data['folder'])], 201);
     }
@@ -270,6 +291,11 @@ class AdminController extends Controller
     private function adminCountry(Country $country): array
     {
         return ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'heroImage' => ImageUrl::public($country->hero_image)];
+    }
+
+    private function adminState(CountryState $state): array
+    {
+        return ['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name, 'imageUrl' => ImageUrl::public($state->image_url)];
     }
 
     private function adminCity(City $city): array
