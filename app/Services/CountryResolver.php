@@ -39,6 +39,9 @@ class CountryResolver
         foreach (self::CONTINENTS as $continent => $codes) {
             foreach (array_unique(explode(' ', $codes)) as $code) {
                 $name = Locale::getDisplayRegion('-'.$code, 'en');
+                if ($code === 'CV') {
+                    $name = 'Cabo Verde';
+                }
                 $map[$this->normalize($name)] = ['code' => $code, 'name' => $name, 'continent_code' => $continent, 'flag' => $this->flag($code)];
                 $map[strtolower($code)] = $map[$this->normalize($name)];
             }
