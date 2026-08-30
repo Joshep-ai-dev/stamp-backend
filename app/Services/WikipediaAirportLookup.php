@@ -8,7 +8,7 @@ use Throwable;
 
 class WikipediaAirportLookup
 {
-    private const SOURCE = 'https://en.wikipedia.org/wiki/List_of_international_airports_by_country';
+    private const SOURCE = 'https://en.wikipedia.org/w/api.php';
 
     public function __construct(private readonly CountryResolver $countryResolver) {}
 
@@ -31,12 +31,42 @@ class WikipediaAirportLookup
             ])->all();
     }
 
+    public function forState(string $countryCode, string $stateName): array
+    {
+        $state = $this->normalize($stateName);
+
+        return collect($this->download())
+            ->where('countryCode', strtoupper($countryCode))
+            ->filter(fn (array $airport): bool => $this->normalize($airport['state'] ?? '') === $state)
+            ->sortBy([['municipality', 'asc'], ['name', 'asc']])
+            ->values()
+            ->map(fn (array $airport): array => [
+                'id' => $airport['iataCode'],
+                'name' => $airport['name'],
+                'iataCode' => $airport['iataCode'],
+                'icaoCode' => null,
+                'city' => $airport['municipality'],
+                'state' => $airport['state'],
+                'countryCode' => $airport['countryCode'],
+            ])->all();
+    }
+
     private function download(): array
     {
-        $html = Http::withHeaders([
+        $response = Http::withHeaders([
             'User-Agent' => 'Kroo Travel airport lookup/1.0 (Laravel application)',
-            'Accept-Language' => 'en',
-        ])->timeout(30)->get(self::SOURCE)->throw()->body();
+        ])->timeout(30)->get(self::SOURCE, [
+            'action' => 'parse',
+            'page' => 'List_of_international_airports_by_country',
+            'prop' => 'text',
+            'format' => 'json',
+            'formatversion' => 2,
+        ])->throw();
+
+        $html = $response->json('parse.text');
+        if (! is_string($html) || $html === '') {
+            throw new \RuntimeException('Wikipedia API did not return parsed article HTML.');
+        }
 
         preg_match_all('~<h[34]\b[^>]*>.*?</h[34]>|<table\b[^>]*>.*?</table>~is', $html, $blocks);
         $countryCode = null;
@@ -69,10 +99,12 @@ class WikipediaAirportLookup
                     $municipality = $cells[0];
                     $name = $cells[1];
                     $iataCode = $cells[$iataIndex];
+                    $state = $cells[$iataIndex + 1] ?? null;
                     $lastMunicipality = $municipality;
                 } elseif ($iataIndex === 1 && $lastMunicipality) {
                     $name = $cells[0];
                     $iataCode = $cells[1];
+                    $state = $cells[2] ?? null;
                     $municipality = $lastMunicipality;
                 } else {
                     continue;
@@ -80,7 +112,7 @@ class WikipediaAirportLookup
 
                 $iataCode = strtoupper(trim($iataCode));
                 if ($municipality !== '' && $name !== '' && preg_match('/^[A-Z0-9]{3}$/', $iataCode)) {
-                    $airports[$iataCode] = compact('countryCode', 'municipality', 'name', 'iataCode');
+                    $airports[$iataCode] = compact('countryCode', 'municipality', 'name', 'iataCode', 'state');
                 }
             }
         }

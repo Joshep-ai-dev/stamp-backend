@@ -161,6 +161,14 @@ class ContentController extends Controller
         return response()->json($airports->forCity($city->country_code, $city->name));
     }
 
+    public function stateAirports(string $code, string $state, WikipediaAirportLookup $airports): JsonResponse
+    {
+        abort_unless(strtoupper($code) === 'US', 404);
+        CountryState::where('country_code', 'US')->where('name', $state)->firstOrFail();
+
+        return response()->json($airports->forState('US', $state));
+    }
+
     private function visibleSights(Request $request, $sights)
     {
         return $request->user('sanctum')?->plan === 'pro'
