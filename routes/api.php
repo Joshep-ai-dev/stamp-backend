@@ -55,4 +55,5 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/sights/{id}', [ContentController::class, 'sight']);
     Route::get('/catalog/cities/{id}', [ContentController::class, 'city']);
     Route::get('/catalog/cities/{id}/sights', [ContentController::class, 'citySights']);
+    Route::get('/catalog/cities/{id}/airports', [ContentController::class, 'cityAirports']);
 });

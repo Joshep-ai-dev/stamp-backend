@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\City;
+use App\Models\Airport;
 use App\Models\CollectionKind;
 use App\Models\Country;
 use App\Models\CountryState;
@@ -11,6 +12,7 @@ use App\Models\Sight;
 use App\Services\ImageUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ContentController extends Controller
 {
@@ -71,18 +73,36 @@ class ContentController extends Controller
     public function state(Request $request, string $code, string $state): JsonResponse
     {
         $country = Country::findOrFail(strtoupper($code));
-        $cities = City::where('country_code', $country->code)->where('subcountry', $state)->orderBy('name')->get();
-        abort_if($cities->isEmpty(), 404);
+        abort_unless($country->code === 'US', 404);
+        $stateRecord = CountryState::where('country_code', 'US')
+            ->where('normalized_name', Str::of($state)->ascii()->lower()->squish()->toString())
+            ->first();
+        $stateName = $stateRecord?->name ?? City::where('country_code', 'US')
+            ->where(fn ($query) => $query->where('subcountry', $state)
+                ->orWhere('normalized_subcountry', Str::of($state)->ascii()->lower()->squish()->toString()))
+            ->value('subcountry');
+        abort_unless($stateName, 404);
+        $cities = City::where('country_code', $country->code)->where('subcountry', $stateName)->orderBy('name')->get();
         $cityIds = $cities->pluck('id');
-        $sights = Sight::with(['country', 'city'])->whereIn('city_id', $cityIds)->orderBy('name')->get();
-        $visibleSights = $this->visibleSights($request, $sights);
+        $sights = Sight::with(['country', 'city'])->whereIn('city_id', $cityIds)
+            ->where('is_featured', true)->orderBy('name')->get();
+        $user = $request->user('sanctum');
+        $visits = $user?->visits()->where('country_code', 'US')->where('subcountry', $stateName)->get() ?? collect();
+        $completed = $user?->completions()->pluck('sight_id') ?? collect();
 
         return response()->json([
-            'id' => $state,
-            'name' => $state,
+            'id' => (string) ($stateRecord?->id ?? $stateName),
+            'name' => $stateName,
+            'imageUrl' => ImageUrl::public($stateRecord?->image_url),
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
             'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
-            'sights' => $visibleSights->map(fn ($sight) => $this->sightItem($sight)),
+            'sights' => $sights->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
+            'stats' => [
+                'cities' => $visits->pluck('city_id')->unique()->count(),
+                'sights' => $completed->intersect($sights->pluck('id'))->count(),
+                'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count(),
+            ],
+            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name])->values(),
         ]);
     }
 
@@ -132,6 +152,16 @@ class ContentController extends Controller
         $sights = Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get();
 
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
+    }
+
+    public function cityAirports(string $id): JsonResponse
+    {
+        $city = City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
+
+        return response()->json(Airport::where('country_code', $city->country_code)
+            ->where('normalized_municipality', $city->normalized_name)
+            ->orderBy('name')->get()
+            ->map(fn ($airport) => ['id' => (string) $airport->source_id, 'name' => $airport->name, 'iataCode' => $airport->iata_code, 'icaoCode' => $airport->icao_code]));
     }
 
     private function visibleSights(Request $request, $sights)
