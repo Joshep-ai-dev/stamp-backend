@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\City;
-use App\Models\Airport;
 use App\Models\CollectionKind;
 use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageUrl;
+use App\Services\WikipediaAirportLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -154,14 +154,11 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function cityAirports(string $id): JsonResponse
+    public function cityAirports(string $id, WikipediaAirportLookup $airports): JsonResponse
     {
         $city = City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
 
-        return response()->json(Airport::where('country_code', $city->country_code)
-            ->where('normalized_municipality', $city->normalized_name)
-            ->orderBy('name')->get()
-            ->map(fn ($airport) => ['id' => (string) $airport->source_id, 'name' => $airport->name, 'iataCode' => $airport->iata_code, 'icaoCode' => $airport->icao_code]));
+        return response()->json($airports->forCity($city->country_code, $city->name));
     }
 
     private function visibleSights(Request $request, $sights)
