@@ -19,8 +19,8 @@ class WikipediaAirportLookup
 
         return collect($catalog)
             ->where('countryCode', strtoupper($countryCode))
-            ->filter(fn (array $airport): bool => collect(preg_split('~\s*/\s*~', $airport['municipality']))
-                ->contains(fn (string $municipality): bool => $this->normalize($municipality) === $city))
+            ->filter(fn (array $airport): bool => collect($this->municipalityNames($airport['municipality']))
+                ->contains(fn (string $municipality): bool => $this->cityNamesMatch($city, $municipality)))
             ->sortBy('name')
             ->values()
             ->map(fn (array $airport): array => [
@@ -38,12 +38,12 @@ class WikipediaAirportLookup
             'Accept-Language' => 'en',
         ])->timeout(30)->get(self::SOURCE)->throw()->body();
 
-        preg_match_all('~<h4\b[^>]*>.*?</h4>|<table\b[^>]*>.*?</table>~is', $html, $blocks);
+        preg_match_all('~<h[34]\b[^>]*>.*?</h[34]>|<table\b[^>]*>.*?</table>~is', $html, $blocks);
         $countryCode = null;
         $airports = [];
 
         foreach ($blocks[0] as $block) {
-            if (preg_match('~^<h4\b~i', $block)) {
+            if (preg_match('~^<h[34]\b~i', $block)) {
                 try {
                     $countryCode = $this->countryResolver->resolve($this->cleanHtml($block))['code'];
                 } catch (Throwable) {
@@ -64,11 +64,15 @@ class WikipediaAirportLookup
                 preg_match_all('~<td\b[^>]*>(.*?)</td>~is', $tableRow, $cells);
                 $cells = array_map(fn (string $cell): string => $this->cleanHtml($cell), $cells[1]);
 
-                if (count($cells) >= 3) {
-                    [$municipality, $name, $iataCode] = array_slice($cells, 0, 3);
+                $iataIndex = collect($cells)->search(fn (string $cell): bool => (bool) preg_match('/^[A-Z0-9]{3}$/', strtoupper(trim($cell))));
+                if (is_int($iataIndex) && $iataIndex >= 2) {
+                    $municipality = $cells[0];
+                    $name = $cells[1];
+                    $iataCode = $cells[$iataIndex];
                     $lastMunicipality = $municipality;
-                } elseif (count($cells) === 2 && $lastMunicipality) {
-                    [$name, $iataCode] = $cells;
+                } elseif ($iataIndex === 1 && $lastMunicipality) {
+                    $name = $cells[0];
+                    $iataCode = $cells[1];
                     $municipality = $lastMunicipality;
                 } else {
                     continue;
@@ -101,5 +105,23 @@ class WikipediaAirportLookup
     private function normalize(string $value): string
     {
         return Str::of($value)->ascii()->lower()->squish()->toString();
+    }
+
+    private function municipalityNames(string $value): array
+    {
+        return collect(preg_split('~\s*/\s*~', $value) ?: [])
+            ->flatMap(fn (string $name): array => [$name, preg_replace('/\s*\([^)]*\)\s*/', ' ', $name) ?? $name])
+            ->map(fn (string $name): string => $this->normalize($name))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function cityNamesMatch(string $city, string $municipality): bool
+    {
+        return $city === $municipality
+            || str_starts_with($city, $municipality.' ')
+            || str_starts_with($municipality, $city.' ');
     }
 }
