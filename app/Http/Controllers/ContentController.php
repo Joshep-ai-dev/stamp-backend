@@ -10,12 +10,20 @@ use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageUrl;
 use App\Services\WikipediaAirportLookup;
+use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ContentController extends Controller
 {
+    public function nearby(Request $request, NearbyCatalogLookup $lookup): JsonResponse
+    {
+        $data = $request->validate(['latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180'], 'radius' => ['sometimes', 'integer', 'min:100', 'max:10000']]);
+
+        return response()->json($lookup->find((float) $data['latitude'], (float) $data['longitude'], (int) ($data['radius'] ?? 1000)));
+    }
+
     public function country(Request $request, string $code): JsonResponse
     {
         $country = Country::with('cities')->findOrFail(strtoupper($code));

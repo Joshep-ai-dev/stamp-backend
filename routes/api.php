@@ -42,7 +42,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/countries', [CountryController::class, 'index']);
         Route::get('/cities', [CityController::class, 'index']);
         Route::get('/cities/{geonameId}', [CityController::class, 'show']);
-        Route::get('/catalog/version', [CatalogController::class, 'version']);
+    Route::get('/catalog/version', [CatalogController::class, 'version']);
+    Route::get('/catalog/nearby', [ContentController::class, 'nearby']);
     });
     Route::get('/daily-destinations', [ContentController::class, 'dailyDestinations']);
     Route::get('/community/leaderboard', [CommunityController::class, 'leaderboard']);
