@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [WebsiteController::class, 'index'])->name('website.home');
 Route::get('/kroo-website', [WebsiteController::class, 'index'])->name('website.legacy');
 Route::get('/images/{folder}/{filename}', [LegacyImageController::class, 'public'])
-    ->where('folder', 'sights|users|collection|daily-destinations|countries|cities')
+    ->where('folder', 'sights|users|collection|daily-destinations|countries|states|cities')
     ->where('filename', '[A-Za-z0-9._-]+')
     ->name('images.public');
 Route::get('/storage/images/{filename}', [LegacyImageController::class, 'show'])->name('images.legacy');

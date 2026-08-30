@@ -5,17 +5,26 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use SplFileObject;
 
 class ImportAirports extends Command
 {
-    protected $signature = 'airports:import {source=https://davidmegginson.github.io/ourairports-data/airports.csv}';
+    protected $signature = 'airports:import {source=https://davidmegginson.github.io/ourairports-data/airports.csv} {--force}';
 
     protected $description = 'Import scheduled airports with IATA codes from the public-domain OurAirports CSV';
 
     public function handle(): int
     {
+        if (! Schema::hasTable('airports')) {
+            $this->error('Run php artisan migrate before importing airports.');
+            return self::FAILURE;
+        }
+        if (DB::table('airports')->exists() && ! $this->option('force')) {
+            $this->info('Airports are already imported. Use --force to refresh them.');
+            return self::SUCCESS;
+        }
         $source = (string) $this->argument('source');
         $path = $source;
         if (filter_var($source, FILTER_VALIDATE_URL)) {
