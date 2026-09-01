@@ -7,10 +7,22 @@ use Illuminate\Support\Str;
 
 class AirportLookup
 {
+    private const CITY_MUNICIPALITIES = [
+        'TR:istanbul' => ['istanbul', 'arnavutkoy'],
+    ];
+
+    private const RETIRED_PASSENGER_AIRPORTS = ['LTBA'];
+
     public function forCity(string $countryCode, string $cityName): array
     {
-        return Airport::query()->where('country_code', strtoupper($countryCode))
-            ->where('normalized_city', $this->normalize($cityName))->orderBy('name')->get()
+        $countryCode = strtoupper($countryCode);
+        $city = $this->normalize($cityName);
+        $municipalities = self::CITY_MUNICIPALITIES[$countryCode.':'.$city] ?? [$city];
+
+        return Airport::query()->where('country_code', $countryCode)
+            ->whereIn('normalized_city', $municipalities)
+            ->whereNotIn('icao_code', self::RETIRED_PASSENGER_AIRPORTS)
+            ->orderBy('name')->get()
             ->map(fn (Airport $airport) => $this->item($airport))->all();
     }
 
