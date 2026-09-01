@@ -18,6 +18,7 @@ return new class extends Migration
             'iata_code' => fn (Blueprint $table) => $table->string('iata_code', 8)->nullable(),
             'name' => fn (Blueprint $table) => $table->string('name')->nullable(),
             'municipality' => fn (Blueprint $table) => $table->string('municipality')->default(''),
+            'normalized_municipality' => fn (Blueprint $table) => $table->string('normalized_municipality')->default(''),
             'normalized_city' => fn (Blueprint $table) => $table->string('normalized_city')->nullable(),
             'city' => fn (Blueprint $table) => $table->string('city')->nullable(),
             'normalized_state' => fn (Blueprint $table) => $table->string('normalized_state')->nullable(),

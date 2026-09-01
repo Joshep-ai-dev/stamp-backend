@@ -23,7 +23,7 @@ class ImportAirports extends Command
             : file_get_contents($source);
         if (! is_string($json)) throw new RuntimeException("Airport source is not readable: {$source}");
         $catalog = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-        $now = now(); $rows = []; $seen = [];
+        $now = now(); $rows = []; $seen = []; $seenIata = [];
         foreach ($catalog as $key => $item) {
             $icao = strtoupper(trim((string) ($item['icao'] ?? $key)));
             $country = strtoupper(trim((string) ($item['country'] ?? '')));
@@ -31,12 +31,20 @@ class ImportAirports extends Command
             if (! preg_match('/^[A-Z0-9]{1,8}$/', $icao) || strlen($country) !== 2 || ! is_numeric($lat) || ! is_numeric($lon)) continue;
             $city = trim((string) ($item['city'] ?? '')) ?: null;
             $state = trim((string) ($item['state'] ?? '')) ?: null;
+            $iata = strtoupper(trim((string) ($item['iata'] ?? ''))) ?: null;
+            if ($iata !== null && isset($seenIata[$iata])) {
+                $iata = null;
+            } elseif ($iata !== null) {
+                $seenIata[$iata] = true;
+            }
             $rows[] = [
                 'source_id' => $this->sourceId($icao), 'icao_code' => $icao,
-                'iata_code' => strtoupper(trim((string) ($item['iata'] ?? ''))) ?: null,
+                'iata_code' => $iata,
                 'name' => trim((string) ($item['name'] ?? $icao)),
-                'municipality' => $city ?? '', 'city' => $city,
-                'normalized_city' => $city ? $this->normalize($city) : null, 'state' => $state,
+                'municipality' => $city ?? '',
+                'normalized_municipality' => $city ? $this->normalize($city) : '',
+                'city' => $city, 'normalized_city' => $city ? $this->normalize($city) : null,
+                'state' => $state,
                 'normalized_state' => $state ? $this->normalize($state) : null, 'country_code' => $country,
                 'latitude' => (float) $lat, 'longitude' => (float) $lon,
                 'elevation' => is_numeric($item['elevation'] ?? null) ? (int) $item['elevation'] : null,
@@ -53,7 +61,7 @@ class ImportAirports extends Command
 
     private function flush(array $rows): void
     {
-        Airport::upsert($rows, ['icao_code'], ['iata_code', 'name', 'municipality', 'normalized_city', 'city', 'normalized_state', 'state', 'country_code', 'latitude', 'longitude', 'elevation', 'timezone', 'updated_at']);
+        Airport::upsert($rows, ['icao_code'], ['iata_code', 'name', 'municipality', 'normalized_municipality', 'normalized_city', 'city', 'normalized_state', 'state', 'country_code', 'latitude', 'longitude', 'elevation', 'timezone', 'updated_at']);
     }
 
     private function normalize(string $value): string
