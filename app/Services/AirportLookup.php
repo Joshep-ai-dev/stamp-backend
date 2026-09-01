@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class AirportLookup
 {
     private const CITY_MUNICIPALITIES = [
-        'TR:istanbul' => ['istanbul', 'arnavutkoy'],
+        'TR:istanbul' => ['istanbul', 'arnavutkoy', 'pendik'],
     ];
 
     private const RETIRED_PASSENGER_AIRPORTS = ['LTBA'];

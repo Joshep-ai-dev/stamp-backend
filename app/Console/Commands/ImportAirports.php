@@ -31,16 +31,28 @@ class ImportAirports extends Command
             throw new RuntimeException('mwgg/Airports returned an invalid JSON catalog.');
         }
 
+        $countryCodes = DB::table('countries')->pluck('code')
+            ->mapWithKeys(fn (string $code): array => [strtoupper(trim($code)) => true])
+            ->all();
+        if ($countryCodes === []) {
+            throw new RuntimeException('No countries exist; import the country catalog first.');
+        }
+
         $now = now();
         $rows = [];
         $seenIcao = [];
         $seenIata = [];
+        $skipped = 0;
 
         foreach ($catalog as $key => $item) {
             if (! is_array($item)) continue;
             $icao = strtoupper(trim((string) ($item['icao'] ?? $key)));
             $iata = strtoupper(trim((string) ($item['iata'] ?? '')));
             $country = strtoupper(trim((string) ($item['country'] ?? '')));
+            $country = match ($country) {
+                'KS' => 'XK',
+                default => $country,
+            };
             $latitude = $item['lat'] ?? null;
             $longitude = $item['lon'] ?? null;
 
@@ -49,8 +61,11 @@ class ImportAirports extends Command
             if (! preg_match('/^[A-Z0-9]{3}$/', $iata)
                 || ! preg_match('/^[A-Z0-9]{1,8}$/', $icao)
                 || isset($seenIata[$iata]) || isset($seenIcao[$icao])
-                || strlen($country) !== 2
-                || ! is_numeric($latitude) || ! is_numeric($longitude)) continue;
+                || ! isset($countryCodes[$country])
+                || ! is_numeric($latitude) || ! is_numeric($longitude)) {
+                $skipped++;
+                continue;
+            }
 
             $city = trim((string) ($item['city'] ?? '')) ?: null;
             $state = trim((string) ($item['state'] ?? '')) ?: null;
@@ -83,7 +98,7 @@ class ImportAirports extends Command
             }
         });
 
-        $this->info('Imported '.count($rows).' IATA-coded airports from mwgg/Airports.');
+        $this->info('Imported '.count($rows).' IATA-coded airports from mwgg/Airports; skipped '.$skipped.' invalid or unsupported records.');
         return self::SUCCESS;
     }
 
