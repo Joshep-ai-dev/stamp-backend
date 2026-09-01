@@ -2,59 +2,37 @@
 
 namespace App\Services;
 
-use App\Models\CollectionList;
-use App\Models\Sight;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use App\Models\Airport;
 
 class NearbyCatalogLookup
 {
-    public function find(float $latitude, float $longitude, int $radius = 1000): array
+    public function find(float $latitude, float $longitude, int $radius = 3000): array
     {
-        $response = Http::withHeaders(['User-Agent' => 'Kroo Travel nearby-place lookup/1.0'])
-            ->timeout(20)->get('https://en.wikipedia.org/w/api.php', [
-                'action' => 'query', 'list' => 'geosearch',
-                'gscoord' => $latitude.'|'.$longitude,
-                'gsradius' => $radius, 'gslimit' => 50, 'gsnamespace' => 0,
-                'format' => 'json', 'formatversion' => 2, 'origin' => '*',
-            ])->throw();
+        $latitudeDelta = $radius / 111320;
+        $longitudeDelta = $radius / max(1, 111320 * cos(deg2rad($latitude)));
 
-        $nearby = collect($response->json('query.geosearch', []));
-        $matches = [];
-        foreach (Sight::with('city')->where('is_featured', true)->get() as $sight) {
-            if ($page = $this->matchingPage($nearby, $sight->name)) {
-                $matches[] = $this->result('sight', (string) $sight->id, $sight->name, $sight->city?->name, $sight->country_code, $page);
-            }
-        }
-        foreach (CollectionList::with(['kind', 'city'])->whereHas('kind', fn ($query) => $query->where('is_published', true))->get() as $place) {
-            if ($page = $this->matchingPage($nearby, $place->title)) {
-                $matches[] = $this->result('collection', (string) $place->id, $place->title, $place->city?->name, $place->city?->country_code, $page);
-            }
-        }
-
-        usort($matches, fn (array $a, array $b) => $a['distanceMeters'] <=> $b['distanceMeters']);
-
-        return $matches;
+        return Airport::query()
+            ->whereBetween('latitude', [$latitude - $latitudeDelta, $latitude + $latitudeDelta])
+            ->whereBetween('longitude', [$longitude - $longitudeDelta, $longitude + $longitudeDelta])
+            ->get()
+            ->map(function (Airport $airport) use ($latitude, $longitude): array {
+                return [
+                    'id' => $airport->iata_code ?: $airport->icao_code, 'type' => 'airport',
+                    'name' => $airport->name, 'city' => $airport->city,
+                    'countryCode' => $airport->country_code,
+                    'distanceMeters' => (int) round($this->distanceMeters($latitude, $longitude, $airport->latitude, $airport->longitude)),
+                    'latitude' => $airport->latitude, 'longitude' => $airport->longitude,
+                    'iataCode' => $airport->iata_code, 'icaoCode' => $airport->icao_code,
+                ];
+            })
+            ->filter(fn (array $airport): bool => $airport['distanceMeters'] <= $radius)
+            ->sortBy('distanceMeters')->values()->all();
     }
 
-    private function matchingPage($pages, string $name): ?array
+    private function distanceMeters(float $lat1, float $lon1, float $lat2, float $lon2): float
     {
-        $name = $this->normalize($name);
-        if (mb_strlen($name) < 4) return null;
-
-        return $pages->first(function (array $page) use ($name): bool {
-            $title = $this->normalize((string) ($page['title'] ?? ''));
-            return $title === $name || str_contains($title, $name) || str_contains($name, $title);
-        });
-    }
-
-    private function result(string $type, string $id, string $name, ?string $city, ?string $countryCode, array $page): array
-    {
-        return ['id' => $id, 'type' => $type, 'name' => $name, 'city' => $city, 'countryCode' => $countryCode, 'distanceMeters' => (int) round((float) $page['dist']), 'latitude' => (float) $page['lat'], 'longitude' => (float) $page['lon'], 'wikipediaTitle' => $page['title']];
-    }
-
-    private function normalize(string $value): string
-    {
-        return Str::of($value)->ascii()->lower()->replaceMatches('/[^a-z0-9]+/', ' ')->squish()->toString();
+        $latDelta = deg2rad($lat2 - $lat1); $lonDelta = deg2rad($lon2 - $lon1);
+        $a = sin($latDelta / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lonDelta / 2) ** 2;
+        return 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

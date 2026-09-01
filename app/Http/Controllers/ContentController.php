@@ -9,7 +9,7 @@ use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageUrl;
-use App\Services\WikipediaAirportLookup;
+use App\Services\AirportLookup;
 use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +21,7 @@ class ContentController extends Controller
     {
         $data = $request->validate(['latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180'], 'radius' => ['sometimes', 'integer', 'min:100', 'max:10000']]);
 
-        return response()->json($lookup->find((float) $data['latitude'], (float) $data['longitude'], (int) ($data['radius'] ?? 1000)));
+        return response()->json($lookup->find((float) $data['latitude'], (float) $data['longitude'], (int) ($data['radius'] ?? 3000)));
     }
 
     public function country(Request $request, string $code): JsonResponse
@@ -162,14 +162,14 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function cityAirports(string $id, WikipediaAirportLookup $airports): JsonResponse
+    public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
         $city = City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
 
         return response()->json($airports->forCity($city->country_code, $city->name));
     }
 
-    public function stateAirports(string $code, string $state, WikipediaAirportLookup $airports): JsonResponse
+    public function stateAirports(string $code, string $state, AirportLookup $airports): JsonResponse
     {
         abort_unless(strtoupper($code) === 'US', 404);
         CountryState::where('country_code', 'US')->where('name', $state)->firstOrFail();
