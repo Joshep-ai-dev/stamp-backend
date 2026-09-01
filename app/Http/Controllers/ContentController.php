@@ -195,7 +195,7 @@ class ContentController extends Controller
 
     public function sightItem(Sight $item): array
     {
-        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city?->geoname_id, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city?->geoname_id, 'city' => $item->city?->name, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
     }
 
     public function collectionItem(CollectionKind $item): array
