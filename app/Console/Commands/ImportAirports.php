@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Airport;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -23,39 +24,62 @@ class ImportAirports extends Command
             : file_get_contents($source);
         if (! is_string($json)) throw new RuntimeException("Airport source is not readable: {$source}");
         $catalog = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-        $now = now(); $rows = []; $seen = []; $seenIata = [];
-        foreach ($catalog as $key => $item) {
-            $icao = strtoupper(trim((string) ($item['icao'] ?? $key)));
-            $country = strtoupper(trim((string) ($item['country'] ?? '')));
-            $lat = $item['lat'] ?? null; $lon = $item['lon'] ?? null;
-            if (! preg_match('/^[A-Z0-9]{1,8}$/', $icao) || strlen($country) !== 2 || ! is_numeric($lat) || ! is_numeric($lon)) continue;
-            $city = trim((string) ($item['city'] ?? '')) ?: null;
-            $state = trim((string) ($item['state'] ?? '')) ?: null;
-            $iata = strtoupper(trim((string) ($item['iata'] ?? ''))) ?: null;
-            if ($iata !== null && isset($seenIata[$iata])) {
-                $iata = null;
-            } elseif ($iata !== null) {
-                $seenIata[$iata] = true;
+        $countryCodes = DB::table('countries')->pluck('code')
+            ->mapWithKeys(fn (string $code): array => [strtoupper($code) => true])
+            ->all();
+        if ($countryCodes === []) throw new RuntimeException('No countries exist; import the country catalog first.');
+
+        $now = now(); $rows = []; $seen = []; $seenIata = []; $skipped = 0;
+        DB::beginTransaction();
+
+        try {
+            // A previous interrupted import may have assigned an IATA code to
+            // an obsolete ICAO row. Rebuild these assignments atomically.
+            Airport::query()->update(['iata_code' => null]);
+
+            foreach ($catalog as $key => $item) {
+                $icao = strtoupper(trim((string) ($item['icao'] ?? $key)));
+                $country = strtoupper(trim((string) ($item['country'] ?? '')));
+                $lat = $item['lat'] ?? null; $lon = $item['lon'] ?? null;
+                if (! preg_match('/^[A-Z0-9]{1,8}$/', $icao) || ! isset($countryCodes[$country]) || ! is_numeric($lat) || ! is_numeric($lon)) {
+                    $skipped++;
+                    continue;
+                }
+                $city = trim((string) ($item['city'] ?? '')) ?: null;
+                $state = trim((string) ($item['state'] ?? '')) ?: null;
+                $iata = strtoupper(trim((string) ($item['iata'] ?? ''))) ?: null;
+                if ($iata !== null && isset($seenIata[$iata])) {
+                    $iata = null;
+                } elseif ($iata !== null) {
+                    $seenIata[$iata] = true;
+                }
+                $rows[] = [
+                    'source_id' => $this->sourceId($icao), 'icao_code' => $icao,
+                    'iata_code' => $iata,
+                    'name' => trim((string) ($item['name'] ?? $icao)),
+                    'municipality' => $city ?? '',
+                    'normalized_municipality' => $city ? $this->normalize($city) : '',
+                    'city' => $city, 'normalized_city' => $city ? $this->normalize($city) : null,
+                    'state' => $state,
+                    'normalized_state' => $state ? $this->normalize($state) : null, 'country_code' => $country,
+                    'latitude' => (float) $lat, 'longitude' => (float) $lon,
+                    'elevation' => is_numeric($item['elevation'] ?? null) ? (int) $item['elevation'] : null,
+                    'timezone' => trim((string) ($item['tz'] ?? '')) ?: null, 'created_at' => $now, 'updated_at' => $now,
+                ];
+                $seen[] = $icao;
+                if (count($rows) >= 750) { $this->flush($rows); $rows = []; }
             }
-            $rows[] = [
-                'source_id' => $this->sourceId($icao), 'icao_code' => $icao,
-                'iata_code' => $iata,
-                'name' => trim((string) ($item['name'] ?? $icao)),
-                'municipality' => $city ?? '',
-                'normalized_municipality' => $city ? $this->normalize($city) : '',
-                'city' => $city, 'normalized_city' => $city ? $this->normalize($city) : null,
-                'state' => $state,
-                'normalized_state' => $state ? $this->normalize($state) : null, 'country_code' => $country,
-                'latitude' => (float) $lat, 'longitude' => (float) $lon,
-                'elevation' => is_numeric($item['elevation'] ?? null) ? (int) $item['elevation'] : null,
-                'timezone' => trim((string) ($item['tz'] ?? '')) ?: null, 'created_at' => $now, 'updated_at' => $now,
-            ];
-            $seen[] = $icao;
-            if (count($rows) >= 750) { $this->flush($rows); $rows = []; }
+
+            if ($rows) $this->flush($rows);
+            if ($this->option('prune')) Airport::whereNotIn('icao_code', $seen)->delete();
+            DB::commit();
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+
+            throw $exception;
         }
-        if ($rows) $this->flush($rows);
-        if ($this->option('prune')) Airport::whereNotIn('icao_code', $seen)->delete();
-        $this->info('Imported '.count($seen).' airports.');
+
+        $this->info('Imported '.count($seen).' airports; skipped '.$skipped.' invalid or unsupported records.');
         return self::SUCCESS;
     }
 
