@@ -28,13 +28,14 @@ class ImportAirports extends Command
             $icao = strtoupper(trim((string) ($item['icao'] ?? $key)));
             $country = strtoupper(trim((string) ($item['country'] ?? '')));
             $lat = $item['lat'] ?? null; $lon = $item['lon'] ?? null;
-            if ($icao === '' || strlen($country) !== 2 || ! is_numeric($lat) || ! is_numeric($lon)) continue;
+            if (! preg_match('/^[A-Z0-9]{1,8}$/', $icao) || strlen($country) !== 2 || ! is_numeric($lat) || ! is_numeric($lon)) continue;
             $city = trim((string) ($item['city'] ?? '')) ?: null;
             $state = trim((string) ($item['state'] ?? '')) ?: null;
             $rows[] = [
-                'source_id' => $icao, 'icao_code' => $icao,
+                'source_id' => $this->sourceId($icao), 'icao_code' => $icao,
                 'iata_code' => strtoupper(trim((string) ($item['iata'] ?? ''))) ?: null,
-                'name' => trim((string) ($item['name'] ?? $icao)), 'city' => $city,
+                'name' => trim((string) ($item['name'] ?? $icao)),
+                'municipality' => $city ?? '', 'city' => $city,
                 'normalized_city' => $city ? $this->normalize($city) : null, 'state' => $state,
                 'normalized_state' => $state ? $this->normalize($state) : null, 'country_code' => $country,
                 'latitude' => (float) $lat, 'longitude' => (float) $lon,
@@ -52,11 +53,18 @@ class ImportAirports extends Command
 
     private function flush(array $rows): void
     {
-        Airport::upsert($rows, ['icao_code'], ['iata_code', 'name', 'normalized_city', 'city', 'normalized_state', 'state', 'country_code', 'latitude', 'longitude', 'elevation', 'timezone', 'updated_at']);
+        Airport::upsert($rows, ['icao_code'], ['iata_code', 'name', 'municipality', 'normalized_city', 'city', 'normalized_state', 'state', 'country_code', 'latitude', 'longitude', 'elevation', 'timezone', 'updated_at']);
     }
 
     private function normalize(string $value): string
     {
         return Str::of($value)->ascii()->lower()->squish()->toString();
+    }
+
+    private function sourceId(string $icao): int
+    {
+        // Preserve leading zeroes by reserving a separate base-36 range for
+        // each code length. The largest possible value easily fits BIGINT.
+        return strlen($icao) * 2_821_109_907_456 + intval($icao, 36);
     }
 }

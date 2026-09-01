@@ -13,10 +13,11 @@ return new class extends Migration
         }
 
         $columns = [
-            'source_id' => fn (Blueprint $table) => $table->string('source_id', 191)->nullable(),
+            'source_id' => fn (Blueprint $table) => $table->unsignedBigInteger('source_id')->nullable(),
             'icao_code' => fn (Blueprint $table) => $table->string('icao_code', 8)->nullable(),
             'iata_code' => fn (Blueprint $table) => $table->string('iata_code', 8)->nullable(),
             'name' => fn (Blueprint $table) => $table->string('name')->nullable(),
+            'municipality' => fn (Blueprint $table) => $table->string('municipality')->default(''),
             'normalized_city' => fn (Blueprint $table) => $table->string('normalized_city')->nullable(),
             'city' => fn (Blueprint $table) => $table->string('city')->nullable(),
             'normalized_state' => fn (Blueprint $table) => $table->string('normalized_state')->nullable(),

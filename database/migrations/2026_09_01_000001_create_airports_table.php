@@ -17,10 +17,11 @@ return new class extends Migration
 
         Schema::create('airports', function (Blueprint $table): void {
             $table->id();
-            $table->string('source_id', 191)->unique();
+            $table->unsignedBigInteger('source_id')->unique();
             $table->string('icao_code', 8)->unique();
             $table->string('iata_code', 8)->nullable()->index();
             $table->string('name');
+            $table->string('municipality')->default('');
             $table->string('normalized_city')->nullable()->index();
             $table->string('city')->nullable();
             $table->string('normalized_state')->nullable()->index();
