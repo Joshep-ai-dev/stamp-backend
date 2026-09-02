@@ -12,7 +12,7 @@
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#002f24;border-radius:18px;overflow:hidden;border:1px solid #bd8058;">
                 <tr>
                     <td align="center" style="padding:34px 30px 18px;">
-                        <img src="{{ rtrim(config('app.url'), '/') }}/assets/kroo-logo.png" width="190" alt="Kroo" style="display:block;width:190px;max-width:70%;height:auto;border:0;">
+                        <img src="{{ $message->embed(resource_path('views/kroo_logo_text.png')) }}" width="190" alt="Kroo" style="display:block;width:190px;max-width:70%;height:auto;border:0;">
                     </td>
                 </tr>
                 <tr>

@@ -42,7 +42,10 @@ class AuthController extends Controller
             'hash' => Hash::make($code),
             'attempts' => 0,
         ], now()->addMinutes(10));
-        Mail::send('emails.verification-code', [
+        Mail::send([
+            'html' => 'emails.verification-code',
+            'text' => 'emails.verification-code-text',
+        ], [
             'code' => $code,
             'purpose' => $data['purpose'],
         ], function ($message) use ($email): void {
