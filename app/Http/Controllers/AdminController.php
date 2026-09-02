@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -175,7 +176,24 @@ class AdminController extends Controller
             ? $this->findCity($id)
             : $class::findOrFail($id);
         $image = $this->modelImage($model);
-        $model->delete();
+        if ($model instanceof City) {
+            $duplicate = City::whereKeyNot($model->getKey())
+                ->where('country_code', $model->country_code)
+                ->where('normalized_name', $model->normalized_name)
+                ->where('normalized_subcountry', $model->normalized_subcountry)
+                ->orderBy('id')
+                ->first();
+            abort_unless($duplicate, 409, 'This city is in use. Create or keep the matching city record before deleting this duplicate.');
+            DB::transaction(function () use ($model, $duplicate): void {
+                DB::table('visits')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city_name' => $duplicate->name]);
+                DB::table('sights')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
+                DB::table('collectionlist')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
+                DB::table('daily_destinations')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city' => $duplicate->name]);
+                $model->delete();
+            });
+        } else {
+            $model->delete();
+        }
         app(ImageStorage::class)->delete($image);
 
         return response()->noContent();
@@ -194,7 +212,7 @@ class AdminController extends Controller
                 $cityIdRule->ignore($model);
             }
             $data = $request->validate([
-                'id' => ['sometimes', 'string', 'max:32', $cityIdRule],
+                'id' => ['sometimes', 'nullable', 'string', 'max:32', $cityIdRule],
                 'name' => ['required', 'string', 'max:150'],
                 'countryId' => ['required', 'exists:countries,code'],
                 'state' => ['nullable', 'string', 'max:150'],
@@ -208,7 +226,7 @@ class AdminController extends Controller
                 ? Str::of($data['state'])->ascii()->lower()->squish()->toString()
                 : null;
             $values = [
-                'geoname_id' => $model?->geoname_id ?? ($data['id'] ?? 'admin-'.Str::uuid()),
+                'geoname_id' => $model?->geoname_id ?? (filled($data['id'] ?? null) ? $data['id'] : 'admin-'.Str::uuid()),
                 'name' => $data['name'],
                 'ascii_name' => Str::ascii($data['name']),
                 'normalized_name' => $normalizedName,
