@@ -117,9 +117,17 @@ class TravelStateApiTest extends TestCase
         $user = User::factory()->create(['password' => 'old-password']);
         Sanctum::actingAs($user);
 
-        $this->putJson('/api/v1/profile', ['nationality' => 'United States', 'dateOfBirth' => '1990-05-14', 'photoUri' => null])->assertOk()
+        $this->putJson('/api/v1/profile', ['nationality' => 'United States', 'dateOfBirth' => '1990-05-14', 'sex' => 'F', 'photoUri' => null])->assertOk()
+            ->assertJsonPath('nationality', 'United States')
             ->assertJsonPath('dateOfBirth', '1990-05-14')
+            ->assertJsonPath('sex', 'F')
             ->assertJsonPath('plan', 'free');
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'nationality' => 'United States',
+            'date_of_birth' => '1990-05-14',
+            'sex' => 'F',
+        ]);
         $this->putJson('/api/v1/auth/password', ['currentPassword' => 'old-password', 'newPassword' => 'new-password'])->assertNoContent();
     }
 }
