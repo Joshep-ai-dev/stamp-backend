@@ -47,6 +47,6 @@ class ProfileController extends Controller
     {
         $user = $request->user()->refresh();
 
-        return ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'language' => $user->language, 'plan' => $user->plan, 'nationality' => $user->nationality, 'dateOfBirth' => $user->date_of_birth?->format('Y-m-d'), 'photoUri' => $user->photo_uri];
+        return ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'language' => $user->language, 'plan' => $user->plan, 'nationality' => $user->nationality, 'dateOfBirth' => $user->date_of_birth?->format('Y-m-d'), 'sex' => $user->sex, 'photoUri' => $user->photo_uri];
     }
 }
