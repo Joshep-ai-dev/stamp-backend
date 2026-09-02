@@ -26,19 +26,32 @@ class AuthController extends Controller
         ]);
         $email = strtolower(trim($data['email']));
         $accountExists = User::where('email', $email)->exists();
-        $eligible = $data['purpose'] === 'sign-in' ? $accountExists : ! $accountExists;
-        if ($eligible) {
-            $code = (string) random_int(100000, 999999);
-            Cache::put($this->codeKey($email, $data['purpose']), [
-                'hash' => Hash::make($code),
-                'attempts' => 0,
-            ], now()->addMinutes(10));
-            Mail::raw("Your Kroo verification code is {$code}. It expires in 10 minutes.", function ($message) use ($email): void {
-                $message->to($email)->subject('Your Kroo verification code');
-            });
+        if ($data['purpose'] === 'sign-in' && ! $accountExists) {
+            throw ValidationException::withMessages([
+                'email' => ['No Kroo account was found for this email. Please create an account first.'],
+            ]);
+        }
+        if ($data['purpose'] === 'create-account' && $accountExists) {
+            throw ValidationException::withMessages([
+                'email' => ['A Kroo account already exists for this email. Please sign in instead.'],
+            ]);
         }
 
-        return response()->json(['message' => 'If this email can be used, a verification code has been sent.']);
+        $code = (string) random_int(100000, 999999);
+        Cache::put($this->codeKey($email, $data['purpose']), [
+            'hash' => Hash::make($code),
+            'attempts' => 0,
+        ], now()->addMinutes(10));
+        Mail::send('emails.verification-code', [
+            'code' => $code,
+            'purpose' => $data['purpose'],
+        ], function ($message) use ($email): void {
+            $message
+                ->to($email)
+                ->subject('Your Kroo verification code');
+        });
+
+        return response()->json(['message' => 'A verification code has been sent.']);
     }
 
     public function verifyCode(Request $request): JsonResponse
