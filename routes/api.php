@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:auth')->group(function (): void {
+        Route::post('/auth/code/request', [AuthController::class, 'requestCode']);
+        Route::post('/auth/code/verify', [AuthController::class, 'verifyCode']);
         Route::post('/auth/register', [AuthController::class, 'register']);
         Route::post('/auth/login', [AuthController::class, 'login']);
     });
