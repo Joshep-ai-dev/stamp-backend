@@ -108,6 +108,26 @@ class ReferenceContentApiTest extends TestCase
             ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('city', 'Paris')->assertJsonPath('cityId', '2988507');
     }
 
+    public function test_collection_item_can_belong_to_more_than_one_collection_without_a_city(): void
+    {
+        $headers = $this->adminHeaders();
+        $first = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'first', 'title' => 'First'])->assertCreated();
+        $second = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'second', 'title' => 'Second'])->assertCreated();
+
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindIds' => [$first->json('id'), $second->json('id')],
+            'title' => 'Shared item',
+            'location' => 'Everywhere',
+        ])->assertCreated()
+            ->assertJsonPath('collectionKindIds', ['first', 'second'])
+            ->assertJsonPath('location', 'Everywhere')
+            ->assertJsonPath('access', 'free');
+
+        $this->getJson('/api/v1/collections/first')->assertOk()->assertJsonPath('places.0.name', 'Shared item');
+        $this->getJson('/api/v1/collections/second')->assertOk()->assertJsonPath('places.0.name', 'Shared item');
+        $this->assertDatabaseCount('collection_kind_lists', 2);
+    }
+
     public function test_admin_city_metadata_is_deduplicated_and_images_are_uploaded_to_public_storage(): void
     {
         Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA']);

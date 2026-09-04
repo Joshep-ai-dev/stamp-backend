@@ -9,6 +9,10 @@ class AirportLookup
 {
     private const CITY_MUNICIPALITIES = [
         'TR:istanbul' => ['istanbul', 'arnavutkoy', 'pendik'],
+        // The airport source labels the New York metropolitan airports by
+        // municipality (for example New York or Newark), while the city
+        // catalog calls the city New York City.
+        'US:new york city' => ['new york city', 'new york', 'queens', 'newark', 'flushing'],
     ];
 
     private const RETIRED_PASSENGER_AIRPORTS = ['LTBA'];

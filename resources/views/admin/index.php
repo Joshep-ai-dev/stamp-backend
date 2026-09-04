@@ -415,7 +415,7 @@
       cities: [['name', 'Name', 'text', 1], ['id', 'City ID (optional)', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state'], ['population', 'Population', 'number'], ['latitude', 'Latitude', 'number'], ['longitude', 'Longitude', 'number'], ['imageUrl', 'Image', 'image']],
       sights: [['name', 'Name', 'text', 1], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City', 'city', 1], ['image', 'Image', 'image'], ['content', 'Content', 'textarea', 1], ['isFeatured', 'Shown in lists', 'check']],
       collections: [['title', 'Title', 'text', 1], ['id', 'ID (optional)', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea', 1], ['isPublished', 'Published', 'check']],
-      'collection-lists': [['collectionKindId', 'Collection kind', 'kind', 1], ['title', 'Title', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City / location', 'city', 1], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea', 1], ['access', 'Access', 'access']],
+      'collection-lists': [['collectionKindIds', 'Collections', 'kinds', 1], ['title', 'Title', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country'], ['state', 'State / region', 'state'], ['cityId', 'City / location', 'city'], ['location', 'Location label (optional)', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea'], ['access', 'Access', 'access']],
       'daily-destinations': [['name', 'Name', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City', 'city', 1], ['imageUrl', 'Image', 'image'], ['icon', 'Fallback emoji', 'text'], ['content', 'Lesson content', 'textarea', 1], ['question', 'Question', 'textarea', 1], ['options', 'Answer options (one per line)', 'textarea'], ['correctAnswer', 'Correct answer index (starts at 0)', 'number', 1], ['publishDate', 'Publish date (blank = every day)', 'date'], ['isPublished', 'Published', 'check']]
     };
     async function call(path, options = {}) { let r; try { r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }) } catch (error) { throw new Error(`Could not reach the server for ${path}. Check the connection and try again.`) } if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
@@ -445,6 +445,46 @@
     async function saveUsStateImage(id) { const input = document.querySelector(`#state-image-${CSS.escape(String(id))}`), file = input?.files?.[0]; if (!file) return note('Choose an image first.', true); try { const body = new FormData(); body.append('image', file); body.append('folder', 'states'); const upload = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const result = await upload.json(); if (!upload.ok) throw new Error(result.message || 'Image upload failed.'); await call(`/admin/api/us-states/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ imageUrl: result.imageUrl }) }); await showUsStates(document.querySelector('.nav button[onclick^="showUsStates"]')); note('State image updated successfully.') } catch (e) { note(e.message, true) } }
     document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); b.classList.add('active'); state.tab = b.dataset.tab; await load() });
     if (state.key) { document.querySelector('#key').value = state.key; login() }
+    function fieldHtml(f, row) {
+      const [key, label, type, wide] = f; let value = row?.[key];
+      if (key === 'collectionKindIds') value = row?.collectionKindIds || [];
+      if (key === 'image') value = row?.image || row?.imageUrl;
+      if (key === 'content') value = row?.content || row?.description;
+      if (key === 'options' && Array.isArray(value)) value = value.join('\n');
+      const cls = `field ${wide ? 'wide' : ''}`, required = wide ? 'required' : '';
+      if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`;
+      if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" ${required} onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`;
+      if (type === 'state') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select></label>`;
+      if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" ${required}><option value="">Select a country first…</option></select></label>`;
+      if (type === 'kinds') return `<label class="${cls}">${label}<select name="${key}" required multiple size="${Math.min(Math.max(state.meta.collectionKinds.length, 2), 6)}">${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${value.includes(x.id) ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select><small>Choose every collection this item belongs to.</small></label>`;
+      if (type === 'access') return `<label class="${cls}">${label}<select name="${key}"><option value="free" ${value !== 'pro' ? 'selected' : ''}>Free</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+</option></select></label>`;
+      if (type === 'image') return `<label class="${cls}">${label}<input name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"></label>`;
+      if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${required}>${esc(value || '')}</textarea></label>`;
+      const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : '';
+      return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} value="${esc(value ?? '')}" ${required} ${key === 'id' && row ? 'disabled' : ''}></label>`;
+    }
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const data = {}, resource = form.dataset.resource, editId = form.dataset.editId;
+      try {
+        for (const f of schemas[resource]) {
+          const el = form.elements[f[0]];
+          if (!el || el.disabled) continue;
+          const value = f[2] === 'image' ? await uploadImage(el)
+            : f[2] === 'check' ? el.checked
+            : f[2] === 'kinds' ? Array.from(el.selectedOptions).map(option => option.value)
+            : f[2] === 'number' ? Number(el.value || 0) : el.value.trim();
+          if (f[0] !== 'id' || value !== '') data[f[0]] = value;
+        }
+        if (resource === 'daily-destinations') data.options = data.options.split('\n').map(x => x.trim()).filter(Boolean);
+        const path = `/admin/api/${resource}${editId ? '/' + encodeURIComponent(editId) : ''}`;
+        await call(path, { method: editId ? 'PUT' : 'POST', body: JSON.stringify(data) });
+        closeEditor();
+        if (resource === 'collections') state.meta = await call('/admin/api/meta');
+        if (resource === 'cities') delete state.states[data.countryId];
+        await load(); note(editId ? 'Updated successfully.' : 'Created successfully.');
+      } catch (err) { note(err.message, true); }
+    };
   </script>
 </body>
 

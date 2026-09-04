@@ -18,8 +18,6 @@ class TravelStateController extends Controller
         $data = $request->validate([
             'completedSightIds' => ['present', 'array', 'max:5000'],
             'completedSightIds.*' => ['string', 'max:255'],
-            'wishlistIds' => ['present', 'array', 'max:5000'],
-            'wishlistIds.*' => ['string', 'max:255'],
         ]);
 
         foreach (array_unique($data['completedSightIds']) as $sightId) {
@@ -27,13 +25,6 @@ class TravelStateController extends Controller
             $syncRequest->setUserResolver(fn () => $request->user());
             $this->completion($syncRequest, $sightId);
         }
-        foreach (array_unique($data['wishlistIds']) as $targetId) {
-            $request->user()->wishlists()->firstOrCreate(
-                ['target_id' => $targetId],
-                ['saved_at' => now()],
-            );
-        }
-
         return $this->show($request);
     }
 
@@ -47,7 +38,6 @@ class TravelStateController extends Controller
 
         return response()->json([
             'completedSightIds' => $user->completions()->pluck('sight_id')->values(),
-            'wishlistIds' => $user->wishlists()->pluck('target_id')->values(),
             'rewards' => $rewards,
             'challengePoints' => round(min(6.25, $rewards->where('unlocked', true)->sum('krooPoints')), 3),
             'collections' => $this->collectionItems($user->collectionProgress()->get()),
@@ -120,25 +110,15 @@ class TravelStateController extends Controller
             }
         }
 
-        $list = CollectionList::with(['kind', 'city.country'])->get()->first(
-            fn ($item) => "collection-{$item->collectionkind_id}-{$item->id}" === $targetId
+        $list = CollectionList::with(['kinds', 'city.country'])->get()->first(
+            fn ($item) => $item->kinds->contains(
+                fn ($kind) => "collection-{$kind->id}-{$item->id}" === $targetId,
+            ),
         );
 
-        $city = $list?->collectionkind_id === 'seas' ? null : $list?->city;
+        $city = $list && $list->kinds->contains('id', 'seas') ? null : $list?->city;
 
         return [$city, ['id' => $targetId, 'name' => $list?->title ?? $targetId, 'type' => 'sight']];
-    }
-
-    public function wishlist(Request $request, string $targetId): JsonResponse
-    {
-        $saved = $request->boolean('saved', true);
-        if ($saved) {
-            $request->user()->wishlists()->firstOrCreate(['target_id' => $targetId], ['saved_at' => now()]);
-        } else {
-            $request->user()->wishlists()->where('target_id', $targetId)->delete();
-        }
-
-        return response()->json(['targetId' => $targetId, 'saved' => $saved]);
     }
 
     public function plan(Request $request): JsonResponse

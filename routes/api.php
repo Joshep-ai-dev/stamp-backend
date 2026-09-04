@@ -32,7 +32,6 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/me/sync/travel-state', [TravelStateController::class, 'sync']);
         Route::get('/me/home', [HomeController::class, 'show']);
         Route::put('/me/completions/{sightId}', [TravelStateController::class, 'completion']);
-        Route::put('/me/wishlist/{targetId}', [TravelStateController::class, 'wishlist']);
         Route::put('/me/plan', [TravelStateController::class, 'plan']);
         Route::get('/collections', [TravelStateController::class, 'collections']);
         Route::put('/me/collections/{collectionId}', [TravelStateController::class, 'updateCollection']);

@@ -157,10 +157,9 @@ Common statuses:
 | `POST` | `/visits` | Yes | Add a visit |
 | `PUT` | `/visits/:id` | Yes | Replace a visit |
 | `DELETE` | `/visits/:id` | Yes | Delete a visit |
-| `GET` | `/me/travel-state` | Yes | Hydrate completions, wishlist, rewards and plan |
+| `GET` | `/me/travel-state` | Yes | Hydrate completions, rewards and plan |
 | `GET` | `/me/home` | Yes | Get the calculated homepage dashboard |
 | `PUT` | `/me/completions/:sightId` | Yes | Set sight completion state |
-| `PUT` | `/me/wishlist/:targetId` | Yes | Set wishlist state |
 | `PUT` | `/me/plan` | Yes | Change free/pro plan |
 | `GET` | `/collections?status=all` | Yes | List user collection progress |
 | `PUT` | `/me/collections/:collectionId` | Yes | Update collection progress |
@@ -370,7 +369,6 @@ Response:
 ```json
 {
   "completedSightIds": ["eiffel-tower"],
-  "wishlistIds": ["city-paris", "country-JP"],
   "rewards": [
     {
       "id": "reward-id",
@@ -468,31 +466,6 @@ Response:
 {
   "sightId": "eiffel-tower",
   "completed": true
-}
-```
-
-### Set wishlist state
-
-```http
-PUT /me/wishlist/:targetId
-```
-
-Request:
-
-```json
-{
-  "saved": true
-}
-```
-
-Target IDs are client-defined namespaced strings such as `city-paris` and `country-FR`. The operation is idempotent.
-
-Response:
-
-```json
-{
-  "targetId": "city-paris",
-  "saved": true
 }
 ```
 
@@ -606,7 +579,6 @@ The default file is [`server/db.json`](../server/db.json). Collections:
 | `users` | Accounts, profile fields, password hashes and plan |
 | `visits` | User-owned city visits and places |
 | `completions` | Completed sight IDs |
-| `wishlists` | Saved target IDs |
 | `rewards` | Unlocked rewards and challenge score values |
 | `collectionProgress` | User-specific active/completed collection progress |
 
@@ -618,17 +590,6 @@ Example completion record:
   "userId": "user-uuid",
   "sightId": "eiffel-tower",
   "completedAt": "2026-08-11T08:00:00.000Z"
-}
-```
-
-Example wishlist record:
-
-```json
-{
-  "id": "uuid",
-  "userId": "user-uuid",
-  "targetId": "city-paris",
-  "savedAt": "2026-08-11T08:00:00.000Z"
 }
 ```
 
