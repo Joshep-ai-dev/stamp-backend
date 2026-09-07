@@ -142,12 +142,15 @@ class ContentController extends Controller
 
     public function city(Request $request, string $id): JsonResponse
     {
-        $city = City::with('country')->where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
+        $city = $this->findCatalogCity($id, ['country']);
 
         return response()->json([
             'id' => $city->geoname_id, 'name' => $city->name, 'countryId' => $city->country_code,
-            'country' => $city->country->name, 'countryCode' => $city->country_code,
-            'continentCode' => $city->country->continent_code, 'subcountry' => $city->subcountry,
+            // A city can be imported before its related country row is available.
+            // Still return the city guide rather than failing with a 500 error.
+            'country' => $city->country?->name ?? $city->country_code,
+            'countryCode' => $city->country_code,
+            'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
             'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url),
             'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
         ]);
@@ -155,7 +158,7 @@ class ContentController extends Controller
 
     public function citySights(Request $request, string $id): JsonResponse
     {
-        $city = City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
+        $city = $this->findCatalogCity($id);
 
         $sights = Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get();
 
@@ -164,7 +167,7 @@ class ContentController extends Controller
 
     public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
-        $city = City::where('geoname_id', $id)->orWhere('id', $id)->firstOrFail();
+        $city = $this->findCatalogCity($id);
 
         return response()->json($airports->forCity($city->country_code, $city->name));
     }
@@ -182,6 +185,22 @@ class ContentController extends Controller
         return $request->user('sanctum')?->plan === 'pro'
             ? $sights
             : $sights->filter(fn ($sight) => ! $this->requiresKrooPlus($sight))->values();
+    }
+
+    /**
+     * City IDs from the admin can be readable strings (for example, "Moab").
+     * Avoid comparing those to the numeric primary key on PostgreSQL.
+     */
+    private function findCatalogCity(string $id, array $with = []): City
+    {
+        $query = City::query()->when($with, fn ($query) => $query->with($with))
+            ->where('geoname_id', $id);
+
+        if (ctype_digit($id)) {
+            $query->orWhereKey($id);
+        }
+
+        return $query->firstOrFail();
     }
 
     private function requiresKrooPlus(Sight $item): bool

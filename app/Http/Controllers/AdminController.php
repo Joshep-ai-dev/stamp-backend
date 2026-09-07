@@ -144,7 +144,16 @@ class AdminController extends Controller
         return response()->json(match ($type) {
             'countries' => Country::orderBy('name')->get()->map(fn ($x) => $this->adminCountry($x)),
             'cities' => City::with('country')->orderBy('name')->get()->map(fn ($x) => $this->adminCity($x)),
-            'sights' => Sight::with(['country', 'city'])->orderBy('name')->get()->map(fn ($x) => $this->adminSight($x)),
+            'sights' => Sight::query()
+                ->with(['country', 'city'])
+                ->join('cities', 'sights.city_id', '=', 'cities.id')
+                ->select('sights.*')
+                ->orderBy('sights.country_code')
+                ->orderBy('cities.subcountry')
+                ->orderBy('cities.name')
+                ->orderBy('sights.name')
+                ->get()
+                ->map(fn ($x) => $this->adminSight($x)),
             'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
             'collection-lists' => CollectionList::with(['kinds', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
             'daily-destinations' => DailyDestination::orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
@@ -204,8 +213,16 @@ class AdminController extends Controller
         $oldImage = $this->modelImage($model);
         if ($type === 'countries') {
             abort_unless($model instanceof Country, 404);
-            $data = $request->validate(['heroImage' => ['nullable', 'string']]);
-            $values = ['hero_image' => $data['heroImage'] ?? $model->hero_image];
+            $data = $request->validate([
+                'name' => ['required', 'string', 'max:150'],
+                'heroImage' => ['nullable', 'string'],
+            ]);
+            $name = Str::of($data['name'])->squish()->toString();
+            $values = [
+                'name' => $name,
+                'normalized_name' => Str::of($name)->ascii()->lower()->toString(),
+                'hero_image' => $data['heroImage'] ?? $model->hero_image,
+            ];
         } elseif ($type === 'cities') {
             $cityIdRule = Rule::unique('cities', 'geoname_id');
             if ($model) {
