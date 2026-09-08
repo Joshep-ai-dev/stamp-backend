@@ -5,6 +5,13 @@ return [
         'admin_key' => env('ADMIN_API_KEY', 'stampo-local-admin'),
     ],
 
+    'revenuecat' => [
+        'secret_api_key' => env('REVENUECAT_SECRET_API_KEY', ''),
+        'entitlement_id' => env('REVENUECAT_ENTITLEMENT_ID', 'kroo_plus'),
+        'webhook_authorization' => env('REVENUECAT_WEBHOOK_AUTHORIZATION', ''),
+        'webhook_signing_secret' => env('REVENUECAT_WEBHOOK_SIGNING_SECRET', ''),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

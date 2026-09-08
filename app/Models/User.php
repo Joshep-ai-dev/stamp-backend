@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'language', 'plan', 'nationality', 'date_of_birth', 'sex', 'photo_uri', 'friend_code'])]
+#[Fillable(['name', 'email', 'password', 'language', 'nationality', 'date_of_birth', 'sex', 'photo_uri', 'friend_code'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -49,6 +50,11 @@ class User extends Authenticatable
     public function collectionProgress(): HasMany
     {
         return $this->hasMany(CollectionProgress::class);
+    }
+
+    public function revenueCatEntitlement(): HasOne
+    {
+        return $this->hasOne(RevenueCatEntitlement::class);
     }
 
     /**

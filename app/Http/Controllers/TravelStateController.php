@@ -121,14 +121,6 @@ class TravelStateController extends Controller
         return [$city, ['id' => $targetId, 'name' => $list?->title ?? $targetId, 'type' => 'sight']];
     }
 
-    public function plan(Request $request): JsonResponse
-    {
-        $plan = $request->validate(['plan' => ['required', 'in:free,pro']])['plan'];
-        $request->user()->update(['plan' => $plan]);
-
-        return response()->json(['plan' => $plan]);
-    }
-
     private function collectionItems($progress): array
     {
         $managed = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('title')->get();

@@ -24,14 +24,22 @@ class TravelStateApiTest extends TestCase
 
         $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => true])->assertOk();
         $this->putJson('/api/v1/me/completions/eiffel-tower', ['completed' => true])->assertOk();
-        $this->putJson('/api/v1/me/plan', ['plan' => 'pro'])->assertOk()->assertJson(['plan' => 'pro']);
         $this->putJson('/api/v1/me/collections/wonders', ['progress' => 100])->assertOk()->assertJsonPath('status', 'completed');
 
         $this->getJson('/api/v1/me/travel-state')->assertOk()
             ->assertJsonPath('completedSightIds.0', 'eiffel-tower')
             ->assertJsonPath('collections.0.progress', 100)
-            ->assertJsonPath('plan', 'pro');
+            ->assertJsonPath('plan', 'free');
         $this->assertDatabaseCount('completions', 1);
+    }
+
+    public function test_clients_cannot_set_their_own_plan(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/v1/me/plan', ['plan' => 'pro'])->assertNotFound();
+        $this->assertSame('free', $user->fresh()->plan);
     }
 
     public function test_guest_travel_state_merges_with_existing_account_state(): void

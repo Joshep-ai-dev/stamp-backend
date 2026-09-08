@@ -8,11 +8,13 @@ use App\Http\Controllers\ContentController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TravelStateController;
 use App\Http\Controllers\VisitController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    Route::post('/billing/revenuecat/webhook', [SubscriptionController::class, 'webhook'])->middleware('throttle:api');
     Route::middleware('throttle:auth')->group(function (): void {
         Route::post('/auth/code/request', [AuthController::class, 'requestCode']);
         Route::post('/auth/code/verify', [AuthController::class, 'verifyCode']);
@@ -32,7 +34,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/me/sync/travel-state', [TravelStateController::class, 'sync']);
         Route::get('/me/home', [HomeController::class, 'show']);
         Route::put('/me/completions/{sightId}', [TravelStateController::class, 'completion']);
-        Route::put('/me/plan', [TravelStateController::class, 'plan']);
+        Route::get('/me/subscription', [SubscriptionController::class, 'show']);
+        Route::post('/me/subscription/revenuecat/sync', [SubscriptionController::class, 'sync']);
         Route::get('/collections', [TravelStateController::class, 'collections']);
         Route::put('/me/collections/{collectionId}', [TravelStateController::class, 'updateCollection']);
         Route::get('/me/community/leaderboard', [CommunityController::class, 'leaderboard']);
