@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Console\Commands\ImportAirports;
 use App\Models\Airport;
+use App\Models\Country;
 use App\Services\AirportLookup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -13,8 +14,9 @@ class ImportAirportsCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_imports_only_iata_airports_and_resolves_both_istanbul_airports(): void
+    public function test_it_imports_only_iata_airports_and_resolves_istanbul_from_city_and_state(): void
     {
+        Country::firstOrCreate(['code' => 'TR'], ['name' => 'Turkey', 'normalized_name' => 'turkey', 'continent_code' => 'AS', 'flag' => '']);
         Http::fake([ImportAirports::SOURCE => Http::response([
             'LTFM' => ['icao' => 'LTFM', 'iata' => 'IST', 'name' => 'Istanbul Airport', 'city' => 'Arnavutkoy', 'state' => 'Istanbul', 'country' => 'TR', 'lat' => 41.262222, 'lon' => 28.727778, 'elevation' => 325, 'tz' => 'Europe/Istanbul'],
             'LTFJ' => ['icao' => 'LTFJ', 'iata' => 'SAW', 'name' => 'Sabiha Gokcen International Airport', 'city' => 'Istanbul', 'state' => 'Istanbul', 'country' => 'TR', 'lat' => 40.898602, 'lon' => 29.3092, 'elevation' => 312, 'tz' => 'Europe/Istanbul'],
@@ -26,7 +28,7 @@ class ImportAirportsCommandTest extends TestCase
 
         $this->assertDatabaseCount('airports', 3);
         $this->assertDatabaseMissing('airports', ['icao_code' => 'LTBW']);
-        $this->assertSame(['IST', 'SAW'], collect(app(AirportLookup::class)->forCity('TR', 'Istanbul'))->pluck('iataCode')->sort()->values()->all());
+        $this->assertSame(['ISL', 'IST', 'SAW'], collect(app(AirportLookup::class)->forCity('TR', 'Istanbul'))->pluck('iataCode')->sort()->values()->all());
         $this->assertTrue(Airport::query()->whereNotNull('iata_code')->where('iata_code', '<>', '')->count() === Airport::count());
     }
 }

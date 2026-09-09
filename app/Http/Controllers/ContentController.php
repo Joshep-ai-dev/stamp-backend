@@ -165,11 +165,16 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
+    public function searchAirports(Request $request, AirportLookup $airports): JsonResponse
+    {
+        $data = $request->validate(['query' => ['required', 'string', 'min:2', 'max:100'], 'limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
+        return response()->json($airports->search($data['query'], $data['limit'] ?? 50));
+    }
     public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
         $city = $this->findCatalogCity($id);
 
-        return response()->json($airports->forCity($city->country_code, $city->name));
+        return response()->json($airports->forCity($city->country_code, $city->name, $city->ascii_name));
     }
 
     public function stateAirports(string $code, string $state, AirportLookup $airports): JsonResponse
