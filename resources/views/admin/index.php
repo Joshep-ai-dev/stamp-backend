@@ -247,7 +247,7 @@
     }
 
     .dialog {
-      width: min(760px, 100%);
+      width: min(880px, 100%);
       max-height: 92vh;
       overflow: auto;
       background: var(--panel);
@@ -310,6 +310,18 @@
       margin-top: 20px
     }
 
+    .lesson-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; width:100% }
+    .lesson-stat, .lesson-help, .question-card { border:1px solid var(--line); border-radius:12px; background:var(--panel) }
+    .lesson-stat { padding:14px }
+    .lesson-stat strong { display:block; margin-top:4px; color:var(--ink); font-size:18px }
+    .lesson-help { grid-column:1/-1; padding:12px 14px; color:var(--muted) }
+    .lesson-pill { display:inline-flex; padding:4px 8px; border-radius:999px; background:#173f33; color:var(--mint); font-weight:700; white-space:nowrap }
+    .lesson-pill.preview { background:#493528; color:#ffd5b8 }
+    .lesson-type-note { grid-column:1/-1; padding:12px 14px; border-left:3px solid var(--accent); border-radius:8px; background:#102f26; color:var(--muted) }
+    .question-card { grid-column:1/-1; padding:0 14px 14px }
+    .question-card summary { padding:14px 0; color:var(--ink); font-weight:700; cursor:pointer }
+    .question-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px }
+
 
     .notice {
       padding: 10px 12px;
@@ -365,6 +377,8 @@
       .grid {
         grid-template-columns: 1fr
       }
+
+      .lesson-summary, .question-fields { grid-template-columns:1fr }
 
       .wide {
         grid-column: auto
@@ -422,13 +436,23 @@
         button.removeAttribute('aria-busy');
       }
     }
+    const krooIqQuestionFields = Array.from({ length: 10 }, (_, offset) => {
+      const number = offset + 1, required = number <= 5 ? 1 : 0;
+      return [
+        [`q${number}Prompt`, `Question ${number}`, 'textarea', required],
+        [`q${number}Image`, `Question ${number} image`, 'image'],
+        [`q${number}Answers`, `Question ${number} answers (one per line)`, 'textarea', required],
+        [`q${number}Correct`, `Question ${number} correct choice (first is 0)`, 'number', required],
+        [`q${number}Explanation`, `Question ${number} explanation`, 'textarea', required],
+      ];
+    }).flat();
     const schemas = {
       countries: [['name', 'Country name', 'text', 1], ['heroImage', 'Country hero image', 'image', 1]],
       cities: [['name', 'Name', 'text', 1], ['id', 'City ID', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state'], ['population', 'Population', 'number'], ['latitude', 'Latitude', 'number'], ['longitude', 'Longitude', 'number'], ['imageUrl', 'Image', 'image']],
       sights: [['name', 'Name', 'text', 1], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City', 'city', 1], ['image', 'Image', 'image'], ['content', 'Content', 'textarea', 1], ['isFeatured', 'Shown in lists', 'check']],
       collections: [['title', 'Title', 'text', 1], ['id', 'ID', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea', 1], ['isPublished', 'Published', 'check']],
       'collection-lists': [['collectionKindIds', 'Collections', 'kinds', 1], ['title', 'Title', 'text', 1], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country'], ['state', 'State / region', 'state'], ['cityId', 'City / location', 'city'], ['location', 'Location label (optional)', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea'], ['access', 'Access', 'access']],
-      'daily-destinations': [['countryId', 'Country', 'country', 1], ['imageUrl', 'Lesson image', 'image'], ['content', 'Country introduction', 'textarea', 1], ['q1Prompt', 'Question 1', 'textarea', 1], ['q1Answers', 'Question 1 answers (one per line)', 'textarea'], ['q1Correct', 'Question 1 correct choice (first is 0)', 'number', 1], ['q1Explanation', 'Question 1 explanation', 'textarea', 1], ['q2Prompt', 'Question 2', 'textarea', 1], ['q2Answers', 'Question 2 answers (one per line)', 'textarea'], ['q2Correct', 'Question 2 correct choice (first is 0)', 'number', 1], ['q2Explanation', 'Question 2 explanation', 'textarea', 1], ['q3Prompt', 'Question 3', 'textarea', 1], ['q3Answers', 'Question 3 answers (one per line)', 'textarea'], ['q3Correct', 'Question 3 correct choice (first is 0)', 'number', 1], ['q3Explanation', 'Question 3 explanation', 'textarea', 1], ['q4Prompt', 'Question 4', 'textarea', 1], ['q4Answers', 'Question 4 answers (one per line)', 'textarea'], ['q4Correct', 'Question 4 correct choice (first is 0)', 'number', 1], ['q4Explanation', 'Question 4 explanation', 'textarea', 1], ['q5Prompt', 'Question 5', 'textarea', 1], ['q5Answers', 'Question 5 answers (one per line)', 'textarea'], ['q5Correct', 'Question 5 correct choice (first is 0)', 'number', 1], ['q5Explanation', 'Question 5 explanation', 'textarea', 1], ['publishDate', 'Available from (optional)', 'date'], ['isPublished', 'Available in Kroo IQ', 'check']]
+      'daily-destinations': [['isPreview', 'Public preview (Lesson 0 with 10 questions)', 'check'], ['countryId', 'Country', 'country', 1], ['imageUrl', 'Main lesson image', 'image'], ['content', 'Country introduction', 'textarea', 1], ...krooIqQuestionFields, ['publishDate', 'Available from (optional)', 'date'], ['isPublished', 'Available in Kroo IQ', 'check']]
     };
     async function call(path, options = {}) { let r; try { r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }) } catch (error) { throw new Error(`Could not reach the server for ${path}. Check the connection and try again.`) } if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
     async function login() { state.key = document.querySelector('#key').value.trim(); try { state.meta = await call('/admin/api/meta'); sessionStorage.stampoAdminKey = state.key; document.querySelector('#login').classList.add('hidden'); document.querySelector('#app').classList.remove('hidden'); await load() } catch (e) { document.querySelector('#loginError').textContent = e.message } }
@@ -440,9 +464,11 @@
     render = function () {
       renderDefaultResource();
       if (state.tab !== 'daily-destinations') return;
-      summary.innerHTML = `<div class="summarybar"><span>${state.rows.length} lessons <small>Each numbered lesson contains all five questions. Lessons are delivered to users in order.</small></span></div>`;
+      const previewCount = state.rows.filter(row => Number(row.lessonNumber) === 0).length;
+      const publishedCount = state.rows.filter(row => row.isPublished !== false).length;
+      summary.innerHTML = `<div class="lesson-summary"><div class="lesson-stat">Total lessons<strong>${state.rows.length}</strong></div><div class="lesson-stat">Published<strong>${publishedCount}</strong></div><div class="lesson-stat">Public preview<strong>${previewCount ? 'Ready' : 'Missing'}</strong></div><div class="lesson-help">Lesson 0 is the one-time public preview with 10 questions. Kroo+ lessons start at Lesson 1, contain 5 questions, and progress in order.</div></div>`;
       const cols = ['lessonNumber', 'imageUrl', 'country', 'publishDate'];
-      table.innerHTML = `<table><thead><tr><th>No.</th>${cols.map(x => `<th>${esc(x)}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td>${cols.map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('')}</tbody></table>`;
+      table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Image</th><th>Country</th><th>Available from</th><th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cols.slice(1).map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('')}</tbody></table>`;
     };
     function setTableFilter(value) { state.filters[state.tab] = value; render() }
     async function submitCitySearch() { state.filters.cities = document.querySelector('#citySearch')?.value.trim() || ''; state.paging.currentPage = 1; await load() }
@@ -455,7 +481,31 @@
     function fieldHtml(f, row) { const [key, label, type, wide] = f; let value = row?.[key]; if (key === 'image') value = row?.image || row?.imageUrl; if (key === 'content') value = row?.content || row?.description; if (key === 'options' && Array.isArray(value)) value = value.join('\n'); const cls = `field ${wide ? 'wide' : ''}`; if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`; if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" required onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; if (type === 'state') { const add = form.dataset.resource === 'cities' ? '<button type="button" onclick="withButtonLoading(this, &quot;Adding...&quot;, () => addState())">+ Add state</button>' : ''; return `<label class="${cls}">${label}<div class="field-row"><select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select>${add}</div></label>` } if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" required><option value="">Select a state first…</option></select></label>`; if (type === 'kind') return `<label class="${cls}">${label}<select name="${key}" required><option value="">Select…</option>${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>`; if (type === 'access') return `<label class="${cls}">${label}<select name="${key}" required><option value="free" ${value !== 'pro' ? 'selected' : ''}>Free</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+</option></select></label>`; if (type === 'image') return `<label class="${cls}">${label}${value ? `<img src="${esc(value)}" alt="" style="width:120px;height:80px;object-fit:cover;margin:6px 0;border-radius:8px">` : ''}<input name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>Images are automatically resized to 1200 × 800 pixels.</small></label>`; if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${f[3] ? 'required' : ''}>${esc(value || '')}</textarea></label>`; const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : ''; return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} value="${esc(value ?? '')}" ${f[3] ? 'required' : ''} ${key === 'id' && row ? 'disabled' : ''}></label>` }
     async function renderStates() { const country = form.elements.countryId?.value; const select = form.elements.state; if (!select) return renderCities(); const selected = select.dataset.value; const list = document.querySelector('#city-state-options'); if (select.tagName !== 'SELECT') { if (!country) { if (list) list.innerHTML = ''; return } try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); if (list) list.innerHTML = state.states[country].map(x => `<option value="${esc(x)}"></option>`).join('') } catch (e) { note(e.message, true) } return } if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return renderCities() } select.disabled = true; select.innerHTML = '<option value="">Loading states…</option>'; try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); select.innerHTML = '<option value="">All / no state</option>' + state.states[country].map(x => `<option value="${esc(x)}" ${x === selected ? 'selected' : ''}>${esc(x)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load states</option>'; note(e.message, true) } finally { select.disabled = false } await renderCities() }
     async function renderCities() { const country = form.elements.countryId?.value; const region = form.elements.state?.value || ''; const select = form.elements.cityId; if (!select) return; const selected = select.dataset.value; if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return } const key = `${country}:${region}`; select.disabled = true; select.innerHTML = '<option value="">Loading cities…</option>'; try { state.cities[key] ||= await call(`/admin/api/cities?country=${encodeURIComponent(country)}&state=${encodeURIComponent(region)}`); select.innerHTML = '<option value="">Select…</option>' + state.cities[key].map(x => `<option value="${esc(x.id)}" ${String(x.id) === String(selected) ? 'selected' : ''}>${esc(x.name)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load cities</option>'; note(e.message, true) } finally { select.disabled = false } }
-    async function openEditor(i) { state.edit = Number.isInteger(i) ? state.rows[i] : null; form.dataset.editId = state.edit?.id || ''; form.dataset.resource = state.tab; const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' '); formTitle.textContent = `${state.edit ? 'Edit' : 'Add'} ${resourceName}`; fields.innerHTML = schemas[state.tab].map(f => fieldHtml(f, state.edit)).join(''); modal.classList.remove('hidden'); await renderStates() }
+    async function openEditor(i) { state.edit = Number.isInteger(i) ? state.rows[i] : null; form.dataset.editId = state.edit?.id || ''; form.dataset.resource = state.tab; const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' '); formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`; fields.innerHTML = schemas[state.tab].map(f => fieldHtml(f, state.edit)).join(''); if (state.tab === 'daily-destinations') prepareKrooIqEditor(); modal.classList.remove('hidden'); await renderStates() }
+    function prepareKrooIqEditor() {
+      const preview = form.elements.isPreview;
+      if (state.edit) {
+        preview.disabled = true;
+        preview.closest('label').insertAdjacentHTML('afterend', `<div class="lesson-type-note"><strong>${preview.checked ? 'Public preview · 10 questions' : 'Kroo+ lesson · 5 questions'}</strong><br>Lesson type is fixed after creation. Create a new lesson if you need the other type.</div>`);
+      } else {
+        preview.addEventListener('change', updateKrooIqQuestionVisibility);
+        preview.closest('label').insertAdjacentHTML('afterend', '<div class="lesson-type-note">Choose Public preview only when creating the single Lesson 0. Leave it off for a standard 5-question Kroo+ lesson.</div>');
+      }
+      for (let number = 1; number <= 10; number++) {
+        const controls = ['Prompt', 'Image', 'Answers', 'Correct', 'Explanation'].map(suffix => form.elements[`q${number}${suffix}`]);
+        const first = controls[0].closest('label');
+        const card = document.createElement('details');
+        card.className = 'question-card'; card.dataset.question = number; card.open = number === 1;
+        card.innerHTML = `<summary>Question ${number}${number > 5 ? ' · Preview only' : ''}</summary><div class="question-fields"></div>`;
+        first.before(card);
+        controls.forEach(control => card.querySelector('.question-fields').append(control.closest('label')));
+      }
+      updateKrooIqQuestionVisibility();
+    }
+    function updateKrooIqQuestionVisibility() {
+      const questionCount = form.elements.isPreview?.checked ? 10 : 5;
+      fields.querySelectorAll('.question-card').forEach(card => card.classList.toggle('hidden', Number(card.dataset.question) > questionCount));
+    }
     function closeEditor() { modal.classList.add('hidden'); state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
     async function normalizeImage(input) { const file = input.files?.[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800; const context = canvas.getContext('2d'); context.fillStyle = '#061f18'; context.fillRect(0, 0, 1200, 800); const scale = Math.max(1200 / bitmap.width, 800 / bitmap.height), width = bitmap.width * scale, height = bitmap.height * scale; context.drawImage(bitmap, (1200 - width) / 2, (800 - height) / 2, width, height); bitmap.close(); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .9)); if (!blob) throw new Error('The image could not be resized.'); normalizedFiles.set(input, new File([blob], `${crypto.randomUUID()}.jpg`, { type: 'image/jpeg' })); note('Image center-cropped to 1200 × 800 pixels.') } catch (error) { input.value = ''; note(error.message || 'The image could not be resized.', true) } }
     async function uploadImage(el) { const file = normalizedFiles.get(el) || el.files?.[0]; if (!file) return el.dataset.current || ''; const folders = { countries: 'countries', cities: 'cities', sights: 'sights', collections: 'collection', 'collection-lists': 'collection', 'daily-destinations': 'daily-destinations' }, body = new FormData(); body.append('image', file); body.append('folder', folders[form.dataset.resource]); const r = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Image upload returned an invalid server response (${r.status}).`); const result = await r.json(); if (!r.ok) { const validation = Object.values(result.errors || {}).flat().join(' '); throw new Error(validation || result.message || 'Image upload failed.') } return result.imageUrl }
@@ -467,13 +517,14 @@
     if (state.key) { document.querySelector('#key').value = state.key; login() }
     function fieldHtml(f, row) {
       const [key, label, type, wide] = f; let value = row?.[key];
-      const questionMatch = key.match(/^q([1-5])(Prompt|Answers|Correct|Explanation)$/);
+      const questionMatch = key.match(/^q(10|[1-9])(Prompt|Image|Answers|Correct|Explanation)$/);
       if (questionMatch) {
         const question = row?.questions?.[Number(questionMatch[1]) - 1] || {};
-        value = question[{ Prompt: 'prompt', Answers: 'answers', Correct: 'correctAnswer', Explanation: 'explanation' }[questionMatch[2]]];
+        value = question[{ Prompt: 'prompt', Image: 'imageUrl', Answers: 'answers', Correct: 'correctAnswer', Explanation: 'explanation' }[questionMatch[2]]];
         if (questionMatch[2] === 'Answers' && Array.isArray(value)) value = value.join('\n');
       }
       if (key === 'collectionKindIds') value = row?.collectionKindIds || [];
+      if (key === 'isPreview') value = row ? Number(row.lessonNumber) === 0 : !state.rows.some(lesson => Number(lesson.lessonNumber) === 0);
       if (key === 'image') value = row?.image || row?.imageUrl;
       if (key === 'content') value = row?.content || row?.description;
       if (key === 'options' && Array.isArray(value)) value = value.join('\n');
@@ -509,13 +560,15 @@
           if (f[0] !== 'id' || value !== '') data[f[0]] = value;
         }
         if (resource === 'daily-destinations') {
-          data.questions = [1, 2, 3, 4, 5].map(i => ({
+          const isPreviewLesson = data.isPreview ?? Number(state.edit?.lessonNumber) === 0;
+          data.questions = Array.from({ length: isPreviewLesson ? 10 : 5 }, (_, offset) => offset + 1).map(i => ({
             prompt: data[`q${i}Prompt`],
+            imageUrl: data[`q${i}Image`],
             answers: data[`q${i}Answers`].split('\n').map(x => x.trim()).filter(Boolean),
             correctAnswer: data[`q${i}Correct`],
             explanation: data[`q${i}Explanation`],
           }));
-          Object.keys(data).filter(key => /^q[1-5]/.test(key)).forEach(key => delete data[key]);
+          Object.keys(data).filter(key => /^q(10|[1-9])/.test(key)).forEach(key => delete data[key]);
         }
         const path = `/admin/api/${resource}${editId ? '/' + encodeURIComponent(editId) : ''}`;
         await call(path, { method: editId ? 'PUT' : 'POST', body: JSON.stringify(data) });

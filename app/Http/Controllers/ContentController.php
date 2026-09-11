@@ -237,6 +237,11 @@ class ContentController extends Controller
     {
         $city = $item->city_id ? City::find($item->city_id) : null;
 
-        return ['id' => $item->id, 'name' => $item->name, 'lessonNumber' => $item->lesson_number, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->subcountry, 'cityId' => $city?->geoname_id, 'city' => $item->city, 'imageUrl' => ImageUrl::public($item->image_url), 'icon' => $item->icon, 'content' => $item->content, 'questions' => $item->questions ?? [], 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        $questions = collect($item->questions ?? [])->map(fn ($question) => [
+            ...$question,
+            'imageUrl' => ImageUrl::public($question['imageUrl'] ?? null),
+        ])->values();
+
+        return ['id' => $item->id, 'name' => $item->name, 'lessonNumber' => $item->lesson_number, 'isPreview' => (int) $item->lesson_number === 0, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->subcountry, 'cityId' => $city?->geoname_id, 'city' => $item->city, 'imageUrl' => ImageUrl::public($item->image_url), 'icon' => $item->icon, 'content' => $item->content, 'questions' => $questions, 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 }

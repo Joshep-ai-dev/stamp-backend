@@ -104,8 +104,8 @@ class ReferenceContentApiTest extends TestCase
             ->assertJsonMissingPath('access')->assertJsonPath('places.0.city', 'Paris')
             ->assertJsonPath('places.0.countryId', 'FR')->assertJsonPath('places.0.access', 'pro')
             ->assertJsonPath('places.0.isPremium', true);
-        $questions = collect(range(1, 5))->map(fn ($number) => ['prompt' => "Question {$number}?", 'answers' => ['Paris', 'Rome'], 'correctAnswer' => 0, 'explanation' => 'Paris is in France.'])->all();
-        $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['lessonNumber' => 1, 'countryId' => 'FR', 'content' => 'France lesson', 'questions' => $questions])
+        $questions = collect(range(1, 5))->map(fn ($number) => ['prompt' => "Question {$number}?", 'imageUrl' => "/questions/{$number}.jpg", 'answers' => ['Paris', 'Rome'], 'correctAnswer' => 0, 'explanation' => 'Paris is in France.'])->all();
+        $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['countryId' => 'FR', 'imageUrl' => '/lessons/france.jpg', 'content' => 'France lesson', 'questions' => $questions])
             ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('lessonNumber', 1)->assertJsonCount(5, 'questions');
     }
 

@@ -141,6 +141,10 @@ class AdminController extends Controller
 
     public function index(string $type): JsonResponse
     {
+        if ($type === 'daily-destinations') {
+            $this->ensureKrooIqSchemaIsReady();
+        }
+
         return response()->json(match ($type) {
             'countries' => Country::orderBy('name')->get()->map(fn ($x) => $this->adminCountry($x)),
             'cities' => City::with('country')->orderBy('name')->get()->map(fn ($x) => $this->adminCity($x)),
@@ -192,12 +196,20 @@ class AdminController extends Controller
                 ->where('normalized_subcountry', $model->normalized_subcountry)
                 ->orderBy('id')
                 ->first();
-            abort_unless($duplicate, 409, 'This city is in use. Create or keep the matching city record before deleting this duplicate.');
+            $dependencies = collect([
+                'visits' => DB::table('visits')->where('city_id', $model->id)->exists(),
+                'sights' => DB::table('sights')->where('city_id', $model->id)->exists(),
+                'collections' => DB::table('collectionlist')->where('city_id', $model->id)->exists(),
+                'Kroo IQ lessons' => DB::table('daily_destinations')->where('city_id', $model->id)->exists(),
+            ])->filter()->keys();
+            abort_if(! $duplicate && $dependencies->isNotEmpty(), 409, 'This city is still used by: '.$dependencies->join(', ').'. Remove or reassign those records first.');
             DB::transaction(function () use ($model, $duplicate): void {
-                DB::table('visits')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city_name' => $duplicate->name]);
-                DB::table('sights')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
-                DB::table('collectionlist')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
-                DB::table('daily_destinations')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city' => $duplicate->name]);
+                if ($duplicate) {
+                    DB::table('visits')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city_name' => $duplicate->name]);
+                    DB::table('sights')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
+                    DB::table('collectionlist')->where('city_id', $model->id)->update(['city_id' => $duplicate->id]);
+                    DB::table('daily_destinations')->where('city_id', $model->id)->update(['city_id' => $duplicate->id, 'city' => $duplicate->name]);
+                }
                 $model->delete();
             });
         } else {
@@ -297,18 +309,27 @@ class AdminController extends Controller
             $values = ['collectionkind_id' => $kindIds[0], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city?->id, 'location' => $location, 'detail' => $data['detail'] ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0];
             $model ??= new CollectionList(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'daily-destinations') {
+            $this->ensureKrooIqSchemaIsReady();
             $data = $request->validate([
+                'isPreview' => ['sometimes', 'boolean'],
                 'countryId' => ['required', 'exists:countries,code'],
-                'imageUrl' => ['nullable', 'string'], 'content' => ['required', 'string'],
-                'questions' => ['required', 'array', 'size:5'],
+                'imageUrl' => ['required', 'string'], 'content' => ['required', 'string'],
+                'questions' => ['required', 'array', 'min:5', 'max:10'],
                 'questions.*.prompt' => ['required', 'string'], 'questions.*.answers' => ['required', 'array', 'min:2'],
                 'questions.*.answers.*' => ['required', 'string'], 'questions.*.correctAnswer' => ['required', 'integer', 'min:0'],
-                'questions.*.explanation' => ['nullable', 'string'], 'publishDate' => ['nullable', 'date_format:Y-m-d'], 'isPublished' => ['boolean'],
+                'questions.*.explanation' => ['nullable', 'string'], 'questions.*.imageUrl' => ['required', 'string'],
+                'publishDate' => ['nullable', 'date_format:Y-m-d'], 'isPublished' => ['boolean'],
             ]);
+            $isPreview = (bool) ($data['isPreview'] ?? ((int) $model?->lesson_number === 0));
+            abort_if($isPreview && $model && (int) $model->lesson_number !== 0, 422, 'Lesson type is fixed after creation. This is a 5-question Kroo+ lesson.');
+            abort_if(! $isPreview && $model && (int) $model->lesson_number === 0, 422, 'Lesson type is fixed after creation. Lesson 0 is the 10-question public preview.');
+            abort_if($isPreview && count($data['questions']) !== 10, 422, 'Lesson 0 must contain exactly 10 questions.');
+            abort_if(! $isPreview && count($data['questions']) !== 5, 422, 'Kroo+ lessons must contain exactly 5 questions.');
+            abort_if($isPreview && ! $model && DailyDestination::where('lesson_number', 0)->exists(), 422, 'Lesson 0 already exists.');
             foreach ($data['questions'] as $question) abort_if($question['correctAnswer'] >= count($question['answers']), 422, 'A correct choice number is invalid.');
             $country = Country::findOrFail(strtoupper($data['countryId']));
             $first = $data['questions'][0];
-            $lessonNumber = $model?->lesson_number ?? ((int) DailyDestination::max('lesson_number') + 1);
+            $lessonNumber = $model?->lesson_number ?? ($isPreview ? 0 : max(1, (int) DailyDestination::max('lesson_number') + 1));
             $city = (object) ['country_code' => $country->code, 'country' => $country, 'id' => null, 'name' => null];
             $data += ['name' => "Lesson {$lessonNumber} - {$country->name}", 'icon' => '🌍', 'question' => $first['prompt'], 'options' => $first['answers'], 'correctAnswer' => $first['correctAnswer']];
             $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
@@ -335,6 +356,15 @@ class AdminController extends Controller
         return match ($type) {
             'countries' => Country::class, 'cities' => City::class, 'sights' => Sight::class, 'collections', 'collection-kinds' => CollectionKind::class, 'collection-lists' => CollectionList::class, 'daily-destinations' => DailyDestination::class, default => abort(404)
         };
+    }
+
+    private function ensureKrooIqSchemaIsReady(): void
+    {
+        abort_unless(
+            Schema::hasColumns('daily_destinations', ['lesson_number', 'questions']),
+            503,
+            'Kroo IQ is being updated. Run the latest database migrations, then try again.',
+        );
     }
 
     private function findCity(string $id): City

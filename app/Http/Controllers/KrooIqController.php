@@ -14,24 +14,49 @@ class KrooIqController extends Controller
 {
     public function today(Request $request): JsonResponse
     {
-        $this->authorizeMember($request);
         $date = now()->toDateString();
-        $lesson = $this->lessonFor($date);
-        abort_if(! $lesson, 404, 'Today\'s Kroo IQ quiz is not available yet.');
+        $attempt = KrooIqAttempt::where('user_id', $request->user()->id)
+            ->where('quiz_date', $date)
+            ->first();
+
+        if ($attempt) {
+            return $this->attemptPayload($attempt);
+        }
+
+        $isMember = app(KrooIqAccess::class)->canUse($request->user());
+        $preview = $this->previewLesson($date);
+        $hasUsedPreview = $preview && $this->hasUsedLesson($request, $preview->id);
+
+        if ($preview && ! $hasUsedPreview) {
+            $lesson = $preview;
+        } else {
+            if (! $isMember) {
+                abort_if(! $preview, 404, 'The free Kroo IQ preview is not available yet.');
+                abort(403, 'You completed the free preview. Join Kroo+ to unlock Lesson 1.');
+            }
+            $lesson = $this->lessonFor($request, $date);
+        }
+
+        abort_if(! $lesson, 404, 'You have completed all available Kroo IQ lessons. Check back for the next lesson.');
         $questions = $this->questions($lesson);
         abort_if($questions->isEmpty(), 404, 'This Kroo IQ lesson does not have questions yet.');
 
-        $attempt = KrooIqAttempt::firstOrCreate(
-            ['user_id' => $request->user()->id, 'quiz_date' => $date],
-            [
-                'question_ids' => $questions->pluck('id')->all(),
-                'answers' => [],
-                'score_before' => $request->user()->kroo_iq_score,
-                'score_after' => $request->user()->kroo_iq_score,
-            ],
-        );
+        $attempt = KrooIqAttempt::firstOrCreate([
+            'user_id' => $request->user()->id, 'quiz_date' => $date,
+        ], [
+            'question_ids' => $questions->pluck('id')->all(),
+            'answers' => [],
+            'score_before' => $request->user()->kroo_iq_score,
+            'score_after' => $request->user()->kroo_iq_score,
+        ]);
 
-        $lessonId = explode(':', $attempt->question_ids[0] ?? $lesson->id, 2)[0];
+        return $this->attemptPayload($attempt);
+    }
+
+    private function attemptPayload(KrooIqAttempt $attempt): JsonResponse
+    {
+        $lessonId = explode(':', $attempt->question_ids[0] ?? '', 2)[0];
+        abort_if($lessonId === '', 404, 'Today\'s Kroo IQ lesson could not be restored.');
         $lesson = DailyDestination::findOrFail($lessonId);
 
         return response()->json($this->payload($attempt, $lesson, $this->questions($lesson)));
@@ -39,7 +64,6 @@ class KrooIqController extends Controller
 
     public function answer(Request $request): JsonResponse
     {
-        $this->authorizeMember($request);
         $data = $request->validate([
             'questionId' => ['required', 'string', 'max:255'],
             'selectedAnswer' => ['required', 'integer', 'min:0'],
@@ -58,6 +82,11 @@ class KrooIqController extends Controller
 
             [$lessonId, $questionIndex] = array_pad(explode(':', $data['questionId'], 2), 2, null);
             $lesson = DailyDestination::findOrFail($lessonId);
+            abort_unless(
+                (int) $lesson->lesson_number === 0 || app(KrooIqAccess::class)->canUse($request->user()),
+                403,
+                'Kroo+ membership is required.',
+            );
             $question = $this->questions($lesson)->get((int) $questionIndex);
             abort_if(! $question, 422, 'The selected question is invalid.');
             abort_if($data['selectedAnswer'] >= count($question['answers']), 422, 'The selected answer is invalid.');
@@ -84,14 +113,37 @@ class KrooIqController extends Controller
         return response()->json($payload);
     }
 
-    private function lessonFor(string $date): ?DailyDestination
+    private function lessonFor(Request $request, string $date): ?DailyDestination
     {
-        $lessons = DailyDestination::where('is_published', true)
-            ->where(fn ($query) => $query->whereDate('publish_date', '<=', $date)->orWhereNull('publish_date'))
-            ->orderBy('lesson_number')->orderBy('created_at')->get();
-        if ($lessons->isEmpty()) return null;
+        $usedLessonIds = KrooIqAttempt::where('user_id', $request->user()->id)
+            ->whereDate('quiz_date', '<', $date)
+            ->get(['question_ids'])
+            ->map(fn (KrooIqAttempt $attempt) => explode(':', $attempt->question_ids[0] ?? '', 2)[0])
+            ->filter()
+            ->unique();
 
-        return $lessons[(now()->dayOfYear - 1) % $lessons->count()];
+        return DailyDestination::where('is_published', true)
+            ->where('lesson_number', '>', 0)
+            ->where(fn ($query) => $query->whereDate('publish_date', '<=', $date)->orWhereNull('publish_date'))
+            ->when($usedLessonIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $usedLessonIds))
+            ->orderBy('lesson_number')
+            ->orderBy('created_at')
+            ->first();
+    }
+
+    private function previewLesson(string $date): ?DailyDestination
+    {
+        return DailyDestination::where('lesson_number', 0)
+            ->where('is_published', true)
+            ->where(fn ($query) => $query->whereDate('publish_date', '<=', $date)->orWhereNull('publish_date'))
+            ->first();
+    }
+
+    private function hasUsedLesson(Request $request, string $lessonId): bool
+    {
+        return KrooIqAttempt::where('user_id', $request->user()->id)
+            ->get(['question_ids'])
+            ->contains(fn (KrooIqAttempt $attempt) => explode(':', $attempt->question_ids[0] ?? '', 2)[0] === $lessonId);
     }
 
     private function questions(DailyDestination $lesson)
@@ -102,12 +154,15 @@ class KrooIqController extends Controller
             'correctAnswer' => $lesson->correct_answer,
             'explanation' => $lesson->content,
         ]];
-        return collect($questions)->take(5)->values()->map(fn ($question, $index) => [
+        $limit = (int) $lesson->lesson_number === 0 ? 10 : 5;
+
+        return collect($questions)->take($limit)->values()->map(fn ($question, $index) => [
             'id' => "{$lesson->id}:{$index}",
             'prompt' => $question['prompt'] ?? '',
             'answers' => array_values($question['answers'] ?? []),
             'correctAnswer' => (int) ($question['correctAnswer'] ?? 0),
             'explanation' => $question['explanation'] ?? $lesson->content,
+            'imageUrl' => ImageUrl::public($question['imageUrl'] ?? null),
         ]);
     }
 
@@ -125,7 +180,9 @@ class KrooIqController extends Controller
                 'id' => $question['id'],
                 'prompt' => $question['prompt'],
                 'answers' => $question['answers'],
+                'imageUrl' => $question['imageUrl'],
             ])->values(),
+            'isPreview' => (int) $destination->lesson_number === 0,
             'attempt' => $this->attemptData($attempt),
         ];
     }
@@ -141,12 +198,4 @@ class KrooIqController extends Controller
         ];
     }
 
-    private function authorizeMember(Request $request): void
-    {
-        abort_unless(
-            app(KrooIqAccess::class)->canUse($request->user()),
-            403,
-            'Kroo+ membership is required.',
-        );
-    }
 }
