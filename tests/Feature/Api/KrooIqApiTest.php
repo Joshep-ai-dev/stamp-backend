@@ -31,15 +31,13 @@ class KrooIqApiTest extends TestCase
     {
         $user = User::factory()->create(['plan' => 'pro']);
         Sanctum::actingAs($user);
-        foreach (range(1, 5) as $number) {
-            DailyDestination::create([
-                'id' => "quiz-{$number}", 'name' => "Place {$number}", 'country' => 'Thailand',
-                'content' => 'Travel lesson.', 'question' => "Question {$number}?",
-                'options' => ['Correct', 'Wrong'], 'correct_answer' => 0,
-                'publish_date' => now()->toDateString(), 'is_published' => true,
-                'display_order' => $number,
-            ]);
-        }
+        DailyDestination::create([
+            'id' => 'thailand-lesson', 'name' => 'Lesson 1 - Thailand', 'country' => 'Thailand',
+            'content' => 'Travel lesson.', 'question' => 'Question 1?',
+            'options' => ['Correct', 'Wrong'], 'correct_answer' => 0,
+            'questions' => collect(range(1, 5))->map(fn ($number) => ['prompt' => "Question {$number}?", 'answers' => ['Correct', 'Wrong'], 'correctAnswer' => 0, 'explanation' => 'Travel lesson.'])->all(),
+            'lesson_number' => 1, 'publish_date' => now()->toDateString(), 'is_published' => true,
+        ]);
 
         $quiz = $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()
             ->assertJsonCount(5, 'questions')->assertJsonMissingPath('questions.0.correctAnswer');
@@ -59,9 +57,7 @@ class KrooIqApiTest extends TestCase
     public function test_answers_must_be_submitted_once_and_in_order(): void
     {
         Sanctum::actingAs(User::factory()->create(['plan' => 'pro']));
-        foreach (range(1, 2) as $number) {
-            DailyDestination::create(['id' => "ordered-{$number}", 'name' => "Place {$number}", 'country' => 'Thailand', 'content' => 'Lesson', 'question' => 'Question?', 'options' => ['A', 'B'], 'correct_answer' => 0, 'is_published' => true, 'display_order' => $number]);
-        }
+        DailyDestination::create(['id' => 'ordered', 'name' => 'Lesson 1 - Thailand', 'country' => 'Thailand', 'content' => 'Lesson', 'question' => 'Question?', 'options' => ['A', 'B'], 'correct_answer' => 0, 'questions' => collect(range(1, 5))->map(fn ($number) => ['prompt' => "Question {$number}?", 'answers' => ['A', 'B'], 'correctAnswer' => 0, 'explanation' => 'Lesson'])->all(), 'lesson_number' => 1, 'is_published' => true]);
         $ids = collect($this->getJson('/api/v1/me/kroo-iq/today')->json('questions'))->pluck('id');
         $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $ids[1], 'selectedAnswer' => 0])->assertConflict();
         $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $ids[0], 'selectedAnswer' => 0])->assertOk();

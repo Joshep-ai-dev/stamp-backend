@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table): void {
-            $table->decimal('kroo_iq_score', 6, 2)->default(7.35);
+            $table->decimal('kroo_iq_score', 6, 2)->default(0);
         });
 
         Schema::create('kroo_iq_attempts', function (Blueprint $table): void {

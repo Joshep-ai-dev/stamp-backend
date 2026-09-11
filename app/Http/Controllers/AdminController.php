@@ -156,7 +156,7 @@ class AdminController extends Controller
                 ->map(fn ($x) => $this->adminSight($x)),
             'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x)),
             'collection-lists' => CollectionList::with(['kinds', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
-            'daily-destinations' => DailyDestination::orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
+            'daily-destinations' => DailyDestination::orderBy('lesson_number')->orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
             default => abort(404),
         });
     }
@@ -297,11 +297,23 @@ class AdminController extends Controller
             $values = ['collectionkind_id' => $kindIds[0], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city?->id, 'location' => $location, 'detail' => $data['detail'] ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0];
             $model ??= new CollectionList(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'daily-destinations') {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('daily_destinations')->ignore($model)], 'name' => ['required', 'string'], 'countryId' => ['required', 'exists:countries,code'], 'state' => ['nullable', 'string', 'max:150'], 'cityId' => ['required', 'exists:cities,geoname_id'], 'imageUrl' => ['nullable', 'string'], 'icon' => ['nullable', 'string'], 'content' => ['required', 'string'], 'question' => ['required', 'string'], 'options' => ['required', 'array', 'min:2'], 'correctAnswer' => ['required', 'integer', 'min:0'], 'publishDate' => ['nullable', 'date_format:Y-m-d'], 'isPublished' => ['boolean']]);
-            $city = City::with('country')->where('geoname_id', $data['cityId'])->where('country_code', $data['countryId'])->firstOrFail();
-            abort_if(($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
-            abort_if($data['correctAnswer'] >= count($data['options']), 422, 'Correct answer index is invalid.');
+            $data = $request->validate([
+                'countryId' => ['required', 'exists:countries,code'],
+                'imageUrl' => ['nullable', 'string'], 'content' => ['required', 'string'],
+                'questions' => ['required', 'array', 'size:5'],
+                'questions.*.prompt' => ['required', 'string'], 'questions.*.answers' => ['required', 'array', 'min:2'],
+                'questions.*.answers.*' => ['required', 'string'], 'questions.*.correctAnswer' => ['required', 'integer', 'min:0'],
+                'questions.*.explanation' => ['nullable', 'string'], 'publishDate' => ['nullable', 'date_format:Y-m-d'], 'isPublished' => ['boolean'],
+            ]);
+            foreach ($data['questions'] as $question) abort_if($question['correctAnswer'] >= count($question['answers']), 422, 'A correct choice number is invalid.');
+            $country = Country::findOrFail(strtoupper($data['countryId']));
+            $first = $data['questions'][0];
+            $lessonNumber = $model?->lesson_number ?? ((int) DailyDestination::max('lesson_number') + 1);
+            $city = (object) ['country_code' => $country->code, 'country' => $country, 'id' => null, 'name' => null];
+            $data += ['name' => "Lesson {$lessonNumber} - {$country->name}", 'icon' => '🌍', 'question' => $first['prompt'], 'options' => $first['answers'], 'correctAnswer' => $first['correctAnswer']];
             $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
+            $values += ['questions' => $data['questions'], 'lesson_number' => $lessonNumber, 'display_order' => $lessonNumber];
+            $values['display_order'] = $lessonNumber;
             $model ??= new DailyDestination(['id' => $data['id'] ?? (string) Str::uuid()]);
         } else {
             abort(404);

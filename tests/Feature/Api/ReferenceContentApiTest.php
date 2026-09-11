@@ -104,8 +104,9 @@ class ReferenceContentApiTest extends TestCase
             ->assertJsonMissingPath('access')->assertJsonPath('places.0.city', 'Paris')
             ->assertJsonPath('places.0.countryId', 'FR')->assertJsonPath('places.0.access', 'pro')
             ->assertJsonPath('places.0.isPremium', true);
-        $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['name' => 'The Louvre', 'countryId' => 'FR', 'cityId' => '2988507', 'content' => 'Museum lesson', 'question' => 'Where is it?', 'options' => ['Paris', 'Rome'], 'correctAnswer' => 0])
-            ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('city', 'Paris')->assertJsonPath('cityId', '2988507');
+        $questions = collect(range(1, 5))->map(fn ($number) => ['prompt' => "Question {$number}?", 'answers' => ['Paris', 'Rome'], 'correctAnswer' => 0, 'explanation' => 'Paris is in France.'])->all();
+        $this->withHeaders($headers)->postJson('/admin/api/daily-destinations', ['lessonNumber' => 1, 'countryId' => 'FR', 'content' => 'France lesson', 'questions' => $questions])
+            ->assertCreated()->assertJsonPath('country', 'France')->assertJsonPath('lessonNumber', 1)->assertJsonCount(5, 'questions');
     }
 
     public function test_collection_item_can_belong_to_more_than_one_collection_without_a_city(): void

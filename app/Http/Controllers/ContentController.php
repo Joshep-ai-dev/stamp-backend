@@ -27,12 +27,16 @@ class ContentController extends Controller
     public function country(Request $request, string $code): JsonResponse
     {
         $country = Country::with('cities')->findOrFail(strtoupper($code));
-        $cities = $country->cities->sortBy('name')->values()->take(10);
         $sights = Sight::with(['country', 'city'])->where('country_code', $country->code)->where('is_featured', true)->orderBy('name')->take(20)->get();
         $collections = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('title')->get()->filter(fn ($item) => $item->lists->contains(fn ($list) => $list->city?->country_code === $country->code))->values();
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', $country->code)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
+        $visitedCityIds = $visits->pluck('city_id')->map(fn ($id) => (string) $id);
+        $orderedCities = $country->cities->sortBy('name')->values();
+        $cities = $orderedCities->take(10)
+            ->merge($orderedCities->filter(fn ($city) => $visitedCityIds->contains((string) $city->geoname_id)))
+            ->unique('geoname_id')->values();
 
         return response()->json([
             'isEnriching' => false,
@@ -233,6 +237,6 @@ class ContentController extends Controller
     {
         $city = $item->city_id ? City::find($item->city_id) : null;
 
-        return ['id' => $item->id, 'name' => $item->name, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->subcountry, 'cityId' => $city?->geoname_id, 'city' => $item->city, 'imageUrl' => ImageUrl::public($item->image_url), 'icon' => $item->icon, 'content' => $item->content, 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        return ['id' => $item->id, 'name' => $item->name, 'lessonNumber' => $item->lesson_number, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->subcountry, 'cityId' => $city?->geoname_id, 'city' => $item->city, 'imageUrl' => ImageUrl::public($item->image_url), 'icon' => $item->icon, 'content' => $item->content, 'questions' => $item->questions ?? [], 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 }
