@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['id', 'image', 'title', 'detail', 'is_published', 'display_order'])]
+#[Fillable(['id', 'image', 'explorer_image', 'hero_image', 'title', 'detail', 'is_published', 'display_order'])]
 class CollectionKind extends Model
 {
     protected $table = 'collectionkind';

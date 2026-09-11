@@ -20,7 +20,9 @@ class ReferenceContentSeeder extends Seeder
         foreach ($data['managedCollections'] ?? [] as $item) {
             $kind = CollectionKind::updateOrCreate(['id' => $item['id']], [
                 'title' => $item['title'], 'detail' => $item['detail'] ?? $item['description'] ?? '',
-                'image' => $item['imageUrl'] ?? '', 'is_published' => $item['isPublished'] ?? true,
+                'image' => $item['heroImageUrl'] ?? $item['imageUrl'] ?? '',
+                'hero_image' => $item['heroImageUrl'] ?? $item['imageUrl'] ?? '',
+                'explorer_image' => $item['explorerImageUrl'] ?? '', 'is_published' => $item['isPublished'] ?? true,
                 'display_order' => $item['displayOrder'] ?? 0,
             ]);
             foreach ($item['places'] ?? [] as $order => $place) {

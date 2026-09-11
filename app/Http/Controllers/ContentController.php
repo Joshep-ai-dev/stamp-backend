@@ -135,6 +135,17 @@ class ContentController extends Controller
         return response()->json($this->collectionItem($item));
     }
 
+    public function collections(): JsonResponse
+    {
+        $items = CollectionKind::with('lists.city.country')
+            ->where('is_published', true)
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get();
+
+        return response()->json($items->map(fn ($item) => $this->collectionItem($item)));
+    }
+
     public function sight(Request $request, string $id): JsonResponse
     {
         $sight = Sight::with(['country', 'city'])->findOrFail($id);
@@ -230,7 +241,7 @@ class ContentController extends Controller
     {
         $item->loadMissing('lists.city.country');
 
-        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->image), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'heroImageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'explorerImageUrl' => ImageUrl::public($item->explorer_image), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 
     public function daily(DailyDestination $item): array

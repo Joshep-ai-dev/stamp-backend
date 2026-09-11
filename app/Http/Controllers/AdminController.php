@@ -281,8 +281,8 @@ class AdminController extends Controller
             $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => false];
             $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean']]);
-            $values = ['title' => $data['title'], 'detail' => $data['detail'] ?? '', 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'explorerImageUrl' => ['required', 'string'], 'heroImageUrl' => ['required', 'string'], 'isPublished' => ['boolean']]);
+            $values = ['title' => $data['title'], 'detail' => $data['detail'] ?? '', 'explorer_image' => $data['explorerImageUrl'], 'hero_image' => $data['heroImageUrl'], 'image' => $data['heroImageUrl'], 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
             $model ??= new CollectionKind(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'collection-lists') {
             $data = $request->validate([
