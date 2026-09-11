@@ -7,6 +7,7 @@ use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\KrooIqController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TravelStateController;
@@ -41,6 +42,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me/community/leaderboard', [CommunityController::class, 'leaderboard']);
         Route::get('/me/friend-code', [CommunityController::class, 'friendCode']);
         Route::post('/me/friends/scan', [CommunityController::class, 'scan']);
+        Route::get('/me/kroo-iq/today', [KrooIqController::class, 'today']);
+        Route::post('/me/kroo-iq/answer', [KrooIqController::class, 'answer']);
     });
     Route::middleware('throttle:catalog')->group(function (): void {
         Route::get('/countries', [CountryController::class, 'index']);

@@ -14,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'language', 'nationality', 'date_of_birth', 'sex', 'photo_uri', 'friend_code'])]
+#[Fillable(['name', 'email', 'password', 'language', 'nationality', 'date_of_birth', 'sex', 'photo_uri', 'friend_code', 'kroo_iq_score'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -57,6 +57,11 @@ class User extends Authenticatable
         return $this->hasOne(RevenueCatEntitlement::class);
     }
 
+    public function krooIqAttempts(): HasMany
+    {
+        return $this->hasMany(KrooIqAttempt::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -68,6 +73,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'date_of_birth' => 'date:Y-m-d',
+            'kroo_iq_score' => 'decimal:2',
         ];
     }
 }
