@@ -11,10 +11,14 @@ class ImageUrl
             return '';
         }
         $parts = parse_url($url);
-        if (isset($parts['host']) && in_array(strtolower($parts['host']), ['localhost', '127.0.0.1'], true)) {
-            return ($parts['path'] ?? '').(isset($parts['query']) ? '?'.$parts['query'] : '');
+        if (isset($parts['host'])) {
+            if (! in_array(strtolower($parts['host']), ['localhost', '127.0.0.1'], true)) {
+                return $url;
+            }
+
+            $url = ($parts['path'] ?? '').(isset($parts['query']) ? '?'.$parts['query'] : '');
         }
 
-        return $url;
+        return url($url);
     }
 }

@@ -53,7 +53,7 @@ class ContentController extends Controller
             'sights' => $sights->values()->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
             'stats' => ['cities' => $visits->pluck('city_id')->unique()->count(), 'totalCities' => $cities->count(), 'sights' => $completed->intersect($sights->pluck('id'))->count(), 'totalSights' => $sights->count(), 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count()],
-            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->city_image_url)])->values(),
+            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
         ]);
     }
 
@@ -114,7 +114,7 @@ class ContentController extends Controller
                 'sights' => $completed->intersect($sights->pluck('id'))->count(),
                 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count(),
             ],
-            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->city_image_url)])->values(),
+            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
         ]);
     }
 
