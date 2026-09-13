@@ -10,6 +10,8 @@ use App\Models\Reward;
 use App\Models\Sight;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -119,17 +121,84 @@ class TravelStateApiTest extends TestCase
         $user = User::factory()->create(['password' => 'old-password']);
         Sanctum::actingAs($user);
 
-        $this->putJson('/api/v1/profile', ['nationality' => 'United States', 'dateOfBirth' => '1990-05-14', 'sex' => 'F', 'photoUri' => null])->assertOk()
+        $this->putJson('/api/v1/profile', [
+            'name' => 'Robb',
+            'familyName' => 'Walker',
+            'phoneNumber' => '+66 81 234 5678',
+            'nationality' => 'United States',
+            'dateOfBirth' => '1990-05-14',
+            'address' => '12 Riverside Road',
+            'city' => 'Bangkok',
+            'stateProvince' => 'Bangkok',
+            'postalCode' => '10110',
+            'country' => 'Thailand',
+            'photoUri' => null,
+        ])->assertOk()
+            ->assertJsonPath('name', 'Robb')
+            ->assertJsonPath('familyName', 'Walker')
+            ->assertJsonPath('phoneNumber', '+66 81 234 5678')
             ->assertJsonPath('nationality', 'United States')
             ->assertJsonPath('dateOfBirth', '1990-05-14')
-            ->assertJsonPath('sex', 'F')
+            ->assertJsonPath('address', '12 Riverside Road')
+            ->assertJsonPath('city', 'Bangkok')
+            ->assertJsonPath('stateProvince', 'Bangkok')
+            ->assertJsonPath('postalCode', '10110')
+            ->assertJsonPath('country', 'Thailand')
+            ->assertJsonMissingPath('sex')
             ->assertJsonPath('plan', 'free');
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
+            'name' => 'Robb',
+            'family_name' => 'Walker',
+            'phone_number' => '+66 81 234 5678',
             'nationality' => 'United States',
             'date_of_birth' => '1990-05-14',
-            'sex' => 'F',
+            'address' => '12 Riverside Road',
+            'city' => 'Bangkok',
+            'state_province' => 'Bangkok',
+            'postal_code' => '10110',
+            'country' => 'Thailand',
         ]);
         $this->putJson('/api/v1/auth/password', ['currentPassword' => 'old-password', 'newPassword' => 'new-password'])->assertNoContent();
+    }
+
+    public function test_passport_fields_are_saved_during_code_account_creation(): void
+    {
+        $email = 'new-traveller@example.com';
+        Cache::put('auth-code:'.hash('sha256', $email).':create-account', [
+            'hash' => Hash::make('123456'),
+            'attempts' => 0,
+        ], now()->addMinutes(10));
+
+        $this->postJson('/api/v1/auth/code/verify', [
+            'email' => $email,
+            'code' => '123456',
+            'purpose' => 'create-account',
+            'name' => 'Robb',
+            'familyName' => 'Walker',
+            'phoneNumber' => '+66 81 234 5678',
+            'nationality' => 'United States',
+            'dateOfBirth' => '1990-05-14',
+            'address' => '12 Riverside Road',
+            'city' => 'Bangkok',
+            'stateProvince' => 'Bangkok',
+            'postalCode' => '10110',
+            'country' => 'Thailand',
+        ])->assertOk()
+            ->assertJsonPath('user.familyName', 'Walker')
+            ->assertJsonPath('user.phoneNumber', '+66 81 234 5678')
+            ->assertJsonPath('user.stateProvince', 'Bangkok')
+            ->assertJsonPath('user.country', 'Thailand');
+
+        $this->assertDatabaseHas('users', [
+            'email' => $email,
+            'family_name' => 'Walker',
+            'phone_number' => '+66 81 234 5678',
+            'address' => '12 Riverside Road',
+            'city' => 'Bangkok',
+            'state_province' => 'Bangkok',
+            'postal_code' => '10110',
+            'country' => 'Thailand',
+        ]);
     }
 }

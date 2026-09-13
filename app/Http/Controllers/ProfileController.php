@@ -18,7 +18,14 @@ class ProfileController extends Controller
     {
         $data = $request->validated();
         $oldPhoto = $request->user()->photo_uri;
-        foreach (['dateOfBirth' => 'date_of_birth', 'photoUri' => 'photo_uri'] as $input => $column) {
+        foreach ([
+            'familyName' => 'family_name',
+            'phoneNumber' => 'phone_number',
+            'dateOfBirth' => 'date_of_birth',
+            'stateProvince' => 'state_province',
+            'postalCode' => 'postal_code',
+            'photoUri' => 'photo_uri',
+        ] as $input => $column) {
             if (array_key_exists($input, $data)) {
                 $data[$column] = $data[$input];
                 unset($data[$input]);
@@ -47,6 +54,22 @@ class ProfileController extends Controller
     {
         $user = $request->user()->refresh();
 
-        return ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'language' => $user->language, 'plan' => $user->plan, 'nationality' => $user->nationality, 'dateOfBirth' => $user->date_of_birth?->format('Y-m-d'), 'sex' => $user->sex, 'photoUri' => $user->photo_uri];
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'familyName' => $user->family_name,
+            'email' => $user->email,
+            'phoneNumber' => $user->phone_number,
+            'language' => $user->language,
+            'plan' => $user->plan,
+            'nationality' => $user->nationality,
+            'dateOfBirth' => $user->date_of_birth?->format('Y-m-d'),
+            'address' => $user->address,
+            'city' => $user->city,
+            'stateProvince' => $user->state_province,
+            'postalCode' => $user->postal_code,
+            'country' => $user->country,
+            'photoUri' => $user->photo_uri,
+        ];
     }
 }

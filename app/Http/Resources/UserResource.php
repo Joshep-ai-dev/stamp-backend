@@ -14,12 +14,18 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'familyName' => $this->family_name,
             'email' => $this->email,
+            'phoneNumber' => $this->phone_number,
             'language' => $this->language,
             'plan' => $this->plan,
             'nationality' => $this->nationality,
             'dateOfBirth' => $this->date_of_birth?->format('Y-m-d'),
-            'sex' => $this->sex,
+            'address' => $this->address,
+            'city' => $this->city,
+            'stateProvince' => $this->state_province,
+            'postalCode' => $this->postal_code,
+            'country' => $this->country,
         ];
     }
 }

@@ -33,10 +33,10 @@ EXPO_PUBLIC_API_URL=http://10.0.2.2:3001
 
 Server environment variables:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PORT` | `3001` | HTTP port |
-| `HOST` | `0.0.0.0` | Bind address |
+| Variable  | Default          | Purpose         |
+| --------- | ---------------- | --------------- |
+| `PORT`    | `3001`           | HTTP port       |
+| `HOST`    | `0.0.0.0`        | Bind address    |
 | `DB_FILE` | `server/db.json` | LowDB JSON file |
 
 ## Conventions
@@ -69,20 +69,20 @@ Errors use an HTTP status and a JSON message:
 
 ```json
 {
-  "message": "Unauthenticated."
+    "message": "Unauthenticated."
 }
 ```
 
 Common statuses:
 
-| Status | Meaning |
-| --- | --- |
-| `200` | Successful read or update |
-| `201` | Resource created |
-| `204` | Successful action with no response body |
-| `401` | Missing, invalid, or expired session |
-| `404` | User-owned resource not found |
-| `422` | Invalid request or credentials |
+| Status | Meaning                                 |
+| ------ | --------------------------------------- |
+| `200`  | Successful read or update               |
+| `201`  | Resource created                        |
+| `204`  | Successful action with no response body |
+| `401`  | Missing, invalid, or expired session    |
+| `404`  | User-owned resource not found           |
+| `422`  | Invalid request or credentials          |
 
 ## Data models
 
@@ -90,11 +90,13 @@ Common statuses:
 
 ```json
 {
-  "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
-  "name": "Robb",
-  "email": "robb@example.com",
-  "language": "English",
-  "plan": "free"
+    "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
+    "name": "Robb",
+    "familyName": "Walker",
+    "email": "robb@example.com",
+    "phoneNumber": "+66 81 234 5678",
+    "language": "English",
+    "plan": "free"
 }
 ```
 
@@ -104,15 +106,21 @@ Common statuses:
 
 ```json
 {
-  "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
-  "name": "Robb",
-  "email": "robb@example.com",
-  "language": "English",
-  "plan": "free",
-  "nationality": "United States",
-  "dateOfBirth": "1990-05-14",
-  "sex": "F",
-  "photoUri": null
+    "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
+    "name": "Robb",
+    "familyName": "Walker",
+    "email": "robb@example.com",
+    "phoneNumber": "+66 81 234 5678",
+    "language": "English",
+    "plan": "free",
+    "nationality": "United States",
+    "dateOfBirth": "1990-05-14",
+    "address": "12 Riverside Road",
+    "city": "Bangkok",
+    "stateProvince": "Bangkok",
+    "postalCode": "10110",
+    "country": "Thailand",
+    "photoUri": null
 }
 ```
 
@@ -120,23 +128,23 @@ Common statuses:
 
 ```json
 {
-  "id": "56aac7ea-8a05-482c-a762-995678f74395",
-  "cityId": "2988507",
-  "cityName": "Paris",
-  "country": "France",
-  "countryCode": "FR",
-  "continentCode": "EU",
-  "subcountry": "Ile-de-France",
-  "visitedAt": "2026-08-10",
-  "note": "Beautiful city.",
-  "places": [
-    {
-      "id": "cdg-airport",
-      "name": "Charles de Gaulle Airport",
-      "type": "airport"
-    }
-  ],
-  "userId": "5ec53967-acde-4ccf-bc78-3f80ee8da15d"
+    "id": "56aac7ea-8a05-482c-a762-995678f74395",
+    "cityId": "2988507",
+    "cityName": "Paris",
+    "country": "France",
+    "countryCode": "FR",
+    "continentCode": "EU",
+    "subcountry": "Ile-de-France",
+    "visitedAt": "2026-08-10",
+    "note": "Beautiful city.",
+    "places": [
+        {
+            "id": "cdg-airport",
+            "name": "Charles de Gaulle Airport",
+            "type": "airport"
+        }
+    ],
+    "userId": "5ec53967-acde-4ccf-bc78-3f80ee8da15d"
 }
 ```
 
@@ -144,25 +152,25 @@ Common statuses:
 
 ## Endpoint summary
 
-| Method | Path | Authentication | Purpose |
-| --- | --- | --- | --- |
-| `POST` | `/auth/register` | No | Create account and session |
-| `POST` | `/auth/login` | No | Create session |
-| `GET` | `/auth/me` | Yes | Restore current user |
-| `PUT` | `/auth/password` | Yes | Change password |
-| `POST` | `/auth/logout` | Yes | Revoke current session |
-| `GET` | `/profile` | Yes | Get complete profile |
-| `PUT` | `/profile` | Yes | Update profile |
-| `GET` | `/visits` | Yes | List the user's visits |
-| `POST` | `/visits` | Yes | Add a visit |
-| `PUT` | `/visits/:id` | Yes | Replace a visit |
-| `DELETE` | `/visits/:id` | Yes | Delete a visit |
-| `GET` | `/me/travel-state` | Yes | Hydrate completions, rewards and plan |
-| `GET` | `/me/home` | Yes | Get the calculated homepage dashboard |
-| `PUT` | `/me/completions/:sightId` | Yes | Set sight completion state |
-| `PUT` | `/me/plan` | Yes | Change free/pro plan |
-| `GET` | `/collections?status=all` | Yes | List user collection progress |
-| `PUT` | `/me/collections/:collectionId` | Yes | Update collection progress |
+| Method   | Path                            | Authentication | Purpose                               |
+| -------- | ------------------------------- | -------------- | ------------------------------------- |
+| `POST`   | `/auth/register`                | No             | Create account and session            |
+| `POST`   | `/auth/login`                   | No             | Create session                        |
+| `GET`    | `/auth/me`                      | Yes            | Restore current user                  |
+| `PUT`    | `/auth/password`                | Yes            | Change password                       |
+| `POST`   | `/auth/logout`                  | Yes            | Revoke current session                |
+| `GET`    | `/profile`                      | Yes            | Get complete profile                  |
+| `PUT`    | `/profile`                      | Yes            | Update profile                        |
+| `GET`    | `/visits`                       | Yes            | List the user's visits                |
+| `POST`   | `/visits`                       | Yes            | Add a visit                           |
+| `PUT`    | `/visits/:id`                   | Yes            | Replace a visit                       |
+| `DELETE` | `/visits/:id`                   | Yes            | Delete a visit                        |
+| `GET`    | `/me/travel-state`              | Yes            | Hydrate completions, rewards and plan |
+| `GET`    | `/me/home`                      | Yes            | Get the calculated homepage dashboard |
+| `PUT`    | `/me/completions/:sightId`      | Yes            | Set sight completion state            |
+| `PUT`    | `/me/plan`                      | Yes            | Change free/pro plan                  |
+| `GET`    | `/collections?status=all`       | Yes            | List user collection progress         |
+| `PUT`    | `/me/collections/:collectionId` | Yes            | Update collection progress            |
 
 ## Authentication endpoints
 
@@ -176,10 +184,10 @@ Request:
 
 ```json
 {
-  "name": "Robb",
-  "email": "robb@example.com",
-  "password": "secret-password",
-  "passwordConfirmation": "secret-password"
+    "name": "Robb",
+    "email": "robb@example.com",
+    "password": "secret-password",
+    "passwordConfirmation": "secret-password"
 }
 ```
 
@@ -195,14 +203,14 @@ Response: `201 Created`
 
 ```json
 {
-  "token": "dev-7bd7c61d-95bd-4331-896f-e3e69e38a47e",
-  "user": {
-    "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
-    "name": "Robb",
-    "email": "robb@example.com",
-    "language": "English",
-    "plan": "free"
-  }
+    "token": "dev-7bd7c61d-95bd-4331-896f-e3e69e38a47e",
+    "user": {
+        "id": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
+        "name": "Robb",
+        "email": "robb@example.com",
+        "language": "English",
+        "plan": "free"
+    }
 }
 ```
 
@@ -218,9 +226,9 @@ Request:
 
 ```json
 {
-  "email": "robb@example.com",
-  "password": "secret-password",
-  "deviceName": "Stampo mobile app"
+    "email": "robb@example.com",
+    "password": "secret-password",
+    "deviceName": "Stampo mobile app"
 }
 ```
 
@@ -248,8 +256,8 @@ Request:
 
 ```json
 {
-  "currentPassword": "secret-password",
-  "newPassword": "new-secret-password"
+    "currentPassword": "secret-password",
+    "newPassword": "new-secret-password"
 }
 ```
 
@@ -288,13 +296,19 @@ Accepted properties:
 
 ```json
 {
-  "name": "Robb",
-  "email": "robb@example.com",
-  "language": "English",
-  "nationality": "United States",
-  "dateOfBirth": "1990-05-14",
-  "sex": "F",
-  "photoUri": "file:///local/profile-photo.jpg"
+    "name": "Robb",
+    "familyName": "Walker",
+    "email": "robb@example.com",
+    "phoneNumber": "+66 81 234 5678",
+    "language": "English",
+    "nationality": "United States",
+    "dateOfBirth": "1990-05-14",
+    "address": "12 Riverside Road",
+    "city": "Bangkok",
+    "stateProvince": "Bangkok",
+    "postalCode": "10110",
+    "country": "Thailand",
+    "photoUri": "file:///local/profile-photo.jpg"
 }
 ```
 
@@ -324,15 +338,15 @@ Request:
 
 ```json
 {
-  "cityId": "2988507",
-  "cityName": "Paris",
-  "country": "France",
-  "countryCode": "FR",
-  "continentCode": "EU",
-  "subcountry": "Ile-de-France",
-  "visitedAt": "2026-08-10",
-  "note": "Beautiful city.",
-  "places": []
+    "cityId": "2988507",
+    "cityName": "Paris",
+    "country": "France",
+    "countryCode": "FR",
+    "continentCode": "EU",
+    "subcountry": "Ile-de-France",
+    "visitedAt": "2026-08-10",
+    "note": "Beautiful city.",
+    "places": []
 }
 ```
 
@@ -368,27 +382,27 @@ Response:
 
 ```json
 {
-  "completedSightIds": ["eiffel-tower"],
-  "rewards": [
-    {
-      "id": "reward-id",
-      "userId": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
-      "title": "Paris Explorer",
-      "krooPoints": 0.8,
-      "unlocked": true
-    }
-  ],
-  "challengePoints": 0.8,
-  "collections": [
-    {
-      "id": "wonders",
-      "title": "Seven Wonders",
-      "detail": "Visit all 7 wonders",
-      "progress": 12,
-      "status": "active"
-    }
-  ],
-  "plan": "free"
+    "completedSightIds": ["eiffel-tower"],
+    "rewards": [
+        {
+            "id": "reward-id",
+            "userId": "5ec53967-acde-4ccf-bc78-3f80ee8da15d",
+            "title": "Paris Explorer",
+            "krooPoints": 0.8,
+            "unlocked": true
+        }
+    ],
+    "challengePoints": 0.8,
+    "collections": [
+        {
+            "id": "wonders",
+            "title": "Seven Wonders",
+            "detail": "Visit all 7 wonders",
+            "progress": 12,
+            "status": "active"
+        }
+    ],
+    "plan": "free"
 }
 ```
 
@@ -410,21 +424,21 @@ Response:
 
 ```json
 [
-  {
-    "id": "wonders",
-    "title": "Seven Wonders",
-    "detail": "Visit all 7 wonders",
-    "progress": 12,
-    "status": "active"
-  },
-  {
-    "id": "seas",
-    "title": "Seven Seas",
-    "detail": "Sail or visit all 7 seas",
-    "progress": 100,
-    "status": "completed",
-    "updatedAt": "2026-08-11T08:00:00.000Z"
-  }
+    {
+        "id": "wonders",
+        "title": "Seven Wonders",
+        "detail": "Visit all 7 wonders",
+        "progress": 12,
+        "status": "active"
+    },
+    {
+        "id": "seas",
+        "title": "Seven Seas",
+        "detail": "Sail or visit all 7 seas",
+        "progress": 100,
+        "status": "completed",
+        "updatedAt": "2026-08-11T08:00:00.000Z"
+    }
 ]
 ```
 
@@ -438,7 +452,7 @@ Request:
 
 ```json
 {
-  "progress": 100
+    "progress": 100
 }
 ```
 
@@ -454,7 +468,7 @@ Request:
 
 ```json
 {
-  "completed": true
+    "completed": true
 }
 ```
 
@@ -464,8 +478,8 @@ Response:
 
 ```json
 {
-  "sightId": "eiffel-tower",
-  "completed": true
+    "sightId": "eiffel-tower",
+    "completed": true
 }
 ```
 
@@ -479,7 +493,7 @@ Request:
 
 ```json
 {
-  "plan": "pro"
+    "plan": "pro"
 }
 ```
 
@@ -487,7 +501,7 @@ Only `free` and `pro` are accepted. Response:
 
 ```json
 {
-  "plan": "pro"
+    "plan": "pro"
 }
 ```
 
@@ -503,28 +517,28 @@ Response:
 
 ```json
 {
-  "counts": {
-    "continents": 2,
-    "countries": 3,
-    "cities": 4,
-    "airports": 1,
-    "sights": 6
-  },
-  "score": 2.792,
-  "level": "Wanderer",
-  "challengePoints": 0,
-  "worldProgress": 2,
-  "visitedCountryCodes": ["BR", "FR", "US"],
-  "continentCounts": {
-    "AF": 0,
-    "AN": 0,
-    "AS": 0,
-    "EU": 1,
-    "NA": 1,
-    "OC": 0,
-    "SA": 1
-  },
-  "updatedAt": "2026-08-11T08:00:00.000Z"
+    "counts": {
+        "continents": 2,
+        "countries": 3,
+        "cities": 4,
+        "airports": 1,
+        "sights": 6
+    },
+    "score": 2.792,
+    "level": "Wanderer",
+    "challengePoints": 0,
+    "worldProgress": 2,
+    "visitedCountryCodes": ["BR", "FR", "US"],
+    "continentCounts": {
+        "AF": 0,
+        "AN": 0,
+        "AS": 0,
+        "EU": 1,
+        "NA": 1,
+        "OC": 0,
+        "SA": 1
+    },
+    "updatedAt": "2026-08-11T08:00:00.000Z"
 }
 ```
 
@@ -532,28 +546,28 @@ Counts use unique continent, country, and city IDs. Airport places are counted f
 
 ### Kroo Score
 
-| Category | Points each | Maximum |
-| --- | ---: | ---: |
-| Continents | `1.0` | `7.0` |
-| Countries | `0.25` | `48.75` |
-| Cities | `0.005` | `10.0` |
-| Airports | `0.01` | `8.0` |
-| Sights | `0.002` | `20.0` |
-| Challenges | Variable | `6.25` |
-| Total |  | `100` |
+| Category   | Points each | Maximum |
+| ---------- | ----------: | ------: |
+| Continents |       `1.0` |   `7.0` |
+| Countries  |      `0.25` | `48.75` |
+| Cities     |     `0.005` |  `10.0` |
+| Airports   |      `0.01` |   `8.0` |
+| Sights     |     `0.002` |  `20.0` |
+| Challenges |    Variable |  `6.25` |
+| Total      |             |   `100` |
 
 The server caps every category and the final total. The score is rounded to three decimal places.
 
 ### Levels
 
-| Level | Score |
-| --- | ---: |
-| Wanderer | `0–4.999` |
-| Traveler | `5–14.999` |
-| Explorer | `15–29.999` |
-| Wayfarer | `30–49.999` |
-| Voyager | `50–74.999` |
-| Kroo Master | `75–100` |
+| Level       |       Score |
+| ----------- | ----------: |
+| Wanderer    |   `0–4.999` |
+| Traveler    |  `5–14.999` |
+| Explorer    | `15–29.999` |
+| Wayfarer    | `30–49.999` |
+| Voyager     | `50–74.999` |
+| Kroo Master |    `75–100` |
 
 `worldProgress` is the rounded percentage of 195 recognized countries visited.
 
@@ -574,22 +588,22 @@ AsyncStorage is an offline UI cache. The authenticated server is authoritative.
 
 The default file is [`server/db.json`](../server/db.json). Collections:
 
-| Collection | Purpose |
-| --- | --- |
-| `users` | Accounts, profile fields, password hashes and plan |
-| `visits` | User-owned city visits and places |
-| `completions` | Completed sight IDs |
-| `rewards` | Unlocked rewards and challenge score values |
+| Collection           | Purpose                                            |
+| -------------------- | -------------------------------------------------- |
+| `users`              | Accounts, profile fields, password hashes and plan |
+| `visits`             | User-owned city visits and places                  |
+| `completions`        | Completed sight IDs                                |
+| `rewards`            | Unlocked rewards and challenge score values        |
 | `collectionProgress` | User-specific active/completed collection progress |
 
 Example completion record:
 
 ```json
 {
-  "id": "uuid",
-  "userId": "user-uuid",
-  "sightId": "eiffel-tower",
-  "completedAt": "2026-08-11T08:00:00.000Z"
+    "id": "uuid",
+    "userId": "user-uuid",
+    "sightId": "eiffel-tower",
+    "completedAt": "2026-08-11T08:00:00.000Z"
 }
 ```
 

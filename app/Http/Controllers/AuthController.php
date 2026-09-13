@@ -9,8 +9,8 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -64,9 +64,15 @@ class AuthController extends Controller
             'code' => ['required', 'digits:6'],
             'purpose' => ['required', Rule::in(['sign-in', 'create-account'])],
             'name' => ['nullable', 'string', 'min:1', 'max:80'],
+            'familyName' => ['nullable', 'string', 'max:80'],
+            'phoneNumber' => ['nullable', 'string', 'max:30'],
             'nationality' => ['nullable', 'string', 'max:100'],
-            'dateOfBirth' => ['nullable', 'date_format:Y-m-d'],
-            'sex' => ['nullable', Rule::in(['M', 'F'])],
+            'dateOfBirth' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'stateProvince' => ['nullable', 'string', 'max:100'],
+            'postalCode' => ['nullable', 'string', 'max:20'],
+            'country' => ['nullable', 'string', 'max:100'],
         ]);
         $email = strtolower(trim($data['email']));
         $key = $this->codeKey($email, $data['purpose']);
@@ -90,7 +96,18 @@ class AuthController extends Controller
                 'name' => trim($data['name'] ?? '') ?: Str::before($email, '@'),
                 'password' => Str::random(64),
             ]);
-            $user->update(collect($data)->only(['name', 'nationality', 'sex'])->filter(fn ($value) => filled($value))->all() + ['date_of_birth' => $data['dateOfBirth'] ?? null]);
+            $user->update(array_filter([
+                'name' => $data['name'] ?? null,
+                'family_name' => $data['familyName'] ?? null,
+                'phone_number' => $data['phoneNumber'] ?? null,
+                'nationality' => $data['nationality'] ?? null,
+                'date_of_birth' => $data['dateOfBirth'] ?? null,
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'state_province' => $data['stateProvince'] ?? null,
+                'postal_code' => $data['postalCode'] ?? null,
+                'country' => $data['country'] ?? null,
+            ], fn ($value) => filled($value)));
         }
         if (! $user->email_verified_at) {
             $user->forceFill(['email_verified_at' => now()])->save();
