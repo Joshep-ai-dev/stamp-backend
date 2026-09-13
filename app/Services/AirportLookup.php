@@ -92,6 +92,11 @@ class AirportLookup
 
     private function normalize(string $value): string
     {
-        return Str::of($value)->ascii()->lower()->squish()->toString();
+        return Str::of($value)
+            ->ascii()
+            ->lower()
+            ->squish()
+            ->replaceMatches('/\s+city$/', '')
+            ->toString();
     }
 }
