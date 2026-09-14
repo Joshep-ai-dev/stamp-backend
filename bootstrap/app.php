@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AssignRequestId;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,7 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if (! $request->is('api/*', 'admin/api/*') || config('app.debug')) {
                 return null;
             }
-            if ($exception instanceof HttpExceptionInterface || $exception instanceof ValidationException) {
+            if ($exception instanceof AuthenticationException || $exception instanceof HttpExceptionInterface || $exception instanceof ValidationException) {
                 return null;
             }
             report($exception);

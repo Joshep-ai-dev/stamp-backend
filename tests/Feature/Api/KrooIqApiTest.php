@@ -13,6 +13,13 @@ class KrooIqApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['features.kroo_iq_requires_kroo_plus' => true]);
+    }
+
     public function test_kroo_iq_requires_authentication_and_free_user_needs_preview_lesson(): void
     {
         $this->getJson('/api/v1/me/kroo-iq/today')->assertUnauthorized();
@@ -35,10 +42,23 @@ class KrooIqApiTest extends TestCase
             'lesson_number' => 0, 'is_published' => true,
         ]);
 
-        $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()
+        $quiz = $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()
             ->assertJsonPath('isPreview', true)
+            ->assertJsonPath('pointsPerCorrect', 0.25)
             ->assertJsonCount(10, 'questions')
-            ->assertJsonPath('questions.0.imageUrl', '/storage/daily-destinations/q1.jpg');
+            ->assertJsonPath('questions.0.imageUrl', url('/storage/daily-destinations/q1.jpg'));
+
+        foreach (collect($quiz->json('questions'))->pluck('id') as $id) {
+            $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $id, 'selectedAnswer' => 0])
+                ->assertOk();
+        }
+
+        $this->assertSame('2.50', $user->fresh()->kroo_iq_score);
+        $this->assertDatabaseHas('kroo_iq_attempts', [
+            'user_id' => $user->id,
+            'correct_count' => 10,
+            'score_after' => 2.50,
+        ]);
     }
 
     public function test_kroo_plus_requirement_can_be_temporarily_disabled(): void
@@ -98,6 +118,7 @@ class KrooIqApiTest extends TestCase
         ]);
 
         $quiz = $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()
+            ->assertJsonPath('pointsPerCorrect', 0.05)
             ->assertJsonCount(5, 'questions')->assertJsonMissingPath('questions.0.correctAnswer');
         $ids = collect($quiz->json('questions'))->pluck('id');
 
@@ -108,7 +129,7 @@ class KrooIqApiTest extends TestCase
         }
 
         $this->assertDatabaseHas('kroo_iq_attempts', ['user_id' => $user->id, 'correct_count' => 5]);
-        $this->assertSame('7.60', $user->fresh()->kroo_iq_score);
+        $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
         $this->getJson('/api/v1/me/kroo-iq/today')->assertJsonPath('attempt.completed', true);
     }
 

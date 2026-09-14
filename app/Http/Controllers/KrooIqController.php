@@ -40,14 +40,15 @@ class KrooIqController extends Controller
         abort_if(! $lesson, 404, 'You have completed all available Kroo IQ lessons. Check back for the next lesson.');
         $questions = $this->questions($lesson);
         abort_if($questions->isEmpty(), 404, 'This Kroo IQ lesson does not have questions yet.');
+        $scoreBefore = (float) ($request->user()->kroo_iq_score ?? 0);
 
         $attempt = KrooIqAttempt::firstOrCreate([
             'user_id' => $request->user()->id, 'quiz_date' => $date,
         ], [
             'question_ids' => $questions->pluck('id')->all(),
             'answers' => [],
-            'score_before' => $request->user()->kroo_iq_score,
-            'score_after' => $request->user()->kroo_iq_score,
+            'score_before' => $scoreBefore,
+            'score_after' => $scoreBefore,
         ]);
 
         return $this->attemptPayload($attempt);
@@ -94,7 +95,8 @@ class KrooIqController extends Controller
             $answers[] = ['questionId' => $data['questionId'], 'selectedAnswer' => $data['selectedAnswer'], 'correct' => $isCorrect];
             $attempt->answers = $answers;
             $attempt->correct_count = collect($answers)->where('correct', true)->count();
-            $attempt->score_after = round((float) $attempt->score_before + ($attempt->correct_count * 0.05), 2);
+            $pointsPerCorrect = (int) $lesson->lesson_number === 0 ? 0.25 : 0.05;
+            $attempt->score_after = round((float) $attempt->score_before + ($attempt->correct_count * $pointsPerCorrect), 2);
 
             if (count($answers) === count($attempt->question_ids)) {
                 $attempt->completed_at = now();
@@ -183,6 +185,7 @@ class KrooIqController extends Controller
                 'imageUrl' => $question['imageUrl'],
             ])->values(),
             'isPreview' => (int) $destination->lesson_number === 0,
+            'pointsPerCorrect' => (int) $destination->lesson_number === 0 ? 0.25 : 0.05,
             'attempt' => $this->attemptData($attempt),
         ];
     }
@@ -197,5 +200,4 @@ class KrooIqController extends Controller
             'completed' => (bool) $attempt->completed_at,
         ];
     }
-
 }
