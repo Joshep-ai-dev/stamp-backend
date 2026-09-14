@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -295,6 +295,7 @@ class AdminController extends Controller
                 'countryId' => ['nullable', 'exists:countries,code'],
                 'state' => ['nullable', 'string', 'max:150'],
                 'cityId' => ['nullable', 'exists:cities,geoname_id'],
+                'sightId' => ['nullable', 'exists:sights,id'],
                 'location' => ['nullable', 'string', 'max:255'],
                 'detail' => ['nullable', 'string'],
                 'access' => ['nullable', Rule::in(['free', 'pro'])],
@@ -305,8 +306,16 @@ class AdminController extends Controller
                 : null;
             abort_if($city && filled($data['countryId'] ?? null) && $city->country_code !== strtoupper($data['countryId']), 422, 'The selected city is not in the selected country.');
             abort_if($city && ($data['state'] ?? null) && $city->subcountry !== $data['state'], 422, 'The selected city is not in the selected state.');
+            $sight = filled($data['sightId'] ?? null) ? Sight::findOrFail($data['sightId']) : null;
+            abort_if($sight && $city && $sight->city_id !== $city->id, 422, 'The selected sight is not in the selected city.');
+            $sightId = $sight?->id ?? $model?->sight_id;
+            if (! $sightId && $city) {
+                $sightId = Sight::where('city_id', $city->id)
+                    ->whereRaw('LOWER(name) = ?', [Str::lower($data['title'])])
+                    ->value('id');
+            }
             $location = $data['location'] ?? ($city ? collect([$city->name, $city->subcountry, $city->country->name])->filter()->join(', ') : $model?->location);
-            $values = ['collectionkind_id' => $kindIds[0], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city?->id, 'location' => $location, 'detail' => $data['detail'] ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0];
+            $values = ['collectionkind_id' => $kindIds[0], 'title' => $data['title'], 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city?->id, 'sight_id' => $sightId, 'location' => $location, 'detail' => $data['detail'] ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0];
             $model ??= new CollectionList(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'daily-destinations') {
             $this->ensureKrooIqSchemaIsReady();
@@ -326,7 +335,9 @@ class AdminController extends Controller
             abort_if($isPreview && count($data['questions']) !== 10, 422, 'Lesson 0 must contain exactly 10 questions.');
             abort_if(! $isPreview && count($data['questions']) !== 5, 422, 'Kroo+ lessons must contain exactly 5 questions.');
             abort_if($isPreview && ! $model && DailyDestination::where('lesson_number', 0)->exists(), 422, 'Lesson 0 already exists.');
-            foreach ($data['questions'] as $question) abort_if($question['correctAnswer'] >= count($question['answers']), 422, 'A correct choice number is invalid.');
+            foreach ($data['questions'] as $question) {
+                abort_if($question['correctAnswer'] >= count($question['answers']), 422, 'A correct choice number is invalid.');
+            }
             $country = Country::findOrFail(strtoupper($data['countryId']));
             $first = $data['questions'][0];
             $lessonNumber = $model?->lesson_number ?? ($isPreview ? 0 : max(1, (int) DailyDestination::max('lesson_number') + 1));
@@ -408,7 +419,7 @@ class AdminController extends Controller
 
     private function collectionList(CollectionList $item): array
     {
-        return ['id' => $item->id, 'collectionKindId' => $item->kinds->first()?->id ?? $item->collectionkind_id, 'collectionKindIds' => $item->kinds->pluck('id')->values(), 'collectionKind' => $item->kinds->pluck('title')->join(', '), 'imageUrl' => ImageUrl::public($item->image), 'title' => $item->title, 'cityId' => $item->city?->geoname_id, 'countryId' => $item->city?->country_code, 'state' => $item->city?->subcountry, 'location' => $item->location, 'detail' => $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'collectionKindId' => $item->kinds->first()?->id ?? $item->collectionkind_id, 'collectionKindIds' => $item->kinds->pluck('id')->values(), 'collectionKind' => $item->kinds->pluck('title')->join(', '), 'imageUrl' => ImageUrl::public($item->image), 'title' => $item->title, 'cityId' => $item->city?->geoname_id, 'sightId' => $item->sight_id ? (string) $item->sight_id : null, 'countryId' => $item->city?->country_code, 'state' => $item->city?->subcountry, 'location' => $item->location, 'detail' => $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
     }
 
     private function modelImage(?Model $model): ?string

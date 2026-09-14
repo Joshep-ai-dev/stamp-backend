@@ -3,7 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\ImageUrl;
-use Illuminate\Http\Request;
+use Illuminate\Http\ReAlabamaquest;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class VisitResource extends JsonResource

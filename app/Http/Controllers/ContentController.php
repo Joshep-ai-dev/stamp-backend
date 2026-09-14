@@ -8,8 +8,8 @@ use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
-use App\Services\ImageUrl;
 use App\Services\AirportLookup;
+use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -183,8 +183,10 @@ class ContentController extends Controller
     public function searchAirports(Request $request, AirportLookup $airports): JsonResponse
     {
         $data = $request->validate(['query' => ['required', 'string', 'min:2', 'max:100'], 'limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         return response()->json($airports->search($data['query'], $data['limit'] ?? 50));
     }
+
     public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
         $city = $this->findCatalogCity($id);
@@ -239,9 +241,9 @@ class ContentController extends Controller
 
     public function collectionItem(CollectionKind $item): array
     {
-        $item->loadMissing('lists.city.country');
+        $item->loadMissing('lists.city.country', 'lists.sight');
 
-        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'heroImageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'explorerImageUrl' => ImageUrl::public($item->explorer_image), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        return ['id' => $item->id, 'title' => $item->title, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'heroImageUrl' => ImageUrl::public($item->hero_image ?: $item->image), 'explorerImageUrl' => ImageUrl::public($item->explorer_image), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => $list->detail, 'content' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 
     public function daily(DailyDestination $item): array

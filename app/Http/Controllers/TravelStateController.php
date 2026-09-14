@@ -6,10 +6,12 @@ use App\Models\CollectionKind;
 use App\Models\CollectionList;
 use App\Models\CollectionProgress;
 use App\Models\Sight;
+use App\Models\User;
 use App\Services\CollectionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class TravelStateController extends Controller
 {
@@ -25,6 +27,7 @@ class TravelStateController extends Controller
             $syncRequest->setUserResolver(fn () => $request->user());
             $this->completion($syncRequest, $sightId);
         }
+
         return $this->show($request);
     }
 
@@ -40,7 +43,7 @@ class TravelStateController extends Controller
             'completedSightIds' => $user->completions()->pluck('sight_id')->values(),
             'rewards' => $rewards,
             'challengePoints' => round(min(6.25, $rewards->where('unlocked', true)->sum('krooPoints')), 3),
-            'collections' => $this->collectionItems($user->collectionProgress()->get()),
+            'collections' => $this->collectionItems($user),
             'plan' => $user->plan,
         ]);
     }
@@ -48,7 +51,7 @@ class TravelStateController extends Controller
     public function collections(Request $request): JsonResponse
     {
         $status = $request->validate(['status' => ['sometimes', 'in:all,active,completed']])['status'] ?? 'all';
-        $items = collect($this->collectionItems($request->user()->collectionProgress()->get()));
+        $items = collect($this->collectionItems($request->user()));
         if ($status !== 'all') {
             $items = $items->where('status', $status)->values();
         }
@@ -62,12 +65,21 @@ class TravelStateController extends Controller
         $progress = $request->validate(['progress' => ['required', 'integer', 'between:0,100']])['progress'];
         $record = $request->user()->collectionProgress()->updateOrCreate(['collection_id' => $collectionId], ['progress' => $progress]);
 
-        return response()->json($this->collection($collectionId, $record));
+        $definition = CollectionKind::with('lists.city.country', 'lists.sight')->find($collectionId);
+
+        return response()->json($this->collection(
+            $collectionId,
+            $record,
+            $definition,
+            $request->user()->completions()->pluck('sight_id'),
+            $this->visitedStates($request->user()),
+        ));
     }
 
     public function completion(Request $request, string $sightId): JsonResponse
     {
         $completed = $request->boolean('completed', true);
+        $sightId = $this->canonicalSightId($sightId);
         DB::transaction(function () use ($request, $sightId, $completed): void {
             [$city, $place] = $this->completionPlace($sightId);
             if ($completed) {
@@ -101,6 +113,21 @@ class TravelStateController extends Controller
         return response()->json(['sightId' => $sightId, 'completed' => $completed]);
     }
 
+    private function canonicalSightId(string $targetId): string
+    {
+        if (! str_starts_with($targetId, 'collection-')) {
+            return $targetId;
+        }
+
+        $list = CollectionList::with('kinds')->get()->first(
+            fn ($item) => $item->kinds->contains(
+                fn ($kind) => "collection-{$kind->id}-{$item->id}" === $targetId,
+            ),
+        );
+
+        return $list?->sight_id ? (string) $list->sight_id : $targetId;
+    }
+
     private function completionPlace(string $targetId): array
     {
         if (! str_starts_with($targetId, 'collection-')) {
@@ -121,25 +148,50 @@ class TravelStateController extends Controller
         return [$city, ['id' => $targetId, 'name' => $list?->title ?? $targetId, 'type' => 'sight']];
     }
 
-    private function collectionItems($progress): array
+    private function collectionItems(User $user): array
     {
-        $managed = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('title')->get();
+        $progress = $user->collectionProgress()->get();
+        $completionIds = $user->completions()->pluck('sight_id');
+        $visitedStates = $this->visitedStates($user);
+        $managed = CollectionKind::with('lists.city.country', 'lists.sight')->where('is_published', true)->orderBy('title')->get();
         $legacy = collect(CollectionCatalog::ITEMS)
             ->except($managed->pluck('id'))
             ->map(fn ($definition, $id) => $this->collection($id, $progress->firstWhere('collection_id', $id)));
 
-        return $managed->map(fn ($definition) => $this->collection($definition->id, $progress->firstWhere('collection_id', $definition->id), $definition))->concat($legacy)->values()->all();
+        return $managed->map(fn ($definition) => $this->collection($definition->id, $progress->firstWhere('collection_id', $definition->id), $definition, $completionIds, $visitedStates))->concat($legacy)->values()->all();
     }
 
-    private function collection(string $id, ?CollectionProgress $progress, ?CollectionKind $definition = null): array
+    private function collection(string $id, ?CollectionProgress $progress, ?CollectionKind $definition = null, $completionIds = null, $visitedStates = null): array
     {
-        $value = $progress?->progress ?? 0;
+        $completionIds ??= collect();
+        $visitedStates ??= collect();
         $legacy = CollectionCatalog::ITEMS[$id] ?? [];
-        $item = ['id' => $id, 'title' => $definition?->title ?? $legacy['title'], 'detail' => $definition?->detail ?? $legacy['detail'], 'imageUrl' => $definition?->hero_image ?: $definition?->image, 'heroImageUrl' => $definition?->hero_image ?: $definition?->image, 'explorerImageUrl' => $definition?->explorer_image, 'places' => $definition?->lists?->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro']) ?? [], 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $places = $definition?->lists?->sortBy('title')->values()->map(function ($list) use ($completionIds, $id, $visitedStates) {
+            $completionId = $list->sight_id ? (string) $list->sight_id : "collection-{$id}-{$list->id}";
+            $state = Str::of((string) $list->city?->subcountry)->ascii()->lower()->squish()->toString();
+            $isStateChecklistItem = $list->city?->country_code === 'US'
+                && $state !== ''
+                && Str::of($list->title)->ascii()->lower()->squish()->toString() === $state;
+            $completed = $completionIds->contains($completionId)
+                || ($isStateChecklistItem && $visitedStates->contains($state));
+
+            return ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro', 'completed' => $completed];
+        }) ?? collect();
+        $value = $definition
+            ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
+            : ($progress?->progress ?? 0);
+        $item = ['id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => $definition?->hero_image ?: $definition?->image, 'heroImageUrl' => $definition?->hero_image ?: $definition?->image, 'explorerImageUrl' => $definition?->explorer_image, 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }
 
         return $item;
+    }
+
+    private function visitedStates(User $user)
+    {
+        return $user->visits()->where('country_code', 'US')->whereNotNull('subcountry')->pluck('subcountry')
+            ->map(fn ($state) => Str::of($state)->ascii()->lower()->squish()->toString())
+            ->filter()->unique()->values();
     }
 }

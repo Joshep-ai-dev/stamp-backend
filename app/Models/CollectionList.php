@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['id', 'collectionkind_id', 'image', 'title', 'city_id', 'location', 'detail', 'access', 'display_order'])]
+#[Fillable(['id', 'collectionkind_id', 'image', 'title', 'city_id', 'sight_id', 'location', 'detail', 'access', 'display_order'])]
 class CollectionList extends Model
 {
     protected $table = 'collectionlist';
@@ -43,5 +43,10 @@ class CollectionList extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    public function sight(): BelongsTo
+    {
+        return $this->belongsTo(Sight::class);
     }
 }
