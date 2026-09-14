@@ -213,6 +213,9 @@ class TravelStateApiTest extends TestCase
 
     public function test_passport_fields_are_saved_during_code_account_creation(): void
     {
+        $member = User::factory()->create(['friend_code' => 'inviting-member']);
+        $grant = $this->postJson('/api/v1/invitations/validate', ['code' => $member->friend_code])->assertOk()->json('accessToken');
+        $this->withHeader('X-Kroo-Invitation', $grant);
         $email = 'new-traveller@example.com';
         Cache::put('auth-code:'.hash('sha256', $email).':create-account', [
             'hash' => Hash::make('123456'),

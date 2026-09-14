@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -11,6 +12,9 @@ class AuthApiTest extends TestCase
 
     public function test_user_can_register_use_token_and_logout(): void
     {
+        $member = User::factory()->create(['friend_code' => 'inviting-member']);
+        $grant = $this->postJson('/api/v1/invitations/validate', ['code' => $member->friend_code])->assertOk()->json('accessToken');
+        $this->withHeader('X-Kroo-Invitation', $grant);
         $response = $this->postJson('/api/v1/auth/register', ['name' => 'Robb', 'email' => 'robb@example.com', 'password' => 'secret-password', 'passwordConfirmation' => 'secret-password']);
         $response->assertCreated()->assertJsonPath('user.language', 'English')->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'language']]);
         $token = $response->json('token');

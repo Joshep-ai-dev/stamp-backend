@@ -7,6 +7,7 @@ use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\KrooIqController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::post('/billing/revenuecat/webhook', [SubscriptionController::class, 'webhook'])->middleware('throttle:api');
     Route::middleware('throttle:auth')->group(function (): void {
+        Route::post('/invitations/validate', [InvitationController::class, 'validateCode']);
         Route::post('/auth/code/request', [AuthController::class, 'requestCode']);
         Route::post('/auth/code/verify', [AuthController::class, 'verifyCode']);
         Route::post('/auth/register', [AuthController::class, 'register']);
@@ -49,9 +51,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/countries', [CountryController::class, 'index']);
         Route::get('/cities', [CityController::class, 'index']);
         Route::get('/cities/{geonameId}', [CityController::class, 'show']);
-    Route::get('/catalog/version', [CatalogController::class, 'version']);
-    Route::get('/catalog/airports', [ContentController::class, 'searchAirports']);
-    Route::get('/catalog/nearby', [ContentController::class, 'nearby']);
+        Route::get('/catalog/version', [CatalogController::class, 'version']);
+        Route::get('/catalog/airports', [ContentController::class, 'searchAirports']);
+        Route::get('/catalog/nearby', [ContentController::class, 'nearby']);
     });
     Route::get('/daily-destinations', [ContentController::class, 'dailyDestinations']);
     Route::get('/community/leaderboard', [CommunityController::class, 'leaderboard']);

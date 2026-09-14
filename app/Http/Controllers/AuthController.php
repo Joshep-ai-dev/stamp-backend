@@ -6,6 +6,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\InvitationAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,6 +25,9 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'max:255'],
             'purpose' => ['required', Rule::in(['sign-in', 'create-account'])],
         ]);
+        if ($data['purpose'] === 'create-account') {
+            InvitationAccess::requireInvitation($request);
+        }
         $email = strtolower(trim($data['email']));
         $accountExists = User::where('email', $email)->exists();
         if ($data['purpose'] === 'sign-in' && ! $accountExists) {
@@ -74,6 +78,9 @@ class AuthController extends Controller
             'postalCode' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:100'],
         ]);
+        if ($data['purpose'] === 'create-account') {
+            InvitationAccess::requireInvitation($request);
+        }
         $email = strtolower(trim($data['email']));
         $key = $this->codeKey($email, $data['purpose']);
         $record = Cache::get($key);
@@ -123,6 +130,7 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request): JsonResponse
     {
+        InvitationAccess::requireInvitation($request);
         $user = User::create($request->safe()->only('name', 'email', 'password'));
 
         return response()->json(['token' => $user->createToken($request->string('deviceName', 'mobile')->toString())->plainTextToken, 'user' => new UserResource($user)], 201);

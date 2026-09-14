@@ -7,11 +7,12 @@ use App\Models\CollectionList;
 use App\Models\CollectionProgress;
 use App\Models\Sight;
 use App\Models\User;
+use App\Services\CollectionAccess;
 use App\Services\CollectionCatalog;
+use App\Services\UsStates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class TravelStateController extends Controller
 {
@@ -62,6 +63,7 @@ class TravelStateController extends Controller
     public function updateCollection(Request $request, string $collectionId): JsonResponse
     {
         abort_unless(isset(CollectionCatalog::ITEMS[$collectionId]) || CollectionKind::where('is_published', true)->whereKey($collectionId)->exists(), 404);
+        abort_if(CollectionKind::whereKey($collectionId)->where('access', 'pro')->exists() && $request->user()->plan !== 'pro', 403, 'Kroo+ membership is required.');
         $progress = $request->validate(['progress' => ['required', 'integer', 'between:0,100']])['progress'];
         $record = $request->user()->collectionProgress()->updateOrCreate(['collection_id' => $collectionId], ['progress' => $progress]);
 
@@ -79,6 +81,9 @@ class TravelStateController extends Controller
     public function completion(Request $request, string $sightId): JsonResponse
     {
         $completed = $request->boolean('completed', true);
+        if ($completed) {
+            CollectionAccess::checkCompletion($request->user(), $sightId);
+        }
         $sightId = $this->canonicalSightId($sightId);
         DB::transaction(function () use ($request, $sightId, $completed): void {
             [$city, $place] = $this->completionPlace($sightId);
@@ -166,21 +171,21 @@ class TravelStateController extends Controller
         $completionIds ??= collect();
         $visitedStates ??= collect();
         $legacy = CollectionCatalog::ITEMS[$id] ?? [];
-        $places = $definition?->lists?->sortBy('title')->values()->map(function ($list) use ($completionIds, $id, $visitedStates) {
+        $places = $definition?->lists?->sortBy('title')->values()->map(function ($list) use ($completionIds, $id, $visitedStates, $definition) {
             $completionId = $list->sight_id ? (string) $list->sight_id : "collection-{$id}-{$list->id}";
-            $state = Str::of((string) $list->city?->subcountry)->ascii()->lower()->squish()->toString();
+            $state = UsStates::normalize($list->city?->subcountry);
             $isStateChecklistItem = $list->city?->country_code === 'US'
                 && $state !== ''
-                && Str::of($list->title)->ascii()->lower()->squish()->toString() === $state;
+                && UsStates::normalize($list->title) === $state;
             $completed = $completionIds->contains($completionId)
                 || ($isStateChecklistItem && $visitedStates->contains($state));
 
-            return ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => $list->detail, 'access' => $list->access, 'isPremium' => $list->access === 'pro', 'completed' => $completed];
+            return ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $definition->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $definition->access === 'pro' || $list->access === 'pro', 'completed' => $completed];
         }) ?? collect();
         $value = $definition
             ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
             : ($progress?->progress ?? 0);
-        $item = ['id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => $definition?->hero_image ?: $definition?->image, 'heroImageUrl' => $definition?->hero_image ?: $definition?->image, 'explorerImageUrl' => $definition?->explorer_image, 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $item = ['access' => $definition?->access ?? 'free', 'id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => $definition?->hero_image ?: $definition?->image, 'heroImageUrl' => $definition?->hero_image ?: $definition?->image, 'explorerImageUrl' => $definition?->explorer_image, 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }
@@ -190,8 +195,8 @@ class TravelStateController extends Controller
 
     private function visitedStates(User $user)
     {
-        return $user->visits()->where('country_code', 'US')->whereNotNull('subcountry')->pluck('subcountry')
-            ->map(fn ($state) => Str::of($state)->ascii()->lower()->squish()->toString())
+        return $user->visits()->with('city')->where('country_code', 'US')->get()
+            ->map(fn ($visit) => UsStates::normalize($visit->subcountry ?: $visit->city?->subcountry))
             ->filter()->unique()->values();
     }
 }

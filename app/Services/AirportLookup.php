@@ -11,14 +11,18 @@ class AirportLookup
     public function search(string $query, int $limit = 50): array
     {
         $term = $this->normalize($query);
-        if ($term === '') return [];
-        $like = '%' . $term . '%';
+        if ($term === '') {
+            return [];
+        }
+        $like = '%'.$term.'%';
+
         return Airport::query()->where(function ($q) use ($like) {
             foreach (['name', 'iata_code', 'icao_code', 'municipality', 'normalized_municipality', 'city', 'normalized_city', 'state', 'normalized_state'] as $column) {
                 $q->orWhere($column, 'like', $like);
             }
         })->orderBy('name')->limit(max(1, min($limit, 100)))->get()->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
+
     public function forCity(string $countryCode, string $cityName, ?string $asciiName = null): array
     {
         $names = $this->names([$cityName, $asciiName]);
@@ -26,12 +30,24 @@ class AirportLookup
             return [];
         }
 
+        // Airports serving a metro area can be in a different municipality or state.
+        // Keep these associations country-scoped and keyed by stable IATA codes.
+        $metroCodes = [
+            'US' => ['new york' => ['JFK', 'LGA', 'EWR']],
+            'MX' => ['mexico' => ['MEX', 'NLU', 'TLC'], 'ciudad de mexico' => ['MEX', 'NLU', 'TLC']],
+            'FR' => ['paris' => ['CDG', 'ORY', 'BVA']],
+            'TH' => ['pattaya' => ['UTP'], 'phatthaya' => ['UTP']],
+        ];
+        $codes = [];
+        foreach ($names as $name) {
+            $codes = array_merge($codes, $metroCodes[strtoupper(trim($countryCode))][$name] ?? []);
+        }
+
         return Airport::query()->where('country_code', strtoupper(trim($countryCode)))
             ->orderBy('name')->get()
             ->filter(fn (Airport $airport) => $this->matches($airport, $names, [
                 'city', 'normalized_city', 'municipality', 'normalized_municipality',
-                'state', 'normalized_state',
-            ]))
+            ]) || in_array($airport->iata_code, $codes, true))
             ->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
 
