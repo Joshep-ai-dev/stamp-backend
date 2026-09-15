@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\UserResource;
 use App\Http\Requests\ProfileRequest;
 use App\Services\ImageStorage;
 use App\Services\KrooId;
@@ -10,6 +11,11 @@ use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
+    public function current(Request $request): UserResource
+    {
+        return new UserResource($request->user());
+    }
+
     public function show(Request $request): JsonResponse
     {
         return response()->json($this->profile($request));

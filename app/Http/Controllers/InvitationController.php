@@ -45,6 +45,18 @@ class InvitationController extends Controller
         return $this->createMembership(InvitationAccess::invitingMember($request), trim($data['name']));
     }
 
+    public function resume(Request $request): JsonResponse
+    {
+        $data = $request->validate(['krooId' => ['required', 'string', 'max:20']]);
+        $krooId = KrooId::parse($data['krooId']);
+        abort_unless($krooId, 422, 'This Kroo ID is not valid.');
+
+        $user = User::where('kroo_id', $krooId)->first();
+        abort_unless($user, 404, 'No Kroo member was found for this Kroo ID.');
+
+        return response()->json($this->session($user));
+    }
+
     private function createMembership(User $member, string $name): JsonResponse
     {
         $user = User::create([
@@ -60,19 +72,26 @@ class InvitationController extends Controller
         ]);
 
         return response()->json([
-            'token' => $user->createToken('Kroo mobile app')->plainTextToken,
+            ...$this->session($user),
             'accessToken' => $this->accessToken($member),
+        ], 201);
+    }
+
+    private function session(User $user): array
+    {
+        return [
+            'token' => $user->createToken('Kroo mobile app')->plainTextToken,
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'email' => '',
+                'email' => str_ends_with($user->email, '@members.kroo.invalid') ? '' : $user->email,
                 'language' => $user->language,
                 'plan' => $user->plan,
                 'emailOptIn' => $user->email_opt_in,
                 'krooId' => $user->kroo_id,
                 'formattedKrooId' => KrooId::format($user->kroo_id),
             ],
-        ], 201);
+        ];
     }
 
     private function memberFor(string $code): ?User

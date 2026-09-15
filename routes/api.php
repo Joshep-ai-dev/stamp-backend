@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\CommunityController;
@@ -20,16 +19,11 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:auth')->group(function (): void {
         Route::post('/invitations/validate', [InvitationController::class, 'validateCode']);
         Route::post('/invitations/join', [InvitationController::class, 'join']);
+        Route::post('/members/resume', [InvitationController::class, 'resume']);
         Route::post('/invitations/claim', [InvitationController::class, 'claim']);
-        Route::post('/auth/code/request', [AuthController::class, 'requestCode']);
-        Route::post('/auth/code/verify', [AuthController::class, 'verifyCode']);
-        Route::post('/auth/register', [AuthController::class, 'register']);
-        Route::post('/auth/login', [AuthController::class, 'login']);
     });
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
-        Route::get('/auth/me', [AuthController::class, 'me']);
-        Route::post('/auth/logout', [AuthController::class, 'logout']);
-        Route::put('/auth/password', [AuthController::class, 'password']);
+        Route::get('/members/current', [ProfileController::class, 'current']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/image', [ProfileController::class, 'uploadImage']);

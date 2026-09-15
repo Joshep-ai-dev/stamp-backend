@@ -66,6 +66,23 @@ class InvitationTest extends TestCase
         $this->postJson('/api/v1/invitations/validate', ['code' => 'unknown'])->assertUnprocessable();
     }
 
+    public function test_member_session_can_be_restored_from_the_saved_kroo_id(): void
+    {
+        $member = User::factory()->create(['name' => 'Avery']);
+
+        $response = $this->postJson('/api/v1/members/resume', [
+            'krooId' => KrooId::format($member->kroo_id),
+        ])->assertOk()
+            ->assertJsonPath('user.id', $member->id)
+            ->assertJsonPath('user.name', 'Avery')
+            ->assertJsonStructure(['token', 'user' => ['krooId', 'formattedKrooId']]);
+
+        $this->withToken($response->json('token'))
+            ->getJson('/api/v1/profile')
+            ->assertOk()
+            ->assertJsonPath('id', $member->id);
+    }
+
     public function test_registration_and_code_account_creation_require_an_invitation(): void
     {
         $this->postJson('/api/v1/auth/register', ['name' => 'Guest', 'email' => 'guest@example.com',
