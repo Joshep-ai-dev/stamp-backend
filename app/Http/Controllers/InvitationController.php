@@ -61,7 +61,7 @@ class InvitationController extends Controller
     {
         $user = User::create([
             'name' => $name,
-            'email' => Str::uuid().'@members.kroo.invalid',
+            'email' => null,
             'password' => Str::random(64),
             'email_opt_in' => true,
             'referred_by_user_id' => $member->id,
@@ -84,7 +84,7 @@ class InvitationController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'email' => str_ends_with($user->email, '@members.kroo.invalid') ? '' : $user->email,
+                'email' => $user->email ?? '',
                 'language' => $user->language,
                 'plan' => $user->plan,
                 'emailOptIn' => $user->email_opt_in,

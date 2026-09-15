@@ -83,6 +83,46 @@ class InvitationTest extends TestCase
             ->assertJsonPath('id', $member->id);
     }
 
+    public function test_pre_checksum_kroo_id_can_resume_the_same_member(): void
+    {
+        $member = User::factory()->create();
+        $currentCode = KrooId::format($member->kroo_id);
+        $legacyCode = substr($currentCode, 0, 8).'Z9';
+
+        $this->postJson('/api/v1/members/resume', ['krooId' => $legacyCode])
+            ->assertOk()
+            ->assertJsonPath('user.id', $member->id);
+    }
+
+    public function test_email_only_connects_when_email_and_kroo_id_belong_to_same_member(): void
+    {
+        $current = User::factory()->create(['email' => 'current@example.com']);
+        $existing = User::factory()->create(['email' => 'existing@example.com', 'name' => 'Existing Member']);
+
+        $this->actingAs($current)->postJson('/api/v1/members/email', [
+            'email' => 'EXISTING@example.com',
+            'krooId' => KrooId::format($current->kroo_id),
+        ])->assertUnprocessable();
+
+        $this->actingAs($existing)->postJson('/api/v1/members/email', [
+            'email' => 'EXISTING@example.com',
+            'krooId' => KrooId::format($existing->kroo_id),
+        ])->assertOk()->assertJsonPath('user.id', $existing->id);
+    }
+
+    public function test_new_email_is_attached_to_current_kroo_member(): void
+    {
+        $current = User::factory()->create();
+
+        $this->actingAs($current)->postJson('/api/v1/members/email', [
+            'email' => 'new@example.com',
+            'krooId' => KrooId::format($current->kroo_id),
+        ])->assertOk()
+            ->assertJsonPath('user.id', $current->id);
+
+        $this->assertDatabaseHas('users', ['id' => $current->id, 'email' => 'new@example.com']);
+    }
+
     public function test_registration_and_code_account_creation_require_an_invitation(): void
     {
         $this->postJson('/api/v1/auth/register', ['name' => 'Guest', 'email' => 'guest@example.com',

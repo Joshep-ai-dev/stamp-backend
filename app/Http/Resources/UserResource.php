@@ -18,7 +18,7 @@ class UserResource extends JsonResource
             'formattedKrooId' => KrooId::format($this->kroo_id),
             'name' => $this->name,
             'familyName' => $this->family_name,
-            'email' => str_ends_with($this->email, '@members.kroo.invalid') ? '' : $this->email,
+            'email' => $this->email ?? '',
             'phoneNumber' => $this->phone_number,
             'language' => $this->language,
             'emailOptIn' => $this->email_opt_in,

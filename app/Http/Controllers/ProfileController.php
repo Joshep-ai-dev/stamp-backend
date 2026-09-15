@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
 use App\Http\Requests\ProfileRequest;
+use App\Models\User;
 use App\Services\ImageStorage;
 use App\Services\KrooId;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,31 @@ class ProfileController extends Controller
     public function current(Request $request): UserResource
     {
         return new UserResource($request->user());
+    }
+
+    public function connectEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'krooId' => ['required', 'string', 'max:20'],
+        ]);
+        $email = strtolower(trim($data['email']));
+        $krooId = KrooId::parse($data['krooId']);
+        abort_unless($krooId, 422, 'This Kroo ID is not valid.');
+        abort_unless((int) $request->user()->kroo_id === $krooId, 403, 'The Kroo ID does not match this member.');
+
+        $emailOwner = User::where('email', $email)->first();
+        abort_if($emailOwner && (int) $emailOwner->kroo_id !== $krooId, 422, 'This email belongs to a different Kroo ID.');
+
+        $user = $emailOwner ?: $request->user();
+        if (! $emailOwner) {
+            $user->update(['email' => $email]);
+        }
+
+        return response()->json([
+            'token' => $user->createToken('Kroo mobile app')->plainTextToken,
+            'user' => (new UserResource($user))->resolve($request),
+        ]);
     }
 
     public function show(Request $request): JsonResponse
@@ -69,7 +95,7 @@ class ProfileController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'familyName' => $user->family_name,
-            'email' => str_ends_with($user->email, '@members.kroo.invalid') ? '' : $user->email,
+            'email' => $user->email ?? '',
             'krooId' => $user->kroo_id,
             'formattedKrooId' => KrooId::format($user->kroo_id),
             'phoneNumber' => $user->phone_number,

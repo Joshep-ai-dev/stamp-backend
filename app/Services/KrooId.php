@@ -62,13 +62,15 @@ final class KrooId
                 return null;
             }
             if ($value[8] !== chr(65 + ($encoded % 26)) || (int) $value[9] !== intdiv($encoded, 26) % 10) {
-                return null;
+                // IDs issued before the checksum was introduced used the
+                // first eight interleaved characters as their stable key.
+                $value = substr($value, 0, 8);
+            } else {
+                $unshifted = ($encoded - self::OFFSET + self::CODE_SPACE) % self::CODE_SPACE;
+                $id = ($unshifted * self::MULTIPLIER_INVERSE) % self::CODE_SPACE + 1;
+
+                return $id <= self::MAXIMUM ? $id : null;
             }
-
-            $unshifted = ($encoded - self::OFFSET + self::CODE_SPACE) % self::CODE_SPACE;
-            $id = ($unshifted * self::MULTIPLIER_INVERSE) % self::CODE_SPACE + 1;
-
-            return $id <= self::MAXIMUM ? $id : null;
         }
 
         // Accept the shorter interleaved format so existing shared codes continue to work.

@@ -24,6 +24,7 @@ Route::prefix('v1')->group(function (): void {
     });
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('/members/current', [ProfileController::class, 'current']);
+        Route::post('/members/email', [ProfileController::class, 'connectEmail']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
