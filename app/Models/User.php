@@ -15,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'family_name', 'email', 'phone_number', 'password', 'language', 'nationality', 'date_of_birth', 'address', 'city', 'state_province', 'postal_code', 'country', 'photo_uri', 'friend_code', 'kroo_id', 'email_opt_in', 'kroo_iq_score'])]
+#[Fillable(['name', 'family_name', 'email', 'phone_number', 'password', 'language', 'nationality', 'date_of_birth', 'address', 'city', 'state_province', 'postal_code', 'country', 'photo_uri', 'friend_code', 'kroo_id', 'referred_by_user_id', 'email_opt_in', 'kroo_iq_score'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -68,6 +68,11 @@ class User extends Authenticatable
     public function krooIqAttempts(): HasMany
     {
         return $this->hasMany(KrooIqAttempt::class);
+    }
+
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(self::class, 'referred_by_user_id');
     }
 
     /**

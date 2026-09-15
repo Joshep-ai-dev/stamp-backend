@@ -52,6 +52,7 @@ class InvitationController extends Controller
             'email' => Str::uuid().'@members.kroo.invalid',
             'password' => Str::random(64),
             'email_opt_in' => true,
+            'referred_by_user_id' => $member->id,
         ]);
         Friend::firstOrCreate([
             'user_id' => min($member->id, $user->id),

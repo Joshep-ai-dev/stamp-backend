@@ -42,7 +42,11 @@ class InvitationTest extends TestCase
         $formattedKrooId = $response->json('user.formattedKrooId');
         $mistypedKrooId = substr($formattedKrooId, 0, 9).(((int) $formattedKrooId[9] + 1) % 10);
         $this->assertNull(KrooId::parse($mistypedKrooId));
-        $this->assertDatabaseHas('users', ['name' => 'Avery', 'email_opt_in' => true]);
+        $this->assertDatabaseHas('users', [
+            'name' => 'Avery',
+            'email_opt_in' => true,
+            'referred_by_user_id' => $member->id,
+        ]);
         $this->assertDatabaseCount('friends', 1);
 
         $headers = ['Authorization' => 'Bearer '.$response->json('token')];

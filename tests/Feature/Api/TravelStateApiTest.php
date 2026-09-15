@@ -66,6 +66,7 @@ class TravelStateApiTest extends TestCase
         $user = User::factory()->create();
         $user->visits()->create(['city_id' => $city->id, 'city_name' => 'Paris', 'country' => 'France', 'country_code' => 'FR', 'continent_code' => 'EU', 'visited_at' => '2026-08-10', 'places' => [['id' => 'cdg', 'name' => 'CDG', 'type' => 'airport'], ['id' => 'eiffel', 'name' => 'Eiffel Tower', 'type' => 'sight']]]);
         Reward::create(['user_id' => $user->id, 'title' => 'Explorer', 'kroo_points' => .8, 'unlocked' => true]);
+        User::factory()->count(2)->create(['referred_by_user_id' => $user->id]);
         Sanctum::actingAs($user);
 
         $this->getJson('/api/v1/me/home')->assertOk()
@@ -75,7 +76,11 @@ class TravelStateApiTest extends TestCase
             ->assertJsonPath('counts.airports', 1)
             ->assertJsonPath('counts.sights', 1)
             ->assertJsonPath('score', 2.067)
-            ->assertJsonPath('level', 'Wanderer');
+            ->assertJsonPath('level', 'Wanderer')
+            ->assertJsonPath('challengeProgress.krooScore', 2.067)
+            ->assertJsonPath('challengeProgress.krooIqScore', 0)
+            ->assertJsonPath('challengeProgress.referralCount', 2)
+            ->assertJsonPath('challengeProgress.qualified', false);
     }
 
     public function test_completing_catalog_items_creates_or_updates_the_city_visit(): void
