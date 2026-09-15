@@ -11,6 +11,7 @@ use App\Models\Sight;
 use App\Services\AirportLookup;
 use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
+use App\Services\WikipediaAirportLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -180,18 +181,39 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function searchAirports(Request $request, AirportLookup $airports): JsonResponse
+    public function searchAirports(Request $request, WikipediaAirportLookup $airports): JsonResponse
     {
-        $data = $request->validate(['query' => ['required', 'string', 'min:2', 'max:100'], 'limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
+        $data = $request->validate([
+            'city' => ['required', 'string', 'min:2', 'max:100'],
+            'country' => ['required', 'string', 'min:2', 'max:100'],
+            'countryCode' => ['nullable', 'string', 'size:2'],
+        ]);
 
-        return response()->json($airports->search($data['query'], $data['limit'] ?? 50));
+        return response()->json($airports->forCity($data['city'], $data['country'], $data['countryCode'] ?? null));
     }
 
     public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
         $city = $this->findCatalogCity($id);
+        $coordinateCity = $city;
+        if ($city->latitude === null || $city->longitude === null) {
+            $coordinateCity = City::query()
+                ->where('country_code', $city->country_code)
+                ->where('normalized_name', $city->normalized_name)
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->orderByDesc('population')
+                ->first() ?? $city;
+        }
 
-        return response()->json($airports->forCity($city->country_code, $city->name, $city->ascii_name, $city->latitude, $city->longitude, $city->normalized_name));
+        return response()->json($airports->forCity(
+            $city->country_code,
+            $city->name,
+            $city->ascii_name,
+            $coordinateCity->latitude,
+            $coordinateCity->longitude,
+            $city->normalized_name,
+        ));
     }
 
     public function stateAirports(string $code, string $state, AirportLookup $airports): JsonResponse
@@ -219,7 +241,7 @@ class ContentController extends Controller
             ->where('geoname_id', $id);
 
         if (ctype_digit($id)) {
-            $query->orWhereKey($id);
+            $query->orWhere($query->getModel()->getQualifiedKeyName(), (int) $id);
         }
 
         return $query->firstOrFail();

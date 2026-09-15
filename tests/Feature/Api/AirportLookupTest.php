@@ -116,6 +116,32 @@ class AirportLookupTest extends TestCase
         $this->assertSame(['LFPO', 'LFPG', 'PRIVATE'], array_column($results, 'icaoCode'));
     }
 
+    public function test_city_airport_endpoint_accepts_numeric_geoname_id_and_recovers_duplicate_coordinates(): void
+    {
+        Country::create([
+            'code' => 'MX', 'name' => 'Mexico',
+            'normalized_name' => 'mexico', 'continent_code' => 'NA',
+        ]);
+        City::create([
+            'geoname_id' => '3530597', 'name' => 'Mexico City',
+            'normalized_name' => 'mexico city', 'country_code' => 'MX',
+        ]);
+        City::create([
+            'geoname_id' => 'duplicate', 'name' => 'Mexico City',
+            'normalized_name' => 'mexico city', 'country_code' => 'MX',
+            'latitude' => 19.4326, 'longitude' => -99.1332, 'population' => 20_000_000,
+        ]);
+        $this->airport('MMMX', [
+            'name' => 'Mexico City International Airport', 'iata_code' => 'MEX',
+            'municipality' => 'Venustiano Carranza', 'country_code' => 'MX',
+            'latitude' => 19.4361, 'longitude' => -99.0719,
+        ]);
+
+        $this->getJson('/api/v1/catalog/cities/3530597/airports')
+            ->assertOk()
+            ->assertJsonPath('0.iataCode', 'MEX');
+    }
+
     public function test_distance_fallback_handles_the_date_line(): void
     {
         $this->airport('CROSS', ['latitude' => 0, 'longitude' => -179.8]);
