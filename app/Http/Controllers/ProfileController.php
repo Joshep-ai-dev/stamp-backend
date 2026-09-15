@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileRequest;
 use App\Services\ImageStorage;
+use App\Services\KrooId;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,9 @@ class ProfileController extends Controller
     public function update(ProfileRequest $request, ImageStorage $images): JsonResponse
     {
         $data = $request->validated();
+        if (array_key_exists('email', $data) && blank($data['email'])) {
+            unset($data['email']);
+        }
         $oldPhoto = $request->user()->photo_uri;
         foreach ([
             'familyName' => 'family_name',
@@ -24,6 +28,7 @@ class ProfileController extends Controller
             'dateOfBirth' => 'date_of_birth',
             'stateProvince' => 'state_province',
             'postalCode' => 'postal_code',
+            'emailOptIn' => 'email_opt_in',
             'photoUri' => 'photo_uri',
         ] as $input => $column) {
             if (array_key_exists($input, $data)) {
@@ -58,9 +63,12 @@ class ProfileController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'familyName' => $user->family_name,
-            'email' => $user->email,
+            'email' => str_ends_with($user->email, '@members.kroo.invalid') ? '' : $user->email,
+            'krooId' => $user->kroo_id,
+            'formattedKrooId' => KrooId::format($user->kroo_id),
             'phoneNumber' => $user->phone_number,
             'language' => $user->language,
+            'emailOptIn' => $user->email_opt_in,
             'plan' => $user->plan,
             'nationality' => $user->nationality,
             'dateOfBirth' => $user->date_of_birth?->format('Y-m-d'),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\KrooId;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'family_name', 'email', 'phone_number', 'password', 'language', 'nationality', 'date_of_birth', 'address', 'city', 'state_province', 'postal_code', 'country', 'photo_uri', 'friend_code', 'kroo_iq_score'])]
+#[Fillable(['name', 'family_name', 'email', 'phone_number', 'password', 'language', 'nationality', 'date_of_birth', 'address', 'city', 'state_province', 'postal_code', 'country', 'photo_uri', 'friend_code', 'kroo_id', 'email_opt_in', 'kroo_iq_score'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -26,6 +27,13 @@ class User extends Authenticatable
     protected $keyType = 'string';
 
     protected $attributes = ['language' => 'English', 'plan' => 'free'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user): void {
+            $user->kroo_id ??= app(KrooId::class)->allocate();
+        });
+    }
 
     public function visits(): HasMany
     {
@@ -74,6 +82,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'date_of_birth' => 'date:Y-m-d',
             'kroo_iq_score' => 'decimal:2',
+            'email_opt_in' => 'boolean',
         ];
     }
 }

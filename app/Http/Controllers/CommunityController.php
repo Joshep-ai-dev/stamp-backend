@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Friend;
 use App\Models\User;
+use App\Services\KrooId;
 use App\Services\KrooScore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class CommunityController extends Controller
 {
@@ -29,18 +29,18 @@ class CommunityController extends Controller
 
     public function friendCode(Request $request): JsonResponse
     {
-        if (! $request->user()->friend_code) {
-            $request->user()->update(['friend_code' => Str::random(36)]);
-        }
-
-        return response()->json(['code' => 'stampo://friend/'.$request->user()->fresh()->friend_code]);
+        return response()->json(['code' => KrooId::format($request->user()->kroo_id)]);
     }
 
     public function scan(Request $request): JsonResponse
     {
         $code = $request->validate(['code' => ['required', 'string']])['code'];
         preg_match('#^stampo://friend/([^/?\#]+)$#', $code, $match);
-        $friend = isset($match[1]) ? User::where('friend_code', $match[1])->first() : null;
+        $value = $match[1] ?? $code;
+        $numeric = preg_replace('/^KROO-/i', '', trim($value));
+        $friend = User::where('friend_code', $value)
+            ->when(ctype_digit($numeric), fn ($query) => $query->orWhere('kroo_id', (int) $numeric))
+            ->first();
         abort_unless($friend, 422, 'This is not a valid Stampo friend code.');
         abort_if($friend->is($request->user()), 422, 'You cannot add your own friend code.');
         $first = min($request->user()->id, $friend->id);

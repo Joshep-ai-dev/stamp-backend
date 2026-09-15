@@ -19,6 +19,8 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/billing/revenuecat/webhook', [SubscriptionController::class, 'webhook'])->middleware('throttle:api');
     Route::middleware('throttle:auth')->group(function (): void {
         Route::post('/invitations/validate', [InvitationController::class, 'validateCode']);
+        Route::post('/invitations/join', [InvitationController::class, 'join']);
+        Route::post('/invitations/claim', [InvitationController::class, 'claim']);
         Route::post('/auth/code/request', [AuthController::class, 'requestCode']);
         Route::post('/auth/code/verify', [AuthController::class, 'verifyCode']);
         Route::post('/auth/register', [AuthController::class, 'register']);
