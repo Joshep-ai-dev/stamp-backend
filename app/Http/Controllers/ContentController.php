@@ -191,7 +191,7 @@ class ContentController extends Controller
     {
         $city = $this->findCatalogCity($id);
 
-        return response()->json($airports->forCity($city->country_code, $city->name, $city->ascii_name));
+        return response()->json($airports->forCity($city->country_code, $city->name, $city->ascii_name, $city->latitude, $city->longitude, $city->normalized_name));
     }
 
     public function stateAirports(string $code, string $state, AirportLookup $airports): JsonResponse

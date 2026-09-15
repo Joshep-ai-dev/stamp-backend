@@ -23,32 +23,47 @@ class AirportLookup
         })->orderBy('name')->limit(max(1, min($limit, 100)))->get()->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
 
-    public function forCity(string $countryCode, string $cityName, ?string $asciiName = null): array
+    public function forCity(string $countryCode, string $cityName, ?string $asciiName = null, ?float $latitude = null, ?float $longitude = null, ?string $normalizedName = null): array
     {
-        $names = $this->names([$cityName, $asciiName]);
+        $names = $this->names([$cityName, $asciiName, $normalizedName]);
         if ($names === []) {
             return [];
         }
 
-        // Airports serving a metro area can be in a different municipality or state.
-        // Keep these associations country-scoped and keyed by stable IATA codes.
-        $metroCodes = [
-            'US' => ['new york' => ['JFK', 'LGA', 'EWR']],
-            'MX' => ['mexico' => ['MEX', 'NLU', 'TLC'], 'ciudad de mexico' => ['MEX', 'NLU', 'TLC']],
-            'FR' => ['paris' => ['CDG', 'ORY', 'BVA']],
-            'TH' => ['pattaya' => ['UTP'], 'phatthaya' => ['UTP']],
-        ];
-        $codes = [];
-        foreach ($names as $name) {
-            $codes = array_merge($codes, $metroCodes[strtoupper(trim($countryCode))][$name] ?? []);
+        $airports = Airport::query()->where('country_code', strtoupper(trim($countryCode)))->get();
+        $matches = $airports->filter(fn (Airport $airport) => $this->matches($airport, $names, [
+            'city', 'normalized_city', 'municipality', 'normalized_municipality',
+        ]));
+        $hasCoordinates = $latitude !== null && $longitude !== null
+            && abs($latitude) <= 90 && abs($longitude) <= 180;
+        $distances = [];
+        if ($hasCoordinates) {
+            foreach ($airports as $airport) {
+                if ($airport->latitude !== null && $airport->longitude !== null
+                    && abs($airport->latitude) <= 90 && abs($airport->longitude) <= 180) {
+                    $distances[$airport->id] = $this->distance($latitude, $longitude, $airport->latitude, $airport->longitude);
+                }
+            }
         }
 
-        return Airport::query()->where('country_code', strtoupper(trim($countryCode)))
-            ->orderBy('name')->get()
-            ->filter(fn (Airport $airport) => $this->matches($airport, $names, [
-                'city', 'normalized_city', 'municipality', 'normalized_municipality',
-            ]) || in_array($airport->iata_code, $codes, true))
-            ->map(fn (Airport $airport) => $this->item($airport))->values()->all();
+        if ($matches->isEmpty()) {
+            $matches = $airports->filter(fn (Airport $airport) => ($distances[$airport->id] ?? INF) <= 100);
+        }
+
+        return $matches->sort(function (Airport $a, Airport $b) use ($distances) {
+            return [blank($a->iata_code), $distances[$a->id] ?? INF, $a->name, $a->id]
+                <=> [blank($b->iata_code), $distances[$b->id] ?? INF, $b->name, $b->id];
+        })->map(fn (Airport $airport) => $this->item($airport))->values()->all();
+    }
+
+    private function distance(float $latitude, float $longitude, float $airportLatitude, float $airportLongitude): float
+    {
+        $deltaLatitude = deg2rad($airportLatitude - $latitude);
+        $deltaLongitude = deg2rad($airportLongitude - $longitude);
+        $a = sin($deltaLatitude / 2) ** 2
+            + cos(deg2rad($latitude)) * cos(deg2rad($airportLatitude)) * sin($deltaLongitude / 2) ** 2;
+
+        return 6371 * 2 * asin(sqrt(max(0, min(1, $a))));
     }
 
     public function forState(string $countryCode, string $stateName): array
