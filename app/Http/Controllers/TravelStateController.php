@@ -9,6 +9,7 @@ use App\Models\Sight;
 use App\Models\User;
 use App\Services\CollectionAccess;
 use App\Services\CollectionCatalog;
+use App\Services\ImageUrl;
 use App\Services\UsStates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -185,7 +186,8 @@ class TravelStateController extends Controller
         $value = $definition
             ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
             : ($progress?->progress ?? 0);
-        $item = ['access' => $definition?->access ?? 'free', 'id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => $definition?->hero_image ?: $definition?->image, 'heroImageUrl' => $definition?->hero_image ?: $definition?->image, 'explorerImageUrl' => $definition?->explorer_image, 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
+        $heroImage = $definition?->hero_image ?: $definition?->image;
+        $item = ['access' => $definition?->access ?? 'free', 'id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($definition?->explorer_image ?: $heroImage), 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();
         }
