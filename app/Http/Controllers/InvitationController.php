@@ -77,10 +77,10 @@ class InvitationController extends Controller
     private function memberFor(string $code): ?User
     {
         $code = preg_replace('#^stampo://friend/#', '', trim($code));
-        $numeric = preg_replace('/^KROO-/i', '', $code);
+        $krooId = KrooId::parse($code);
 
         return User::where('friend_code', $code)
-            ->when(ctype_digit($numeric), fn ($query) => $query->orWhere('kroo_id', (int) $numeric))
+            ->when($krooId, fn ($query) => $query->orWhere('kroo_id', $krooId))
             ->first();
     }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\User;
+use App\Services\KrooId;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Tests\TestCase;
@@ -14,7 +15,7 @@ class InvitationTest extends TestCase
     public function test_member_code_unlocks_guest_access(): void
     {
         $member = User::factory()->create(['friend_code' => 'member-code']);
-        foreach (['member-code', 'stampo://friend/member-code', (string) $member->kroo_id, 'KROO-'.str_pad((string) $member->kroo_id, 10, '0', STR_PAD_LEFT)] as $code) {
+        foreach (['member-code', 'stampo://friend/member-code', (string) $member->kroo_id, 'KROO-'.str_pad((string) $member->kroo_id, 10, '0', STR_PAD_LEFT), KrooId::format($member->kroo_id)] as $code) {
             $response = $this->postJson('/api/v1/invitations/validate', ['code' => $code])->assertOk();
             $grant = json_decode(Crypt::decryptString($response->json('accessToken')), true);
             $this->assertSame($member->id, $grant['invitedBy']);
@@ -26,7 +27,7 @@ class InvitationTest extends TestCase
         $member = User::factory()->create();
 
         $response = $this->postJson('/api/v1/invitations/join', [
-            'code' => 'KROO-'.str_pad((string) $member->kroo_id, 10, '0', STR_PAD_LEFT),
+            'code' => KrooId::format($member->kroo_id),
             'name' => 'Avery',
         ])->assertCreated()
             ->assertJsonPath('user.name', 'Avery')
@@ -36,7 +37,11 @@ class InvitationTest extends TestCase
 
         $this->assertIsInt($response->json('user.krooId'));
         $this->assertLessThanOrEqual(1_000_000_000, $response->json('user.krooId'));
-        $this->assertMatchesRegularExpression('/^KROO-\d{10}$/', $response->json('user.formattedKrooId'));
+        $this->assertMatchesRegularExpression('/^(?:[A-Z]\d){5}$/', $response->json('user.formattedKrooId'));
+        $this->assertSame($response->json('user.krooId'), KrooId::parse($response->json('user.formattedKrooId')));
+        $formattedKrooId = $response->json('user.formattedKrooId');
+        $mistypedKrooId = substr($formattedKrooId, 0, 9).(((int) $formattedKrooId[9] + 1) % 10);
+        $this->assertNull(KrooId::parse($mistypedKrooId));
         $this->assertDatabaseHas('users', ['name' => 'Avery', 'email_opt_in' => true]);
         $this->assertDatabaseCount('friends', 1);
 

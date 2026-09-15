@@ -37,9 +37,9 @@ class CommunityController extends Controller
         $code = $request->validate(['code' => ['required', 'string']])['code'];
         preg_match('#^stampo://friend/([^/?\#]+)$#', $code, $match);
         $value = $match[1] ?? $code;
-        $numeric = preg_replace('/^KROO-/i', '', trim($value));
+        $krooId = KrooId::parse($value);
         $friend = User::where('friend_code', $value)
-            ->when(ctype_digit($numeric), fn ($query) => $query->orWhere('kroo_id', (int) $numeric))
+            ->when($krooId, fn ($query) => $query->orWhere('kroo_id', $krooId))
             ->first();
         abort_unless($friend, 422, 'This is not a valid Stampo friend code.');
         abort_if($friend->is($request->user()), 422, 'You cannot add your own friend code.');
