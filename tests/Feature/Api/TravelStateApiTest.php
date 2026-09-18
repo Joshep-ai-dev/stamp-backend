@@ -79,7 +79,7 @@ class TravelStateApiTest extends TestCase
             ->assertJsonPath('level', 'Wanderer')
             ->assertJsonPath('challengeProgress.krooScore', 2.067)
             ->assertJsonPath('challengeProgress.krooIqScore', 0)
-            ->assertJsonPath('challengeProgress.referralCount', 2)
+            ->assertJsonPath('challengeProgress.referralCount', 0)
             ->assertJsonPath('challengeProgress.qualified', false);
     }
 

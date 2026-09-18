@@ -2,19 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\KrooPlusReferralQualification;
 use App\Services\KrooScore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
-    public function show(Request $request): JsonResponse
+    public function show(Request $request, KrooPlusReferralQualification $referralQualification): JsonResponse
     {
+        $referralQualification->qualifyEligibleMemberships();
         $user = $request->user();
         $summary = KrooScore::for($user);
         $visits = $user->visits;
         $krooIqScore = round((float) ($user->kroo_iq_score ?? 0), 2);
-        $referralCount = $user->referrals()->count();
+        $referralCount = $user->referrals()
+            ->whereHas('revenueCatEntitlement', fn ($query) => $query->whereNotNull('referral_qualified_at'))
+            ->count();
         $challengeProgress = [
             'krooScore' => $summary['score'],
             'krooScoreTarget' => 5,

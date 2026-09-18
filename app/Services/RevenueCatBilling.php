@@ -43,6 +43,15 @@ class RevenueCatBilling
         $subscription = is_array($subscription) ? $subscription : [];
         $expiry = $this->latestExpiry($entitlement, $subscription);
         $active = $entitlement !== null && ($expiry === null || $expiry->isFuture());
+        $existing = $user->revenueCatEntitlement()->first();
+        $paidMembershipStartedAt = $this->paidMembershipStartedAt($existing, $subscription, $active);
+        $referralQualifiedAt = $existing?->referral_qualified_at;
+        $qualificationMonths = max(1, (int) config('services.revenuecat.referral_qualification_months', 3));
+        if ($referralQualifiedAt === null
+            && $active
+            && $paidMembershipStartedAt?->lte(now()->subMonthsNoOverflow($qualificationMonths))) {
+            $referralQualifiedAt = now();
+        }
 
         $attributes = [
             'app_user_id' => $user->id,
@@ -52,6 +61,8 @@ class RevenueCatBilling
             'period_type' => $subscription['period_type'] ?? null,
             'is_active' => $active,
             'expires_at' => $expiry,
+            'paid_membership_started_at' => $paidMembershipStartedAt,
+            'referral_qualified_at' => $referralQualifiedAt,
             'last_verified_at' => now(),
             'subscriber_payload' => $payload,
         ];
@@ -96,7 +107,9 @@ class RevenueCatBilling
 
     private function latestExpiry(?array $entitlement, array $subscription): ?CarbonImmutable
     {
-        if ($entitlement === null) return null;
+        if ($entitlement === null) {
+            return null;
+        }
         $dates = collect([
             $entitlement['expires_date'] ?? null,
             $entitlement['grace_period_expires_date'] ?? null,
@@ -105,5 +118,25 @@ class RevenueCatBilling
         ])->filter()->map(fn (string $date): CarbonImmutable => CarbonImmutable::parse($date));
 
         return $dates->sortByDesc(fn (CarbonImmutable $date): int => $date->getTimestamp())->first();
+    }
+
+    private function paidMembershipStartedAt(
+        ?RevenueCatEntitlement $existing,
+        array $subscription,
+        bool $active,
+    ): ?CarbonImmutable {
+        if (! $active || strtolower((string) ($subscription['period_type'] ?? '')) !== 'normal') {
+            return null;
+        }
+
+        if ($existing?->paid_membership_started_at !== null) {
+            return CarbonImmutable::instance($existing->paid_membership_started_at);
+        }
+
+        $startedAt = strtolower((string) $existing?->period_type) === 'trial'
+            ? ($subscription['purchase_date'] ?? null)
+            : ($subscription['original_purchase_date'] ?? $subscription['purchase_date'] ?? null);
+
+        return is_string($startedAt) ? CarbonImmutable::parse($startedAt) : now()->toImmutable();
     }
 }
