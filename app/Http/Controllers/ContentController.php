@@ -9,7 +9,6 @@ use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\AirportLookup;
-use App\Services\ExactAirportLookup;
 use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
@@ -181,7 +180,7 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function searchAirports(Request $request, ExactAirportLookup $external): JsonResponse
+    public function searchAirports(Request $request, AirportLookup $airports): JsonResponse
     {
         $data = $request->validate([
             'city' => ['required', 'string', 'min:2', 'max:100'],
@@ -190,25 +189,25 @@ class ContentController extends Controller
             'state' => ['nullable', 'string', 'max:150'],
         ]);
 
-        $geonamesId = $external->resolveGeoNamesId(
-            $data['city'],
-            $data['state'] ?? '',
+        $results = $airports->forCity(
             $data['countryCode'],
+            $data['city'],
+            stateName: $data['state'] ?? null,
         );
-        $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
 
         return response()->json($this->airportLocation($results, $data['city'], $data['state'] ?? null, $data['countryCode']));
     }
 
-    public function cityAirports(string $id, ExactAirportLookup $external): JsonResponse
+    public function cityAirports(string $id, AirportLookup $airports): JsonResponse
     {
         $city = $this->findCatalogCity($id);
-        $geonamesId = $external->resolveGeoNamesId(
-            $city->name,
-            $city->subcountry ?? '',
+        $results = $airports->forCity(
             $city->country_code,
+            $city->name,
+            $city->ascii_name,
+            normalizedName: $city->normalized_name,
+            stateName: $city->subcountry,
         );
-        $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
 
         return response()->json($this->airportLocation($results, $city->name, $city->subcountry, $city->country_code));
     }

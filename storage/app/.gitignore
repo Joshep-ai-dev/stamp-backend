@@ -1,5 +1,7 @@
 *
 !imports/
+!imports/airports.csv
+!imports/regions.csv
 !imports/world-cities.csv
 !private/
 !public/

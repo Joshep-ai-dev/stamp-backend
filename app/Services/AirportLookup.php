@@ -23,47 +23,26 @@ class AirportLookup
         })->orderBy('name')->limit(max(1, min($limit, 100)))->get()->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
 
-    public function forCity(string $countryCode, string $cityName, ?string $asciiName = null, ?float $latitude = null, ?float $longitude = null, ?string $normalizedName = null): array
+    public function forCity(string $countryCode, string $cityName, ?string $asciiName = null, ?float $latitude = null, ?float $longitude = null, ?string $normalizedName = null, ?string $stateName = null): array
     {
         $names = $this->names([$cityName, $asciiName, $normalizedName]);
         if ($names === []) {
             return [];
         }
 
-        $airports = Airport::query()->where('country_code', strtoupper(trim($countryCode)))->get();
-        $matches = $airports->filter(fn (Airport $airport) => $this->matches($airport, $names, [
-            'city', 'normalized_city', 'municipality', 'normalized_municipality',
-        ]));
-        $hasCoordinates = $latitude !== null && $longitude !== null
-            && abs($latitude) <= 90 && abs($longitude) <= 180;
-        $distances = [];
-        if ($hasCoordinates) {
-            foreach ($airports as $airport) {
-                if ($airport->latitude !== null && $airport->longitude !== null
-                    && abs($airport->latitude) <= 90 && abs($airport->longitude) <= 180) {
-                    $distances[$airport->id] = $this->distance($latitude, $longitude, $airport->latitude, $airport->longitude);
-                }
-            }
-        }
+        $states = $this->names([$stateName]);
 
-        if ($matches->isEmpty()) {
-            $matches = $airports->filter(fn (Airport $airport) => ($distances[$airport->id] ?? INF) <= 100);
-        }
+        return Airport::query()->where('country_code', strtoupper(trim($countryCode)))
+            ->orderBy('name')->get()
+            ->filter(function (Airport $airport) use ($names, $states): bool {
+                $municipalityMatches = $this->matches($airport, $names, [
+                    'city', 'normalized_city', 'municipality', 'normalized_municipality',
+                ]);
+                $stateMatches = $states === [] || $this->matches($airport, $states, ['state', 'normalized_state']);
 
-        return $matches->sort(function (Airport $a, Airport $b) use ($distances) {
-            return [blank($a->iata_code), $distances[$a->id] ?? INF, $a->name, $a->id]
-                <=> [blank($b->iata_code), $distances[$b->id] ?? INF, $b->name, $b->id];
-        })->map(fn (Airport $airport) => $this->item($airport))->values()->all();
-    }
-
-    private function distance(float $latitude, float $longitude, float $airportLatitude, float $airportLongitude): float
-    {
-        $deltaLatitude = deg2rad($airportLatitude - $latitude);
-        $deltaLongitude = deg2rad($airportLongitude - $longitude);
-        $a = sin($deltaLatitude / 2) ** 2
-            + cos(deg2rad($latitude)) * cos(deg2rad($airportLatitude)) * sin($deltaLongitude / 2) ** 2;
-
-        return 6371 * 2 * asin(sqrt(max(0, min(1, $a))));
+                return $municipalityMatches && $stateMatches;
+            })
+            ->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
 
     public function forState(string $countryCode, string $stateName): array

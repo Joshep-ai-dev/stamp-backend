@@ -63,7 +63,7 @@ class AirportLookupTest extends TestCase
         $this->assertSame([], app(AirportLookup::class)->forState('TH', ' '));
     }
 
-    public function test_city_distance_fallback_is_country_scoped_and_prefers_iata(): void
+    public function test_city_lookup_does_not_fall_back_to_distance(): void
     {
         $this->airport('NEAR', ['latitude' => 0, 'longitude' => 0.1]);
         $this->airport('MID', ['iata_code' => 'MID', 'latitude' => 0, 'longitude' => 0.3]);
@@ -73,7 +73,7 @@ class AirportLookupTest extends TestCase
 
         $results = app(AirportLookup::class)->forCity('TH', 'Any city', null, 0, 0);
 
-        $this->assertSame(['MID', 'FAR', 'NEAR'], array_column($results, 'icaoCode'));
+        $this->assertSame([], $results);
         $this->assertSame([], app(AirportLookup::class)->forCity('TH', 'Any city'));
     }
 
@@ -87,7 +87,7 @@ class AirportLookupTest extends TestCase
         $this->assertSame(['EXACT'], array_column($results, 'icaoCode'));
     }
 
-    public function test_paris_finds_nearby_airports_with_different_municipality_names(): void
+    public function test_airport_name_does_not_create_a_false_city_match(): void
     {
         $this->airport('LFPG', [
             'name' => 'Charles de Gaulle Airport', 'iata_code' => 'CDG',
@@ -114,23 +114,12 @@ class AirportLookupTest extends TestCase
 
         $results = app(AirportLookup::class)->forCity('FR', 'Paris', null, 48.8566, 2.3522);
 
-        $this->assertSame(['LFPO', 'LFPG', 'PRIVATE'], array_column($results, 'icaoCode'));
+        $this->assertSame([], $results);
     }
 
-    public function test_city_airport_endpoint_resolves_exact_geonames_id_instead_of_trusting_stored_id(): void
+    public function test_city_airport_endpoint_uses_city_state_and_country_catalog_fields(): void
     {
-        config()->set('services.geonames.username', 'test-user');
-        Http::fake([
-            'secure.geonames.org/*' => Http::response(['geonames' => [[
-                'geonameId' => 3530597, 'name' => 'Mexico City', 'toponymName' => 'Mexico City',
-                'adminName1' => 'Mexico City', 'countryCode' => 'MX',
-            ]]]),
-            'query.wikidata.org/*' => Http::response(['results' => ['bindings' => [[
-                'airport' => ['value' => 'http://www.wikidata.org/entity/Q191655'],
-                'airportLabel' => ['value' => 'Mexico City International Airport'],
-                'iata' => ['value' => 'MEX'], 'icao' => ['value' => 'MMMX'],
-            ]]]]),
-        ]);
+        Http::fake();
         Country::create([
             'code' => 'MX', 'name' => 'Mexico',
             'normalized_name' => 'mexico', 'continent_code' => 'NA',
@@ -152,22 +141,18 @@ class AirportLookupTest extends TestCase
 
         $this->getJson('/api/v1/catalog/cities/3530597/airports')
             ->assertOk()
-            ->assertJsonPath('0.iataCode', 'MEX');
+            ->assertExactJson([]);
 
-        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'secure.geonames.org')
-            && $request['name_equals'] === 'Mexico City'
-            && $request['country'] === 'MX');
-        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'query.wikidata.org')
-            && str_contains(urldecode($request->url()), 'wdt:P1566 "3530597"'));
+        Http::assertNothingSent();
     }
 
-    public function test_distance_fallback_handles_the_date_line(): void
+    public function test_coordinates_do_not_add_airports_from_other_cities(): void
     {
         $this->airport('CROSS', ['latitude' => 0, 'longitude' => -179.8]);
 
         $results = app(AirportLookup::class)->forCity('TH', 'Any city', null, 0, 179.8);
 
-        $this->assertSame(['CROSS'], array_column($results, 'icaoCode'));
+        $this->assertSame([], $results);
     }
 
     private function airport(string $code, array $attributes): void
