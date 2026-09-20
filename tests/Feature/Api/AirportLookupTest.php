@@ -17,7 +17,7 @@ class AirportLookupTest extends TestCase
     public function test_city_lookup_matches_each_location_field_and_keeps_country_scope(): void
     {
         foreach (['city', 'normalized_city', 'municipality', 'normalized_municipality'] as $index => $column) {
-            $this->airport('T'.$index, [$column => '  Bángkok  ']);
+            $this->airport('T'.$index, array_merge(['iata_code' => 'A'.$index.'A'], [$column => '  Bangkok  ']));
         }
         $this->airport('OTHER', ['municipality' => 'Bangkok', 'country_code' => 'US']);
         $this->airport('PHUKET', ['city' => 'Phuket']);

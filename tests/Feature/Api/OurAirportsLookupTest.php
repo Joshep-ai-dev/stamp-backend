@@ -46,6 +46,9 @@ class OurAirportsLookupTest extends TestCase
 
         $this->getJson('/api/v1/catalog/cities/manual-hong-kong/airports')
             ->assertOk()->assertJsonCount(1)->assertJsonPath('0.iataCode', 'HKG');
+
+        $this->getJson('/api/v1/catalog/airports?city=Hong%20Kong&state=&country=Hong%20Kong&countryCode=HK')
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.iataCode', 'HKG');
     }
 
     public function test_istanbul_matches_all_compound_ourairports_municipalities(): void
@@ -57,6 +60,12 @@ class OurAirportsLookupTest extends TestCase
         $this->airport('LTFM', 'IST', 'İstanbul Airport', 'İstanbul', 'İstanbul', 'TR');
 
         $this->getJson('/api/v1/catalog/cities/manual-istanbul/airports')
+            ->assertOk()->assertJsonCount(3)
+            ->assertJsonFragment(['iataCode' => 'ISL'])
+            ->assertJsonFragment(['iataCode' => 'SAW'])
+            ->assertJsonFragment(['iataCode' => 'IST']);
+
+        $this->getJson('/api/v1/catalog/airports?city=Istanbul&state=Istanbul&country=T%C3%BCrkiye&countryCode=TR')
             ->assertOk()->assertJsonCount(3)
             ->assertJsonFragment(['iataCode' => 'ISL'])
             ->assertJsonFragment(['iataCode' => 'SAW'])

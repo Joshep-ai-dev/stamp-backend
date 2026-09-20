@@ -32,7 +32,10 @@ class AirportLookup
 
         $states = $this->names([$stateName]);
         $countryCode = strtoupper(trim($countryCode));
-        $airports = Airport::query()->where('country_code', $countryCode)->orderBy('name')->get();
+        // Some upgraded installations use the legacy airports table without
+        // an `id` primary key. A base collection prevents Eloquent's merge
+        // operations from keying every airport by the same null model key.
+        $airports = Airport::query()->where('country_code', $countryCode)->orderBy('name')->get()->toBase();
         $municipalityMatches = $airports->filter(function (Airport $airport) use ($names): bool {
             $municipality = $this->normalize(implode(' ', array_filter([
                 $airport->city, $airport->normalized_city,
@@ -45,10 +48,10 @@ class AirportLookup
             fn (Airport $airport): bool => $states === [] || $this->matches($airport, $states, ['state', 'normalized_state']),
         );
         $locationMatches = $states !== [] && $stateMatches->isEmpty() ? $municipalityMatches : $stateMatches;
-        $servedCityMatches = $airports->whereNotIn('id', $municipalityMatches->pluck('id'))
+        $servedCityMatches = $airports->whereNotIn('iata_code', $municipalityMatches->pluck('iata_code'))
             ->filter(fn (Airport $airport): bool => Str::contains($this->normalize($airport->name), $names));
 
-        return $locationMatches->merge($servedCityMatches)->unique('id')->sortBy('name')
+        return $locationMatches->merge($servedCityMatches)->unique('iata_code')->sortBy('name')
             ->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
 
