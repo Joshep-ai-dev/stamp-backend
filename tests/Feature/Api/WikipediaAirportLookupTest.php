@@ -94,4 +94,45 @@ class WikipediaAirportLookupTest extends TestCase
             && $request['name_equals'] === 'Provo'
             && $request['country'] === 'US');
     }
+
+    public function test_city_without_wikidata_geonames_property_uses_geonames_identity_link(): void
+    {
+        config()->set('services.geonames.username', 'test-user');
+        Country::create([
+            'code' => 'HK', 'name' => 'Hong Kong',
+            'normalized_name' => 'hong kong', 'continent_code' => 'AS',
+        ]);
+        City::create([
+            'geoname_id' => 'manual-hong-kong', 'name' => 'Hong Kong',
+            'normalized_name' => 'hong kong', 'country_code' => 'HK',
+        ]);
+        Http::fake([
+            'secure.geonames.org/*' => Http::sequence()
+                ->push(['geonames' => [[
+                    'geonameId' => 1819729, 'name' => 'Hong Kong',
+                    'toponymName' => 'Hong Kong', 'adminName1' => '', 'countryCode' => 'HK',
+                ]]])
+                ->push(['alternateNames' => [[
+                    'lang' => 'link', 'name' => 'https://en.wikipedia.org/wiki/Hong_Kong',
+                ]]]),
+            'query.wikidata.org/*' => Http::sequence()
+                ->push(['results' => ['bindings' => []]])
+                ->push(['results' => ['bindings' => [[
+                    'airport' => ['value' => 'http://www.wikidata.org/entity/Q17704'],
+                    'airportLabel' => ['value' => 'Hong Kong International Airport'],
+                    'iata' => ['value' => 'HKG'], 'icao' => ['value' => 'VHHH'],
+                ]]]]),
+            'en.wikipedia.org/*' => Http::response(['query' => ['pages' => [[
+                'pageprops' => ['wikibase_item' => 'Q8646'],
+            ]]]]),
+        ]);
+
+        $this->getJson('/api/v1/catalog/cities/manual-hong-kong/airports')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.iataCode', 'HKG');
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'query.wikidata.org')
+            && str_contains(urldecode($request->url()), 'VALUES ?city { wd:Q8646 }'));
+    }
 }
