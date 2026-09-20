@@ -94,7 +94,7 @@ class InvitationTest extends TestCase
             ->assertJsonPath('user.id', $member->id);
     }
 
-    public function test_email_only_connects_when_email_and_kroo_id_belong_to_same_member(): void
+    public function test_email_can_be_shared_by_multiple_members(): void
     {
         $current = User::factory()->create(['email' => 'current@example.com']);
         $existing = User::factory()->create(['email' => 'existing@example.com', 'name' => 'Existing Member']);
@@ -102,7 +102,9 @@ class InvitationTest extends TestCase
         $this->actingAs($current)->postJson('/api/v1/members/email', [
             'email' => 'EXISTING@example.com',
             'krooId' => KrooId::format($current->kroo_id),
-        ])->assertUnprocessable();
+        ])->assertOk()->assertJsonPath('user.id', $current->id);
+
+        $this->assertDatabaseHas('users', ['id' => $current->id, 'email' => 'existing@example.com']);
 
         $this->actingAs($existing)->postJson('/api/v1/members/email', [
             'email' => 'EXISTING@example.com',

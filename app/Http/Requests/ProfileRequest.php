@@ -16,7 +16,7 @@ class ProfileRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'min:1', 'max:80'],
             'familyName' => ['sometimes', 'nullable', 'string', 'max:80'],
-            'email' => ['sometimes', 'nullable', 'email:rfc', 'max:255', 'unique:users,email,'.$this->user()->id],
+            'email' => ['sometimes', 'nullable', 'email:rfc', 'max:255'],
             'phoneNumber' => ['sometimes', 'nullable', 'string', 'max:30'],
             'language' => ['sometimes', 'required', 'string', 'min:2', 'max:40'],
             'emailOptIn' => ['sometimes', 'boolean'],

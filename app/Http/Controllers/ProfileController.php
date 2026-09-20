@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
 use App\Http\Requests\ProfileRequest;
-use App\Models\User;
 use App\Services\ImageStorage;
 use App\Services\KrooId;
 use Illuminate\Http\JsonResponse;
@@ -28,13 +27,8 @@ class ProfileController extends Controller
         abort_unless($krooId, 422, 'This Kroo ID is not valid.');
         abort_unless((int) $request->user()->kroo_id === $krooId, 403, 'The Kroo ID does not match this member.');
 
-        $emailOwner = User::where('email', $email)->first();
-        abort_if($emailOwner && (int) $emailOwner->kroo_id !== $krooId, 422, 'This email belongs to a different Kroo ID.');
-
-        $user = $emailOwner ?: $request->user();
-        if (! $emailOwner) {
-            $user->update(['email' => $email]);
-        }
+        $user = $request->user();
+        $user->update(['email' => $email]);
 
         return response()->json([
             'token' => $user->createToken('Kroo mobile app')->plainTextToken,
