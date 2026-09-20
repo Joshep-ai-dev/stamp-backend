@@ -48,6 +48,21 @@ class OurAirportsLookupTest extends TestCase
             ->assertOk()->assertJsonCount(1)->assertJsonPath('0.iataCode', 'HKG');
     }
 
+    public function test_istanbul_matches_all_compound_ourairports_municipalities(): void
+    {
+        $this->country('TR', 'Türkiye');
+        $this->city('manual-istanbul', 'Istanbul', 'TR', 'Istanbul');
+        $this->airport('LTBA', 'ISL', 'İstanbul Atatürk Airport', 'Istanbul(Bakırköy)', 'İstanbul', 'TR');
+        $this->airport('LTFJ', 'SAW', 'Istanbul Sabiha Gökçen International Airport', 'Pendik, Istanbul', 'İstanbul', 'TR');
+        $this->airport('LTFM', 'IST', 'İstanbul Airport', 'İstanbul', 'İstanbul', 'TR');
+
+        $this->getJson('/api/v1/catalog/cities/manual-istanbul/airports')
+            ->assertOk()->assertJsonCount(3)
+            ->assertJsonFragment(['iataCode' => 'ISL'])
+            ->assertJsonFragment(['iataCode' => 'SAW'])
+            ->assertJsonFragment(['iataCode' => 'IST']);
+    }
+
     private function country(string $code, string $name): void
     {
         Country::create(['code' => $code, 'name' => $name, 'normalized_name' => strtolower($name), 'continent_code' => 'AS']);

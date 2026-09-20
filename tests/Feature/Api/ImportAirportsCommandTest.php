@@ -23,6 +23,7 @@ class ImportAirportsCommandTest extends TestCase
             '2,LTFJ,large_airport,Sabiha Gokcen International Airport,40.898602,29.3092,312,AS,TR,TR-34,Istanbul,yes,LTFJ,SAW,,,,',
             '3,LTBA,large_airport,Ataturk International Airport,40.976898,28.8146,163,AS,TR,TR-34,Istanbul,no,LTBA,ISL,,,,',
             '4,LTBW,small_airport,Istanbul Hezarfen Airfield,41.1036,28.5477,56,AS,TR,TR-34,Istanbul,no,LTBW,,,,,',
+            '5,TR-HP,heliport,Istanbul Heliport,41.1,28.9,20,AS,TR,TR-34,Istanbul,no,LTHP,HHP,,,,',
         ]));
         file_put_contents($regions, "id,code,local_code,name,continent,iso_country,wikipedia_link,keywords\n1,TR-34,34,Istanbul,AS,TR,,");
 
@@ -32,6 +33,7 @@ class ImportAirportsCommandTest extends TestCase
 
         $this->assertDatabaseCount('airports', 3);
         $this->assertDatabaseMissing('airports', ['icao_code' => 'LTBW']);
+        $this->assertDatabaseMissing('airports', ['iata_code' => 'HHP']);
         $this->assertSame(['ISL', 'IST', 'SAW'], collect(app(AirportLookup::class)->forCity('TR', 'Istanbul'))->pluck('iataCode')->sort()->values()->all());
         $this->assertTrue(Airport::query()->whereNotNull('iata_code')->where('iata_code', '<>', '')->count() === Airport::count());
     }

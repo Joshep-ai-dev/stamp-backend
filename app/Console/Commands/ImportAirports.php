@@ -50,9 +50,11 @@ class ImportAirports extends Command
             $iata = strtoupper(trim((string) ($item['iata_code'] ?? '')));
             $icao = strtoupper(trim((string) (($item['icao_code'] ?? '') ?: ($item['gps_code'] ?? '') ?: ($item['ident'] ?? ''))));
             $country = strtoupper(trim((string) ($item['iso_country'] ?? '')));
+            $type = strtolower(trim((string) ($item['type'] ?? '')));
             $latitude = $item['latitude_deg'] ?? null;
             $longitude = $item['longitude_deg'] ?? null;
             if (! preg_match('/^[A-Z0-9]{3}$/', $iata) || isset($seenIata[$iata])
+                || $type === 'heliport'
                 || ! preg_match('/^[A-Z0-9-]{1,8}$/', $icao) || ! isset($countryCodes[$country])
                 || ! is_numeric($latitude) || ! is_numeric($longitude)) {
                 $skipped++;
@@ -98,7 +100,7 @@ class ImportAirports extends Command
     {
         $handle = fopen($path, 'rb');
         if ($handle === false) {
-            return [];
+            throw new RuntimeException("OurAirports region source is not readable: {$path}");
         }
         $header = fgetcsv($handle, escape: '');
         $regions = [];
@@ -114,6 +116,10 @@ class ImportAirports extends Command
             }
         }
         fclose($handle);
+
+        if ($regions === []) {
+            throw new RuntimeException('OurAirports region source contains no valid regions.');
+        }
 
         return $regions;
     }
