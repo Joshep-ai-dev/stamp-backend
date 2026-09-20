@@ -9,9 +9,9 @@ use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\AirportLookup;
+use App\Services\ExactAirportLookup;
 use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
-use App\Services\WikipediaAirportLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -181,39 +181,58 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function searchAirports(Request $request, WikipediaAirportLookup $airports): JsonResponse
+    public function searchAirports(Request $request, ExactAirportLookup $external, AirportLookup $local): JsonResponse
     {
         $data = $request->validate([
             'city' => ['required', 'string', 'min:2', 'max:100'],
             'country' => ['required', 'string', 'min:2', 'max:100'],
-            'countryCode' => ['nullable', 'string', 'size:2'],
+            'countryCode' => ['required', 'string', 'size:2'],
+            'state' => ['nullable', 'string', 'max:150'],
         ]);
 
-        return response()->json($airports->forCity($data['city'], $data['country'], $data['countryCode'] ?? null));
-    }
-
-    public function cityAirports(string $id, AirportLookup $airports): JsonResponse
-    {
-        $city = $this->findCatalogCity($id);
-        $coordinateCity = $city;
-        if ($city->latitude === null || $city->longitude === null) {
-            $coordinateCity = City::query()
-                ->where('country_code', $city->country_code)
-                ->where('normalized_name', $city->normalized_name)
-                ->whereNotNull('latitude')
-                ->whereNotNull('longitude')
-                ->orderByDesc('population')
-                ->first() ?? $city;
+        $geonamesId = $external->resolveGeoNamesId(
+            $data['city'],
+            $data['state'] ?? '',
+            $data['countryCode'],
+        );
+        $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
+        if ($results === []) {
+            $results = $local->forCity($data['countryCode'], $data['city']);
         }
 
-        return response()->json($airports->forCity(
-            $city->country_code,
-            $city->name,
-            $city->ascii_name,
-            $coordinateCity->latitude,
-            $coordinateCity->longitude,
-            $city->normalized_name,
-        ));
+        return response()->json($this->airportLocation($results, $data['city'], $data['state'] ?? null, $data['countryCode']));
+    }
+
+    public function cityAirports(string $id, ExactAirportLookup $external, AirportLookup $local): JsonResponse
+    {
+        $city = $this->findCatalogCity($id);
+        $geonamesId = ctype_digit((string) $city->geoname_id)
+            ? (string) $city->geoname_id
+            : $external->resolveGeoNamesId(
+                $city->name,
+                $city->subcountry ?? '',
+                $city->country_code,
+            );
+        $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
+        if ($results === []) {
+            $results = $local->forCity(
+                $city->country_code,
+                $city->name,
+                $city->ascii_name,
+                normalizedName: $city->normalized_name,
+            );
+        }
+
+        return response()->json($this->airportLocation($results, $city->name, $city->subcountry, $city->country_code));
+    }
+
+    private function airportLocation(array $airports, string $city, ?string $state, string $countryCode): array
+    {
+        return collect($airports)->map(fn (array $airport): array => array_merge($airport, [
+            'city' => $airport['city'] ?? $city,
+            'state' => $airport['state'] ?? $state,
+            'countryCode' => $airport['countryCode'] ?? strtoupper($countryCode),
+        ]))->values()->all();
     }
 
     public function stateAirports(string $code, string $state, AirportLookup $airports): JsonResponse

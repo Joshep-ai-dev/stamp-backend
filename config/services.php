@@ -5,6 +5,10 @@ return [
         'admin_key' => env('ADMIN_API_KEY', 'stampo-local-admin'),
     ],
 
+    'geonames' => [
+        'username' => env('GEONAMES_USERNAME', ''),
+    ],
+
     'revenuecat' => [
         'secret_api_key' => env('REVENUECAT_SECRET_API_KEY', ''),
         'entitlement_id' => env('REVENUECAT_ENTITLEMENT_ID', 'kroo_plus'),

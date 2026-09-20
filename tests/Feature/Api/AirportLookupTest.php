@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\Country;
 use App\Services\AirportLookup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AirportLookupTest extends TestCase
@@ -118,6 +119,11 @@ class AirportLookupTest extends TestCase
 
     public function test_city_airport_endpoint_accepts_numeric_geoname_id_and_recovers_duplicate_coordinates(): void
     {
+        Http::fake(['query.wikidata.org/*' => Http::response(['results' => ['bindings' => [[
+            'airport' => ['value' => 'http://www.wikidata.org/entity/Q191655'],
+            'airportLabel' => ['value' => 'Mexico City International Airport'],
+            'iata' => ['value' => 'MEX'], 'icao' => ['value' => 'MMMX'],
+        ]]]])]);
         Country::create([
             'code' => 'MX', 'name' => 'Mexico',
             'normalized_name' => 'mexico', 'continent_code' => 'NA',
