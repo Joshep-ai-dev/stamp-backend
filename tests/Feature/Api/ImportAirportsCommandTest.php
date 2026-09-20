@@ -32,7 +32,7 @@ class ImportAirportsCommandTest extends TestCase
 
         $this->assertDatabaseCount('airports', 3);
         $this->assertDatabaseMissing('airports', ['icao_code' => 'LTBW']);
-        $this->assertSame(['ISL', 'SAW'], collect(app(AirportLookup::class)->forCity('TR', 'Istanbul'))->pluck('iataCode')->sort()->values()->all());
+        $this->assertSame(['ISL', 'IST', 'SAW'], collect(app(AirportLookup::class)->forCity('TR', 'Istanbul'))->pluck('iataCode')->sort()->values()->all());
         $this->assertTrue(Airport::query()->whereNotNull('iata_code')->where('iata_code', '<>', '')->count() === Airport::count());
     }
 }

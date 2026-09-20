@@ -87,11 +87,11 @@ class AirportLookupTest extends TestCase
         $this->assertSame(['EXACT'], array_column($results, 'icaoCode'));
     }
 
-    public function test_airport_name_does_not_create_a_false_city_match(): void
+    public function test_formatted_municipality_names_still_match_the_city(): void
     {
         $this->airport('LFPG', [
             'name' => 'Charles de Gaulle Airport', 'iata_code' => 'CDG',
-            'municipality' => 'Roissy-en-France', 'country_code' => 'FR',
+            'municipality' => 'Paris (Roissy-en-France, Val-d’Oise)', 'country_code' => 'FR',
             'latitude' => 49.0097, 'longitude' => 2.5479,
         ]);
         $this->airport('LFPO', [
@@ -114,7 +114,7 @@ class AirportLookupTest extends TestCase
 
         $results = app(AirportLookup::class)->forCity('FR', 'Paris', null, 48.8566, 2.3522);
 
-        $this->assertSame([], $results);
+        $this->assertSame(['LFPG', 'LFPO'], array_column($results, 'icaoCode'));
     }
 
     public function test_city_airport_endpoint_uses_city_state_and_country_catalog_fields(): void
@@ -141,7 +141,7 @@ class AirportLookupTest extends TestCase
 
         $this->getJson('/api/v1/catalog/cities/3530597/airports')
             ->assertOk()
-            ->assertExactJson([]);
+            ->assertJsonPath('0.iataCode', 'MEX');
 
         Http::assertNothingSent();
     }

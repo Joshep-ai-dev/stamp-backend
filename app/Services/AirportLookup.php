@@ -35,12 +35,16 @@ class AirportLookup
         return Airport::query()->where('country_code', strtoupper(trim($countryCode)))
             ->orderBy('name')->get()
             ->filter(function (Airport $airport) use ($names, $states): bool {
-                $municipalityMatches = $this->matches($airport, $names, [
-                    'city', 'normalized_city', 'municipality', 'normalized_municipality',
-                ]);
+                $municipality = $this->normalize(implode(' ', array_filter([
+                    $airport->city, $airport->normalized_city,
+                    $airport->municipality, $airport->normalized_municipality,
+                ])));
+                $airportName = $this->normalize($airport->name);
+                $municipalityMatches = $this->containsName($municipality, $names);
+                $airportNameMatches = $this->containsName($airportName, $names);
                 $stateMatches = $states === [] || $this->matches($airport, $states, ['state', 'normalized_state']);
 
-                return $municipalityMatches && $stateMatches;
+                return $municipalityMatches ? $stateMatches : $airportNameMatches;
             })
             ->map(fn (Airport $airport) => $this->item($airport))->values()->all();
     }
@@ -83,6 +87,13 @@ class AirportLookup
         }
 
         return false;
+    }
+
+    private function containsName(string $value, array $names): bool
+    {
+        return collect($names)->contains(
+            fn (string $name): bool => preg_match('/(?:^|\b)'.preg_quote($name, '/').'(?:\b|$)/u', $value) === 1,
+        );
     }
 
     private function names(array $values): array

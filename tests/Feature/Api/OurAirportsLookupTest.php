@@ -27,7 +27,7 @@ class OurAirportsLookupTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_airport_in_another_municipality_is_not_returned_for_the_city(): void
+    public function test_airport_name_identifies_served_city_when_municipality_differs(): void
     {
         $this->country('TH', 'Thailand');
         $this->city('manual-pattaya', 'Pattaya', 'TH', 'Chon Buri');
@@ -35,7 +35,7 @@ class OurAirportsLookupTest extends TestCase
         $this->airport('VTBS', 'BKK', 'Suvarnabhumi Airport', 'Bangkok', 'Bangkok', 'TH');
 
         $this->getJson('/api/v1/catalog/cities/manual-pattaya/airports')
-            ->assertOk()->assertExactJson([]);
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.iataCode', 'UTP');
     }
 
     public function test_hong_kong_matches_ourairports_municipality(): void
