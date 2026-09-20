@@ -117,13 +117,20 @@ class AirportLookupTest extends TestCase
         $this->assertSame(['LFPO', 'LFPG', 'PRIVATE'], array_column($results, 'icaoCode'));
     }
 
-    public function test_city_airport_endpoint_accepts_numeric_geoname_id_and_recovers_duplicate_coordinates(): void
+    public function test_city_airport_endpoint_resolves_exact_geonames_id_instead_of_trusting_stored_id(): void
     {
-        Http::fake(['query.wikidata.org/*' => Http::response(['results' => ['bindings' => [[
-            'airport' => ['value' => 'http://www.wikidata.org/entity/Q191655'],
-            'airportLabel' => ['value' => 'Mexico City International Airport'],
-            'iata' => ['value' => 'MEX'], 'icao' => ['value' => 'MMMX'],
-        ]]]])]);
+        config()->set('services.geonames.username', 'test-user');
+        Http::fake([
+            'secure.geonames.org/*' => Http::response(['geonames' => [[
+                'geonameId' => 3530597, 'name' => 'Mexico City', 'toponymName' => 'Mexico City',
+                'adminName1' => 'Mexico City', 'countryCode' => 'MX',
+            ]]]),
+            'query.wikidata.org/*' => Http::response(['results' => ['bindings' => [[
+                'airport' => ['value' => 'http://www.wikidata.org/entity/Q191655'],
+                'airportLabel' => ['value' => 'Mexico City International Airport'],
+                'iata' => ['value' => 'MEX'], 'icao' => ['value' => 'MMMX'],
+            ]]]]),
+        ]);
         Country::create([
             'code' => 'MX', 'name' => 'Mexico',
             'normalized_name' => 'mexico', 'continent_code' => 'NA',
@@ -146,6 +153,12 @@ class AirportLookupTest extends TestCase
         $this->getJson('/api/v1/catalog/cities/3530597/airports')
             ->assertOk()
             ->assertJsonPath('0.iataCode', 'MEX');
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'secure.geonames.org')
+            && $request['name_equals'] === 'Mexico City'
+            && $request['country'] === 'MX');
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'query.wikidata.org')
+            && str_contains(urldecode($request->url()), 'wdt:P1566 "3530597"'));
     }
 
     public function test_distance_fallback_handles_the_date_line(): void

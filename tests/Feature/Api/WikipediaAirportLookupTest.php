@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Airport;
 use App\Models\City;
 use App\Models\Country;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +26,16 @@ class WikipediaAirportLookupTest extends TestCase
                 'airportLabel' => ['value' => 'Provo Municipal Airport'],
                 'iata' => ['value' => 'PVU'], 'icao' => ['value' => 'KPVU'],
             ]]]]),
+        ]);
+        Airport::create([
+            'source_id' => 1,
+            'icao_code' => 'LOCAL',
+            'iata_code' => 'BAD',
+            'name' => 'Incorrect Local Airport',
+            'country_code' => 'US',
+            'municipality' => 'Provo',
+            'latitude' => 40.2,
+            'longitude' => -111.7,
         ]);
 
         $this->getJson('/api/v1/catalog/airports?city=Provo&state=Utah&country=United%20States&countryCode=US')

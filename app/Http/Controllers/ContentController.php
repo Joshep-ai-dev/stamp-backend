@@ -181,7 +181,7 @@ class ContentController extends Controller
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
 
-    public function searchAirports(Request $request, ExactAirportLookup $external, AirportLookup $local): JsonResponse
+    public function searchAirports(Request $request, ExactAirportLookup $external): JsonResponse
     {
         $data = $request->validate([
             'city' => ['required', 'string', 'min:2', 'max:100'],
@@ -196,32 +196,19 @@ class ContentController extends Controller
             $data['countryCode'],
         );
         $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
-        if ($results === []) {
-            $results = $local->forCity($data['countryCode'], $data['city']);
-        }
 
         return response()->json($this->airportLocation($results, $data['city'], $data['state'] ?? null, $data['countryCode']));
     }
 
-    public function cityAirports(string $id, ExactAirportLookup $external, AirportLookup $local): JsonResponse
+    public function cityAirports(string $id, ExactAirportLookup $external): JsonResponse
     {
         $city = $this->findCatalogCity($id);
-        $geonamesId = ctype_digit((string) $city->geoname_id)
-            ? (string) $city->geoname_id
-            : $external->resolveGeoNamesId(
-                $city->name,
-                $city->subcountry ?? '',
-                $city->country_code,
-            );
+        $geonamesId = $external->resolveGeoNamesId(
+            $city->name,
+            $city->subcountry ?? '',
+            $city->country_code,
+        );
         $results = $geonamesId ? $external->forGeoNamesId($geonamesId) : [];
-        if ($results === []) {
-            $results = $local->forCity(
-                $city->country_code,
-                $city->name,
-                $city->ascii_name,
-                normalizedName: $city->normalized_name,
-            );
-        }
 
         return response()->json($this->airportLocation($results, $city->name, $city->subcountry, $city->country_code));
     }

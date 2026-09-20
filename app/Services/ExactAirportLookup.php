@@ -16,6 +16,11 @@ class ExactAirportLookup
         if ($username === '') {
             return null;
         }
+        $cacheKey = 'geonames-city:'.hash('sha256', $this->normalize($city).'|'.$this->normalizeRegion($state).'|'.strtoupper($countryCode));
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached)) {
+            return $cached !== '' ? $cached : null;
+        }
 
         try {
             $response = Http::acceptJson()->timeout(8)->retry(2, 200)
@@ -39,9 +44,14 @@ class ExactAirportLookup
             if (strtoupper((string) ($place['countryCode'] ?? '')) === strtoupper($countryCode)
                 && collect($names)->contains(fn ($name): bool => $this->normalize((string) $name) === $cityName)
                 && ($regionName === '' || $this->normalizeRegion((string) ($place['adminName1'] ?? '')) === $regionName)) {
-                return isset($place['geonameId']) ? (string) $place['geonameId'] : null;
+                $geonamesId = isset($place['geonameId']) ? (string) $place['geonameId'] : '';
+                Cache::put($cacheKey, $geonamesId, now()->addDay());
+
+                return $geonamesId !== '' ? $geonamesId : null;
             }
         }
+
+        Cache::put($cacheKey, '', now()->addDay());
 
         return null;
     }
