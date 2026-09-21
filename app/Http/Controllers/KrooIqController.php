@@ -115,6 +115,43 @@ class KrooIqController extends Controller
         return response()->json($payload);
     }
 
+    public function replay(Request $request): JsonResponse
+    {
+        $attempt = DB::transaction(function () use ($request): KrooIqAttempt {
+            $attempt = KrooIqAttempt::where('user_id', $request->user()->id)
+                ->whereNotNull('completed_at')
+                ->orderByDesc('quiz_date')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+
+            abort_if(! $attempt, 404, 'There is no completed Kroo IQ lesson to replay.');
+            $lessonId = explode(':', $attempt->question_ids[0] ?? '', 2)[0];
+            $lesson = DailyDestination::findOrFail($lessonId);
+            abort_unless(
+                (int) $lesson->lesson_number === 0 || app(KrooIqAccess::class)->canUse($request->user()),
+                403,
+                'Kroo+ membership is required.',
+            );
+
+            $earned = max(0, (float) $attempt->score_after - (float) $attempt->score_before);
+            $scoreBefore = max(0, round((float) $request->user()->kroo_iq_score - $earned, 2));
+            $attempt->forceFill([
+                'quiz_date' => now()->toDateString(),
+                'question_ids' => $this->questions($lesson)->pluck('id')->all(),
+                'answers' => [],
+                'correct_count' => 0,
+                'score_before' => $scoreBefore,
+                'score_after' => $scoreBefore,
+                'completed_at' => null,
+            ])->save();
+
+            return $attempt;
+        });
+
+        return $this->attemptPayload($attempt);
+    }
+
     private function lessonFor(Request $request, string $date): ?DailyDestination
     {
         $usedLessonIds = KrooIqAttempt::where('user_id', $request->user()->id)
@@ -160,6 +197,7 @@ class KrooIqController extends Controller
 
         return collect($questions)->take($limit)->values()->map(fn ($question, $index) => [
             'id' => "{$lesson->id}:{$index}",
+            'information' => $question['information'] ?? $lesson->content,
             'prompt' => $question['prompt'] ?? '',
             'answers' => array_values($question['answers'] ?? []),
             'correctAnswer' => (int) ($question['correctAnswer'] ?? 0),
@@ -180,6 +218,7 @@ class KrooIqController extends Controller
             ],
             'questions' => $questions->map(fn ($question) => [
                 'id' => $question['id'],
+                'information' => $question['information'],
                 'prompt' => $question['prompt'],
                 'answers' => $question['answers'],
                 'imageUrl' => $question['imageUrl'],

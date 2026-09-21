@@ -451,6 +451,7 @@
   <div id="modal" class="modal hidden">
     <form id="form" class="dialog">
       <h1 id="formTitle">Add</h1>
+      <div id="formNotice" role="alert" aria-live="assertive"></div>
       <div id="fields" class="grid" style="margin-top:18px"></div>
       <div class="dialogfoot"><button type="button" onclick="closeEditor()">Cancel</button><button class="primary"
           type="submit">Save</button></div>
@@ -516,7 +517,7 @@
   </script>
   <script>
     const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, edit: null };
-    const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), fields = document.querySelector('#fields');
+    const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), formNotice = document.querySelector('#formNotice'), fields = document.querySelector('#fields');
     const normalizedFiles = new WeakMap();
     async function withButtonLoading(button, label, action) {
       if (button.disabled) return;
@@ -534,8 +535,9 @@
     const krooIqQuestionFields = Array.from({ length: 10 }, (_, offset) => {
       const number = offset + 1, required = number <= 5 ? 1 : 0;
       return [
+        [`q${number}Information`, `Information before question ${number}`, 'textarea', required],
         [`q${number}Prompt`, `Question ${number}`, 'textarea', required],
-        [`q${number}Image`, `Question ${number} image`, 'image'],
+        [`q${number}Image`, `Information photo for question ${number}`, 'image'],
         [`q${number}Answers`, `Question ${number} answers (one per line)`, 'textarea', required],
         [`q${number}Correct`, `Question ${number} correct choice (first is 0)`, 'number', required],
         [`q${number}Explanation`, `Question ${number} explanation`, 'textarea', required],
@@ -576,7 +578,7 @@
     function fieldHtml(f, row) { const [key, label, type, wide] = f; let value = row?.[key]; if (key === 'image') value = row?.image || row?.imageUrl; if (key === 'content') value = row?.content || row?.description; if (key === 'options' && Array.isArray(value)) value = value.join('\n'); const cls = `field ${wide ? 'wide' : ''}`; if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`; if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" required onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; if (type === 'state') { const add = form.dataset.resource === 'cities' ? '<button type="button" onclick="withButtonLoading(this, &quot;Adding...&quot;, () => addState())">+ Add state</button>' : ''; return `<label class="${cls}">${label}<div class="field-row"><select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select>${add}</div></label>` } if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" required><option value="">Select a state first…</option></select></label>`; if (type === 'kind') return `<label class="${cls}">${label}<select name="${key}" required><option value="">Select…</option>${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>`; if (type === 'access') return `<label class="${cls}">${label}<select name="${key}" required><option value="free" ${value !== 'pro' ? 'selected' : ''}>Everyone</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+ only</option></select></label>`; if (type === 'image') return `<label class="${cls}">${label}${value ? `<img src="${esc(value)}" alt="" style="width:120px;height:80px;object-fit:cover;margin:6px 0;border-radius:8px">` : ''}<input name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>Images are automatically resized to 1200 × 800 pixels.</small></label>`; if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${f[3] ? 'required' : ''}>${esc(value || '')}</textarea></label>`; const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : ''; return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} value="${esc(value ?? '')}" ${f[3] ? 'required' : ''} ${key === 'id' && row ? 'disabled' : ''}></label>` }
     async function renderStates() { const country = form.elements.countryId?.value; const select = form.elements.state; if (!select) return renderCities(); const selected = select.dataset.value; const list = document.querySelector('#city-state-options'); if (select.tagName !== 'SELECT') { if (!country) { if (list) list.innerHTML = ''; return } try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); if (list) list.innerHTML = state.states[country].map(x => `<option value="${esc(x)}"></option>`).join('') } catch (e) { note(e.message, true) } return } if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return renderCities() } select.disabled = true; select.innerHTML = '<option value="">Loading states…</option>'; try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); select.innerHTML = '<option value="">All / no state</option>' + state.states[country].map(x => `<option value="${esc(x)}" ${x === selected ? 'selected' : ''}>${esc(x)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load states</option>'; note(e.message, true) } finally { select.disabled = false } await renderCities() }
     async function renderCities() { const country = form.elements.countryId?.value; const region = form.elements.state?.value || ''; const select = form.elements.cityId; if (!select) return; const selected = select.dataset.value; if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return } const key = `${country}:${region}`; select.disabled = true; select.innerHTML = '<option value="">Loading cities…</option>'; try { state.cities[key] ||= await call(`/admin/api/cities?country=${encodeURIComponent(country)}&state=${encodeURIComponent(region)}`); select.innerHTML = '<option value="">Select…</option>' + state.cities[key].map(x => `<option value="${esc(x.id)}" ${String(x.id) === String(selected) ? 'selected' : ''}>${esc(x.name)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load cities</option>'; note(e.message, true) } finally { select.disabled = false } }
-    async function openEditor(i) { state.edit = Number.isInteger(i) ? state.rows[i] : null; form.dataset.editId = state.edit?.id || ''; form.dataset.resource = state.tab; const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' '); formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`; fields.innerHTML = schemas[state.tab].map(f => fieldHtml(f, state.edit)).join(''); if (state.tab === 'daily-destinations') prepareKrooIqEditor(); modal.classList.remove('hidden'); await renderStates() }
+    async function openEditor(i) { state.edit = Number.isInteger(i) ? state.rows[i] : null; formNotice.innerHTML = ''; form.dataset.editId = state.edit?.id || ''; form.dataset.resource = state.tab; const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' '); formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`; fields.innerHTML = schemas[state.tab].map(f => fieldHtml(f, state.edit)).join(''); if (state.tab === 'daily-destinations') prepareKrooIqEditor(); modal.classList.remove('hidden'); await renderStates() }
     function prepareKrooIqEditor() {
       const preview = form.elements.isPreview;
       if (state.edit) {
@@ -587,7 +589,7 @@
         preview.closest('label').insertAdjacentHTML('afterend', '<div class="lesson-type-note">Choose Public preview only when creating the single Lesson 0. Leave it off for a standard 5-question Kroo+ lesson.</div>');
       }
       for (let number = 1; number <= 10; number++) {
-        const controls = ['Prompt', 'Image', 'Answers', 'Correct', 'Explanation'].map(suffix => form.elements[`q${number}${suffix}`]);
+        const controls = ['Information', 'Image', 'Prompt', 'Answers', 'Correct', 'Explanation'].map(suffix => form.elements[`q${number}${suffix}`]);
         const first = controls[0].closest('label');
         const card = document.createElement('details');
         card.className = 'question-card'; card.dataset.question = number; card.open = number === 1;
@@ -601,7 +603,7 @@
       const questionCount = form.elements.isPreview?.checked ? 10 : 5;
       fields.querySelectorAll('.question-card').forEach(card => card.classList.toggle('hidden', Number(card.dataset.question) > questionCount));
     }
-    function closeEditor() { modal.classList.add('hidden'); state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
+    function closeEditor() { modal.classList.add('hidden'); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
     async function normalizeImage(input) { const file = input.files?.[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800; const context = canvas.getContext('2d'); const transparent = input.name === 'explorerImageUrl'; if (!transparent) { context.fillStyle = '#061f18'; context.fillRect(0, 0, 1200, 800) } const scale = transparent ? Math.min(1200 / bitmap.width, 800 / bitmap.height) : Math.max(1200 / bitmap.width, 800 / bitmap.height), width = bitmap.width * scale, height = bitmap.height * scale; context.drawImage(bitmap, (1200 - width) / 2, (800 - height) / 2, width, height); bitmap.close(); const mime = transparent ? 'image/png' : 'image/jpeg'; const extension = transparent ? 'png' : 'jpg'; const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, .9)); if (!blob) throw new Error('The image could not be resized.'); const preview = input.closest('.image-field')?.querySelector('.field-preview'); if (preview) { const reader = new FileReader(); reader.onload = () => { preview.innerHTML = imagePreview(reader.result, input.closest('.image-field').querySelector('label').textContent) }; reader.readAsDataURL(blob) } normalizedFiles.set(input, new File([blob], `${crypto.randomUUID()}.${extension}`, { type: mime })); note(transparent ? 'Explorer image fitted to a transparent 1200 × 800 canvas.' : 'Image center-cropped to 1200 × 800 pixels.') } catch (error) { input.value = ''; normalizedFiles.delete(input); note(error.message || 'The image could not be resized.', true) } }
     async function uploadImage(el) { const file = normalizedFiles.get(el) || el.files?.[0]; if (!file) return el.dataset.current || ''; const folders = { countries: 'countries', cities: 'cities', sights: 'sights', collections: 'collection', 'collection-lists': 'collection', 'daily-destinations': 'daily-destinations' }, body = new FormData(); body.append('image', file); body.append('folder', folders[form.dataset.resource]); const r = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Image upload returned an invalid server response (${r.status}).`); const result = await r.json(); if (!r.ok) { const validation = Object.values(result.errors || {}).flat().join(' '); throw new Error(validation || result.message || 'Image upload failed.') } return result.imageUrl }
     form.onsubmit = async e => { e.preventDefault(); const data = {}, resource = form.dataset.resource, editId = form.dataset.editId; try { for (const f of schemas[resource]) { const el = form.elements[f[0]]; if (!el || el.disabled) continue; const value = f[2] === 'image' ? await uploadImage(el) : f[2] === 'check' ? el.checked : f[2] === 'number' ? Number(el.value || 0) : el.value.trim(); if (f[0] !== 'id' || value !== '') data[f[0]] = value } if (resource === 'daily-destinations') data.options = data.options.split('\n').map(x => x.trim()).filter(Boolean); const path = `/admin/api/${resource}${editId ? '/' + encodeURIComponent(editId) : ''}`; await call(path, { method: editId ? 'PUT' : 'POST', body: JSON.stringify(data) }); closeEditor(); if (resource === 'collections') state.meta = await call('/admin/api/meta'); if (resource === 'cities') delete state.states[data.countryId]; await load(); note(editId ? 'Updated successfully.' : 'Created successfully.') } catch (err) { note(err.message, true) } };
@@ -612,10 +614,10 @@
     if (state.key) { document.querySelector('#key').value = state.key; login() }
     function fieldHtml(f, row) {
       const [key, label, type, wide] = f; let value = row?.[key];
-      const questionMatch = key.match(/^q(10|[1-9])(Prompt|Image|Answers|Correct|Explanation)$/);
+      const questionMatch = key.match(/^q(10|[1-9])(Information|Prompt|Image|Answers|Correct|Explanation)$/);
       if (questionMatch) {
         const question = row?.questions?.[Number(questionMatch[1]) - 1] || {};
-        value = question[{ Prompt: 'prompt', Image: 'imageUrl', Answers: 'answers', Correct: 'correctAnswer', Explanation: 'explanation' }[questionMatch[2]]];
+        value = question[{ Information: 'information', Prompt: 'prompt', Image: 'imageUrl', Answers: 'answers', Correct: 'correctAnswer', Explanation: 'explanation' }[questionMatch[2]]];
         if (questionMatch[2] === 'Answers' && Array.isArray(value)) value = value.join('\n');
       }
       if (key === 'collectionKindIds') value = row?.collectionKindIds || [];
@@ -657,6 +659,7 @@
         if (resource === 'daily-destinations') {
           const isPreviewLesson = data.isPreview ?? Number(state.edit?.lessonNumber) === 0;
           data.questions = Array.from({ length: isPreviewLesson ? 10 : 5 }, (_, offset) => offset + 1).map(i => ({
+            information: data[`q${i}Information`],
             prompt: data[`q${i}Prompt`],
             imageUrl: data[`q${i}Image`],
             answers: data[`q${i}Answers`].split('\n').map(x => x.trim()).filter(Boolean),
@@ -671,7 +674,7 @@
         if (resource === 'collections') state.meta = await call('/admin/api/meta');
         if (resource === 'cities') delete state.states[data.countryId];
         await load(); note(editId ? 'Updated successfully.' : 'Created successfully.');
-      } catch (err) { note(err.message, true); }
+      } catch (err) { formNotice.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
       });
       cancelButton.disabled = false;
       delete form.dataset.saving;

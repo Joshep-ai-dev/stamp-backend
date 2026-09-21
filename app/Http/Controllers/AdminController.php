@@ -325,6 +325,7 @@ class AdminController extends Controller
                 'countryId' => ['required', 'exists:countries,code'],
                 'imageUrl' => ['required', 'string'], 'content' => ['required', 'string'],
                 'questions' => ['required', 'array', 'min:5', 'max:10'],
+                'questions.*.information' => ['required', 'string'],
                 'questions.*.prompt' => ['required', 'string'], 'questions.*.answers' => ['required', 'array', 'min:2'],
                 'questions.*.answers.*' => ['required', 'string'], 'questions.*.correctAnswer' => ['required', 'integer', 'min:0'],
                 'questions.*.explanation' => ['nullable', 'string'], 'questions.*.imageUrl' => ['required', 'string'],
