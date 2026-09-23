@@ -33,6 +33,7 @@ class KrooPlusReferralQualification
                     true,
                     $entitlement->paid_membership_started_at,
                     $subscription,
+                    is_string($planId) ? $planId : null,
                 )) {
                     $entitlement->forceFill(['referral_qualified_at' => now()])->save();
                     $qualified++;

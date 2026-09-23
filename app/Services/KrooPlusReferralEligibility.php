@@ -13,6 +13,7 @@ class KrooPlusReferralEligibility
         bool $active,
         ?CarbonInterface $paidMembershipStartedAt,
         array $subscription,
+        ?string $planId = null,
     ): bool {
         if (! $active
             || $paidMembershipStartedAt === null
@@ -20,7 +21,7 @@ class KrooPlusReferralEligibility
             return false;
         }
 
-        return $this->isAnnual($subscription)
+        return $this->isAnnual($subscription, $planId)
             || $paidMembershipStartedAt->lte(
                 now()->subMonthsNoOverflow(
                     max(1, (int) config('services.revenuecat.referral_qualification_months', 3)),
@@ -28,8 +29,14 @@ class KrooPlusReferralEligibility
             );
     }
 
-    public function isAnnual(array $subscription): bool
+    public function isAnnual(array $subscription, ?string $planId = null): bool
     {
+        if ($planId !== null
+            && (str_contains(strtolower($planId), 'annual')
+                || str_contains(strtolower($planId), 'yearly'))) {
+            return true;
+        }
+
         $purchasedAt = $subscription['purchase_date'] ?? null;
         $expiresAt = $subscription['expires_date'] ?? null;
         if (! is_string($purchasedAt) || ! is_string($expiresAt)) {

@@ -39,12 +39,13 @@ class RevenueCatBilling
         $entitlement = $payload['subscriber']['entitlements'][$entitlementId] ?? null;
         $entitlement = is_array($entitlement) ? $entitlement : null;
         $productId = $entitlement['product_identifier'] ?? null;
+        $productPlanId = is_string($entitlement['product_plan_identifier'] ?? null)
+            ? $entitlement['product_plan_identifier']
+            : null;
         [$subscriptionProductId, $subscription] = $this->referralEligibility->subscriptionFor(
             $payload['subscriber']['subscriptions'] ?? [],
             is_string($productId) ? $productId : null,
-            is_string($entitlement['product_plan_identifier'] ?? null)
-                ? $entitlement['product_plan_identifier']
-                : null,
+            $productPlanId,
         );
         $expiry = $this->latestExpiry($entitlement, $subscription);
         $active = $entitlement !== null && ($expiry === null || $expiry->isFuture());
@@ -52,7 +53,12 @@ class RevenueCatBilling
         $paidMembershipStartedAt = $this->paidMembershipStartedAt($existing, $subscription, $active);
         $referralQualifiedAt = $existing?->referral_qualified_at;
         if ($referralQualifiedAt === null
-            && $this->referralEligibility->qualifies($active, $paidMembershipStartedAt, $subscription)) {
+            && $this->referralEligibility->qualifies(
+                $active,
+                $paidMembershipStartedAt,
+                $subscription,
+                $productPlanId,
+            )) {
             $referralQualifiedAt = now();
         }
 

@@ -157,12 +157,12 @@ class SubscriptionApiTest extends TestCase
     {
         $referrer = User::factory()->create();
         $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
-        $this->fakeActiveSubscriber(now(), 'normal', now()->addYear(), 'annual');
+        $this->fakeActiveSubscriber(now(), 'normal', now()->addHour(), 'annual', false);
 
         Sanctum::actingAs($referred);
         $this->postJson('/api/v1/me/subscription/revenuecat/sync')
             ->assertOk()
-            ->assertJsonPath('productId', 'kroo_plus_monthly:annual');
+            ->assertJsonPath('productId', 'kroo_plus_monthly');
 
         Sanctum::actingAs($referrer);
         $this->getJson('/api/v1/me/home')
@@ -215,6 +215,7 @@ class SubscriptionApiTest extends TestCase
         string $periodType = 'normal',
         ?CarbonInterface $expiresDate = null,
         ?string $basePlanId = null,
+        bool $compositeProductId = true,
     ): void
     {
         $originalPurchaseDate ??= now()->subMonth();
@@ -234,7 +235,9 @@ class SubscriptionApiTest extends TestCase
                         ],
                     ],
                     'subscriptions' => [
-                        ($basePlanId === null ? 'kroo_plus_monthly' : "kroo_plus_monthly:{$basePlanId}") => [
+                        ($basePlanId !== null && $compositeProductId
+                            ? "kroo_plus_monthly:{$basePlanId}"
+                            : 'kroo_plus_monthly') => [
                             'store' => 'play_store',
                             'period_type' => $periodType,
                             'original_purchase_date' => $originalPurchaseDate->toIso8601String(),
