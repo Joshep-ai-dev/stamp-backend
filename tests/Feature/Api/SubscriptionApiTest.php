@@ -98,6 +98,7 @@ class SubscriptionApiTest extends TestCase
     public function test_paid_member_qualifies_as_a_referral_after_three_months(): void
     {
         $referrer = User::factory()->create();
+        $this->givePaidMembership($referrer, now()->subDay());
         $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
         $this->fakeActiveSubscriber(now()->subMonths(3)->subDay());
 
@@ -119,6 +120,7 @@ class SubscriptionApiTest extends TestCase
     public function test_trial_and_short_paid_memberships_do_not_count_as_referrals(): void
     {
         $referrer = User::factory()->create();
+        $this->givePaidMembership($referrer, now()->subDay());
         $trialMember = User::factory()->create(['referred_by_user_id' => $referrer->id]);
         $paidMember = User::factory()->create(['referred_by_user_id' => $referrer->id]);
 
@@ -139,6 +141,7 @@ class SubscriptionApiTest extends TestCase
     public function test_active_annual_membership_counts_as_a_referral_immediately(): void
     {
         $referrer = User::factory()->create();
+        $this->givePaidMembership($referrer, now()->subDay());
         $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
         $this->fakeActiveSubscriber(now(), 'normal', now()->addYear());
 
@@ -156,6 +159,7 @@ class SubscriptionApiTest extends TestCase
     public function test_google_annual_base_plan_counts_as_a_referral_immediately(): void
     {
         $referrer = User::factory()->create();
+        $this->givePaidMembership($referrer, now()->subDay());
         $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
         $this->fakeActiveSubscriber(now(), 'normal', now()->addHour(), 'annual', false);
 
@@ -173,6 +177,7 @@ class SubscriptionApiTest extends TestCase
     public function test_home_dashboard_backfills_an_existing_annual_referral(): void
     {
         $referrer = User::factory()->create();
+        $this->givePaidMembership($referrer, now()->subDay());
         $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
         RevenueCatEntitlement::create([
             'user_id' => $referred->id,
@@ -208,6 +213,45 @@ class SubscriptionApiTest extends TestCase
         $this->getJson('/api/v1/me/home')
             ->assertOk()
             ->assertJsonPath('challengeProgress.referralCount', 1);
+    }
+
+    public function test_referrals_created_before_the_referrer_joined_kroo_plus_do_not_count(): void
+    {
+        $referrer = User::factory()->create();
+        $referredBefore = User::factory()->create([
+            'referred_by_user_id' => $referrer->id,
+            'created_at' => now()->subDays(2),
+        ]);
+        $this->givePaidMembership($referrer, now()->subDay());
+        $this->givePaidMembership($referredBefore, now(), now());
+
+        $referredAfter = User::factory()->create(['referred_by_user_id' => $referrer->id]);
+        $this->givePaidMembership($referredAfter, now(), now());
+
+        Sanctum::actingAs($referrer);
+        $this->getJson('/api/v1/me/home')
+            ->assertOk()
+            ->assertJsonPath('challengeProgress.referralCount', 1);
+    }
+
+    private function givePaidMembership(
+        User $user,
+        CarbonInterface $startedAt,
+        ?CarbonInterface $qualifiedAt = null,
+    ): void {
+        RevenueCatEntitlement::create([
+            'user_id' => $user->id,
+            'app_user_id' => $user->id,
+            'entitlement_id' => 'kroo_plus',
+            'product_id' => 'kroo_plus',
+            'store' => 'play_store',
+            'period_type' => 'normal',
+            'is_active' => true,
+            'expires_at' => now()->addYear(),
+            'paid_membership_started_at' => $startedAt,
+            'referral_qualified_at' => $qualifiedAt,
+            'last_verified_at' => now(),
+        ]);
     }
 
     private function fakeActiveSubscriber(

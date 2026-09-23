@@ -142,7 +142,7 @@ class RevenueCatBilling
             return CarbonImmutable::instance($existing->paid_membership_started_at);
         }
 
-        $startedAt = strtolower((string) $existing?->period_type) === 'trial'
+        $startedAt = $existing !== null
             ? ($subscription['purchase_date'] ?? null)
             : ($subscription['original_purchase_date'] ?? $subscription['purchase_date'] ?? null);
 

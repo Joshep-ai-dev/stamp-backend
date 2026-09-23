@@ -16,9 +16,15 @@ class HomeController extends Controller
         $summary = KrooScore::for($user);
         $visits = $user->visits;
         $krooIqScore = round((float) ($user->kroo_iq_score ?? 0), 2);
-        $referralCount = $user->referrals()
-            ->whereHas('revenueCatEntitlement', fn ($query) => $query->whereNotNull('referral_qualified_at'))
-            ->count();
+        $paidMembershipStartedAt = $user->revenueCatEntitlement?->paid_membership_started_at;
+        $referralCount = $paidMembershipStartedAt === null
+            ? 0
+            : $user->referrals()
+                ->where('users.created_at', '>=', $paidMembershipStartedAt)
+                ->whereHas('revenueCatEntitlement', fn ($query) => $query
+                    ->whereNotNull('referral_qualified_at')
+                    ->where('paid_membership_started_at', '>=', $paidMembershipStartedAt))
+                ->count();
         $challengeProgress = [
             'krooScore' => $summary['score'],
             'krooScoreTarget' => 5,
