@@ -136,9 +136,89 @@ class SubscriptionApiTest extends TestCase
             ->assertJsonPath('challengeProgress.referralCount', 0);
     }
 
-    private function fakeActiveSubscriber(?CarbonInterface $originalPurchaseDate = null, string $periodType = 'normal'): void
+    public function test_active_annual_membership_counts_as_a_referral_immediately(): void
+    {
+        $referrer = User::factory()->create();
+        $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
+        $this->fakeActiveSubscriber(now(), 'normal', now()->addYear());
+
+        Sanctum::actingAs($referred);
+        $this->postJson('/api/v1/me/subscription/revenuecat/sync')->assertOk();
+
+        $this->assertNotNull($referred->revenueCatEntitlement()->first()?->referral_qualified_at);
+
+        Sanctum::actingAs($referrer);
+        $this->getJson('/api/v1/me/home')
+            ->assertOk()
+            ->assertJsonPath('challengeProgress.referralCount', 1);
+    }
+
+    public function test_google_annual_base_plan_counts_as_a_referral_immediately(): void
+    {
+        $referrer = User::factory()->create();
+        $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
+        $this->fakeActiveSubscriber(now(), 'normal', now()->addYear(), 'annual');
+
+        Sanctum::actingAs($referred);
+        $this->postJson('/api/v1/me/subscription/revenuecat/sync')
+            ->assertOk()
+            ->assertJsonPath('productId', 'kroo_plus_monthly:annual');
+
+        Sanctum::actingAs($referrer);
+        $this->getJson('/api/v1/me/home')
+            ->assertOk()
+            ->assertJsonPath('challengeProgress.referralCount', 1);
+    }
+
+    public function test_home_dashboard_backfills_an_existing_annual_referral(): void
+    {
+        $referrer = User::factory()->create();
+        $referred = User::factory()->create(['referred_by_user_id' => $referrer->id]);
+        RevenueCatEntitlement::create([
+            'user_id' => $referred->id,
+            'app_user_id' => $referred->id,
+            'entitlement_id' => 'kroo_plus',
+            'product_id' => 'kroo_plus:annual',
+            'store' => 'play_store',
+            'period_type' => 'normal',
+            'is_active' => true,
+            'expires_at' => now()->addYear(),
+            'paid_membership_started_at' => now(),
+            'last_verified_at' => now(),
+            'subscriber_payload' => [
+                'subscriber' => [
+                    'entitlements' => [
+                        'kroo_plus' => [
+                            'product_identifier' => 'kroo_plus',
+                            'product_plan_identifier' => 'annual',
+                        ],
+                    ],
+                    'subscriptions' => [
+                        'kroo_plus:annual' => [
+                            'period_type' => 'normal',
+                            'purchase_date' => now()->toIso8601String(),
+                            'expires_date' => now()->addYear()->toIso8601String(),
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        Sanctum::actingAs($referrer);
+        $this->getJson('/api/v1/me/home')
+            ->assertOk()
+            ->assertJsonPath('challengeProgress.referralCount', 1);
+    }
+
+    private function fakeActiveSubscriber(
+        ?CarbonInterface $originalPurchaseDate = null,
+        string $periodType = 'normal',
+        ?CarbonInterface $expiresDate = null,
+        ?string $basePlanId = null,
+    ): void
     {
         $originalPurchaseDate ??= now()->subMonth();
+        $expiresDate ??= now()->addMonth();
         config([
             'services.revenuecat.secret_api_key' => 'rc-secret',
             'services.revenuecat.entitlement_id' => 'kroo_plus',
@@ -149,15 +229,17 @@ class SubscriptionApiTest extends TestCase
                     'entitlements' => [
                         'kroo_plus' => [
                             'product_identifier' => 'kroo_plus_monthly',
-                            'expires_date' => now()->addMonth()->toIso8601String(),
+                            'product_plan_identifier' => $basePlanId,
+                            'expires_date' => $expiresDate->toIso8601String(),
                         ],
                     ],
                     'subscriptions' => [
-                        'kroo_plus_monthly' => [
+                        ($basePlanId === null ? 'kroo_plus_monthly' : "kroo_plus_monthly:{$basePlanId}") => [
                             'store' => 'play_store',
                             'period_type' => $periodType,
                             'original_purchase_date' => $originalPurchaseDate->toIso8601String(),
                             'purchase_date' => now()->toIso8601String(),
+                            'expires_date' => $expiresDate->toIso8601String(),
                         ],
                     ],
                 ],

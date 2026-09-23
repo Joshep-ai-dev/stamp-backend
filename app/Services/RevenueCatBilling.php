@@ -10,6 +10,8 @@ use RuntimeException;
 
 class RevenueCatBilling
 {
+    public function __construct(private readonly KrooPlusReferralEligibility $referralEligibility) {}
+
     public function configured(): bool
     {
         return trim((string) config('services.revenuecat.secret_api_key')) !== '';
@@ -37,26 +39,27 @@ class RevenueCatBilling
         $entitlement = $payload['subscriber']['entitlements'][$entitlementId] ?? null;
         $entitlement = is_array($entitlement) ? $entitlement : null;
         $productId = $entitlement['product_identifier'] ?? null;
-        $subscription = is_string($productId)
-            ? ($payload['subscriber']['subscriptions'][$productId] ?? null)
-            : null;
-        $subscription = is_array($subscription) ? $subscription : [];
+        [$subscriptionProductId, $subscription] = $this->referralEligibility->subscriptionFor(
+            $payload['subscriber']['subscriptions'] ?? [],
+            is_string($productId) ? $productId : null,
+            is_string($entitlement['product_plan_identifier'] ?? null)
+                ? $entitlement['product_plan_identifier']
+                : null,
+        );
         $expiry = $this->latestExpiry($entitlement, $subscription);
         $active = $entitlement !== null && ($expiry === null || $expiry->isFuture());
         $existing = $user->revenueCatEntitlement()->first();
         $paidMembershipStartedAt = $this->paidMembershipStartedAt($existing, $subscription, $active);
         $referralQualifiedAt = $existing?->referral_qualified_at;
-        $qualificationMonths = max(1, (int) config('services.revenuecat.referral_qualification_months', 3));
         if ($referralQualifiedAt === null
-            && $active
-            && $paidMembershipStartedAt?->lte(now()->subMonthsNoOverflow($qualificationMonths))) {
+            && $this->referralEligibility->qualifies($active, $paidMembershipStartedAt, $subscription)) {
             $referralQualifiedAt = now();
         }
 
         $attributes = [
             'app_user_id' => $user->id,
             'entitlement_id' => $entitlementId,
-            'product_id' => $productId,
+            'product_id' => $subscriptionProductId ?? $productId,
             'store' => $subscription['store'] ?? null,
             'period_type' => $subscription['period_type'] ?? null,
             'is_active' => $active,
