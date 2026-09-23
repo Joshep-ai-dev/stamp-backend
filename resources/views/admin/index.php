@@ -453,7 +453,7 @@
       <h1 id="formTitle">Add</h1>
       <div id="formNotice" role="alert" aria-live="assertive"></div>
       <div id="fields" class="grid" style="margin-top:18px"></div>
-      <div class="dialogfoot"><button type="button" onclick="closeEditor()">Cancel</button><button class="primary"
+      <div class="dialogfoot"><button type="button" onclick="closeEditor()">Close</button><button class="primary"
           type="submit">Save</button></div>
     </form>
   </div>
