@@ -206,6 +206,7 @@ class KrooIqController extends Controller
                 'name' => $destination->country,
                 'countryCode' => $country?->code ?? $destination->country_code,
                 'flag' => $country?->flag,
+                'heroImage' => ImageUrl::public($country?->hero_image),
                 'region' => 'Lesson '.$destination->lesson_number,
             ],
             'questions' => $questions->map(fn ($question) => [
