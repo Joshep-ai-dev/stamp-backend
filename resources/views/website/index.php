@@ -366,7 +366,7 @@
       <a href="#" class="official-store-link google" aria-label="Get Kroo on Google Play"><img src="assets/google-play-badge.png" alt="Get it on Google Play"></a>
     </div>
     <div class="footlinks">
-      <a href="#">Privacy</a>
+      <a href="<?= route('website.privacy') ?>">Privacy</a>
       <a href="#">Terms</a>
       <a href="#">Dream Vacation Challenge Rules</a>
       <a href="#">Contact</a>

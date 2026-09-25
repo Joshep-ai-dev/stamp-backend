@@ -23,6 +23,18 @@ class KrooIqController extends Controller
             return $this->attemptPayload($attempt);
         }
 
+        $unfinishedAttempt = KrooIqAttempt::where('user_id', $request->user()->id)
+            ->whereNull('completed_at')
+            ->orderByDesc('quiz_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($unfinishedAttempt) {
+            $unfinishedAttempt->forceFill(['quiz_date' => $date])->save();
+
+            return $this->attemptPayload($unfinishedAttempt);
+        }
+
         $isMember = app(KrooIqAccess::class)->canUse($request->user());
         $preview = $this->previewLesson($date);
         $hasUsedPreview = $preview && $this->hasUsedLesson($request, $preview->id);
@@ -37,7 +49,15 @@ class KrooIqController extends Controller
             $lesson = $this->lessonFor($request, $date);
         }
 
-        abort_if(! $lesson, 404, 'You have completed all available Kroo IQ lessons. Check back for the next lesson.');
+        if (! $lesson) {
+            $hasCompletedLesson = KrooIqAttempt::where('user_id', $request->user()->id)
+                ->whereNotNull('completed_at')
+                ->exists();
+
+            abort(404, $hasCompletedLesson
+                ? 'You have completed all available Kroo IQ lessons. Check back for the next lesson.'
+                : 'Today\'s Kroo IQ lesson is not available yet. Please try again soon.');
+        }
         $questions = $this->questions($lesson);
         abort_if($questions->isEmpty(), 404, 'This Kroo IQ lesson does not have questions yet.');
         $scoreBefore = (float) ($request->user()->kroo_iq_score ?? 0);

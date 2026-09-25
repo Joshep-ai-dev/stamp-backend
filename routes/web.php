@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [WebsiteController::class, 'index'])->name('website.home');
 Route::get('/kroo-website', [WebsiteController::class, 'index'])->name('website.legacy');
+Route::get('/privacy', [WebsiteController::class, 'privacy'])->name('website.privacy');
 Route::get('/images/{folder}/{filename}', [LegacyImageController::class, 'public'])
     ->where('folder', 'sights|users|collection|daily-destinations|countries|states|cities')
     ->where('filename', '[A-Za-z0-9._-]+')

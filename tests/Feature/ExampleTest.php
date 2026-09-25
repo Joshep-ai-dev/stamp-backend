@@ -23,6 +23,20 @@ class ExampleTest extends TestCase
         $this->get('/kroo-website')->assertStatus(200);
     }
 
+    public function test_privacy_policy_is_publicly_available_and_linked_from_the_website(): void
+    {
+        $this->get('/privacy')
+            ->assertOk()
+            ->assertSeeText('Kroo Privacy Policy')
+            ->assertSeeText('Information We Collect')
+            ->assertSeeText('support@krootravel.com')
+            ->assertDontSeeText('Open Items to Resolve With Legal Counsel Before Publishing');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('href="'.route('website.privacy').'"', false);
+    }
+
     public function test_admin_normalizes_images_and_includes_location_filters(): void
     {
         $this->get('/admin')->assertStatus(200);

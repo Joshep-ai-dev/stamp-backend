@@ -144,6 +144,49 @@ class KrooIqApiTest extends TestCase
         $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $ids[0], 'selectedAnswer' => 0])->assertConflict();
     }
 
+    public function test_unfinished_lesson_from_an_earlier_day_is_resumed_today(): void
+    {
+        Carbon::setTestNow('2026-09-24 09:00:00');
+        $user = User::factory()->create(['plan' => 'free']);
+        Sanctum::actingAs($user);
+        DailyDestination::create([
+            'id' => 'unfinished-preview', 'name' => 'Lesson 0', 'country' => 'Thailand', 'content' => 'Preview',
+            'question' => 'Preview?', 'options' => ['A', 'B'], 'correct_answer' => 0,
+            'questions' => collect(range(1, 10))->map(fn ($number) => [
+                'prompt' => "Preview {$number}?", 'answers' => ['A', 'B'],
+                'correctAnswer' => 0, 'explanation' => 'Preview',
+            ])->all(),
+            'lesson_number' => 0, 'is_published' => true,
+        ]);
+
+        $quiz = $this->getJson('/api/v1/me/kroo-iq/today')->assertOk();
+        $this->postJson('/api/v1/me/kroo-iq/answer', [
+            'questionId' => $quiz->json('questions.0.id'),
+            'selectedAnswer' => 0,
+        ])->assertOk();
+
+        Carbon::setTestNow('2026-09-25 09:00:00');
+        $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()
+            ->assertJsonPath('date', '2026-09-25')
+            ->assertJsonCount(1, 'attempt.answers')
+            ->assertJsonPath('attempt.completed', false);
+
+        $this->postJson('/api/v1/me/kroo-iq/answer', [
+            'questionId' => $quiz->json('questions.1.id'),
+            'selectedAnswer' => 0,
+        ])->assertOk();
+
+        Carbon::setTestNow();
+    }
+
+    public function test_member_without_published_lessons_is_not_offered_replay(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['plan' => 'pro']));
+
+        $this->getJson('/api/v1/me/kroo-iq/today')->assertNotFound()
+            ->assertJsonPath('message', 'Today\'s Kroo IQ lesson is not available yet. Please try again soon.');
+    }
+
     public function test_completed_lesson_can_be_replayed_without_stacking_its_previous_score(): void
     {
         Carbon::setTestNow('2026-09-21 09:00:00');

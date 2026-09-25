@@ -10,4 +10,9 @@ class WebsiteController extends Controller
     {
         return view('website.index');
     }
+
+    public function privacy(): View
+    {
+        return view('website.privacy');
+    }
 }
