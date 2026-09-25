@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Country;
 use App\Models\DailyDestination;
 use App\Models\KrooIqAttempt;
 use App\Services\ImageUrl;
@@ -191,10 +192,20 @@ class KrooIqController extends Controller
 
     private function payload(KrooIqAttempt $attempt, DailyDestination $destination, $questions): array
     {
+        $country = Country::query()
+            ->when(
+                $destination->country_code,
+                fn ($query) => $query->where('code', strtoupper($destination->country_code)),
+                fn ($query) => $query->where('name', $destination->country),
+            )
+            ->first();
+
         return [
             'date' => $attempt->quiz_date->format('Y-m-d'),
             'destination' => [
                 'name' => $destination->country,
+                'countryCode' => $country?->code ?? $destination->country_code,
+                'flag' => $country?->flag,
                 'region' => 'Lesson '.$destination->lesson_number,
                 'content' => $destination->content,
                 'imageUrl' => ImageUrl::public($destination->image_url),
