@@ -323,7 +323,6 @@ class AdminController extends Controller
             $data = $request->validate([
                 'isPreview' => ['sometimes', 'boolean'],
                 'countryId' => ['required', 'exists:countries,code'],
-                'imageUrl' => ['required', 'string'], 'content' => ['required', 'string'],
                 'questions' => ['required', 'array', 'min:5', 'max:10'],
                 'questions.*.information' => ['required', 'string'],
                 'questions.*.prompt' => ['required', 'string'], 'questions.*.answers' => ['required', 'array', 'min:2'],
@@ -343,6 +342,7 @@ class AdminController extends Controller
             $country = Country::findOrFail(strtoupper($data['countryId']));
             $first = $data['questions'][0];
             $lessonNumber = $model?->lesson_number ?? ($isPreview ? 0 : max(1, (int) DailyDestination::max('lesson_number') + 1));
+            $data += ['imageUrl' => $model?->image_url, 'content' => $model?->content ?? ''];
             $city = (object) ['country_code' => $country->code, 'country' => $country, 'id' => null, 'name' => null];
             $data += ['name' => "Lesson {$lessonNumber} - {$country->name}", 'icon' => '🌍', 'question' => $first['prompt'], 'options' => $first['answers'], 'correctAnswer' => $first['correctAnswer']];
             $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
