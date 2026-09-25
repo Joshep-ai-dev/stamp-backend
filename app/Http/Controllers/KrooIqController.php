@@ -115,7 +115,7 @@ class KrooIqController extends Controller
             $answers[] = ['questionId' => $data['questionId'], 'selectedAnswer' => $data['selectedAnswer'], 'correct' => $isCorrect];
             $attempt->answers = $answers;
             $attempt->correct_count = collect($answers)->where('correct', true)->count();
-            $pointsPerCorrect = (int) $lesson->lesson_number === 0 ? 0.25 : 0.05;
+            $pointsPerCorrect = 0.05;
             $attempt->score_after = round((float) $attempt->score_before + ($attempt->correct_count * $pointsPerCorrect), 2);
 
             if (count($answers) === count($attempt->question_ids)) {
@@ -207,7 +207,7 @@ class KrooIqController extends Controller
                 'imageUrl' => $question['imageUrl'],
             ])->values(),
             'isPreview' => (int) $destination->lesson_number === 0,
-            'pointsPerCorrect' => (int) $destination->lesson_number === 0 ? 0.25 : 0.05,
+            'pointsPerCorrect' => 0.05,
             'attempt' => $this->attemptData($attempt),
         ];
     }

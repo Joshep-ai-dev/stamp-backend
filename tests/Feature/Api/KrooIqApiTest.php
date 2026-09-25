@@ -130,7 +130,7 @@ class KrooIqApiTest extends TestCase
         }
 
         $this->assertDatabaseHas('kroo_iq_attempts', ['user_id' => $user->id, 'correct_count' => 5]);
-        $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
+        $this->assertSame('0.05', $user->fresh()->kroo_iq_score);
         $this->getJson('/api/v1/me/kroo-iq/today')->assertJsonPath('attempt.completed', true);
         $this->postJson('/api/v1/me/kroo-iq/replay')->assertNotFound();
     }

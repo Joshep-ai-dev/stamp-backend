@@ -28,7 +28,7 @@ return new class extends Migration
                         ? null
                         : DB::table('daily_destinations')->where('id', $lessonId)->value('lesson_number');
 
-                    return (int) $attempt->correct_count * ((int) $lessonNumber === 0 ? 0.25 : 0.05);
+                    return (int) $attempt->correct_count * 0.05;
                 });
 
                 DB::table('users')->where('id', $userId)->update([
