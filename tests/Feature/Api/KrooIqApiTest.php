@@ -132,6 +132,7 @@ class KrooIqApiTest extends TestCase
         $this->assertDatabaseHas('kroo_iq_attempts', ['user_id' => $user->id, 'correct_count' => 5]);
         $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
         $this->getJson('/api/v1/me/kroo-iq/today')->assertJsonPath('attempt.completed', true);
+        $this->postJson('/api/v1/me/kroo-iq/replay')->assertNotFound();
     }
 
     public function test_answers_must_be_submitted_once_and_in_order(): void
@@ -185,41 +186,6 @@ class KrooIqApiTest extends TestCase
 
         $this->getJson('/api/v1/me/kroo-iq/today')->assertNotFound()
             ->assertJsonPath('message', 'Today\'s Kroo IQ lesson is not available yet. Please try again soon.');
-    }
-
-    public function test_completed_lesson_can_be_replayed_without_stacking_its_previous_score(): void
-    {
-        Carbon::setTestNow('2026-09-21 09:00:00');
-        $user = User::factory()->create(['plan' => 'pro']);
-        Sanctum::actingAs($user);
-        DailyDestination::create([
-            'id' => 'replayable', 'name' => 'Lesson 1', 'country' => 'Japan', 'content' => 'Lesson',
-            'question' => 'Question?', 'options' => ['A', 'B'], 'correct_answer' => 0,
-            'questions' => collect(range(1, 5))->map(fn ($number) => [
-                'information' => "Fact {$number}", 'prompt' => "Question {$number}?",
-                'answers' => ['A', 'B'], 'correctAnswer' => 0, 'explanation' => 'Explanation',
-            ])->all(),
-            'lesson_number' => 1, 'is_published' => true,
-        ]);
-
-        $quiz = $this->getJson('/api/v1/me/kroo-iq/today')->assertOk();
-        foreach (collect($quiz->json('questions'))->pluck('id') as $id) {
-            $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $id, 'selectedAnswer' => 0])->assertOk();
-        }
-        $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
-
-        $this->postJson('/api/v1/me/kroo-iq/replay')->assertOk()
-            ->assertJsonPath('attempt.completed', false)
-            ->assertJsonCount(0, 'attempt.answers')
-            ->assertJsonPath('attempt.scoreBefore', 0);
-        $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
-
-        foreach (collect($quiz->json('questions'))->pluck('id') as $id) {
-            $this->postJson('/api/v1/me/kroo-iq/answer', ['questionId' => $id, 'selectedAnswer' => 0])->assertOk();
-        }
-        $this->assertSame('0.25', $user->fresh()->kroo_iq_score);
-
-        Carbon::setTestNow();
     }
 
     public function test_each_member_progresses_through_lessons_in_order_from_lesson_one(): void

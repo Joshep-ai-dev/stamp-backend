@@ -42,7 +42,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me/friend-code', [CommunityController::class, 'friendCode']);
         Route::post('/me/friends/scan', [CommunityController::class, 'scan']);
         Route::get('/me/kroo-iq/today', [KrooIqController::class, 'today']);
-        Route::post('/me/kroo-iq/replay', [KrooIqController::class, 'replay']);
         Route::post('/me/kroo-iq/answer', [KrooIqController::class, 'answer']);
     });
     Route::middleware('throttle:catalog')->group(function (): void {
