@@ -26,16 +26,20 @@ class ContentController extends Controller
 
     public function country(Request $request, string $code): JsonResponse
     {
-        $country = Country::with('cities')->findOrFail(strtoupper($code));
+        $country = Country::findOrFail(strtoupper($code));
         $sights = Sight::with(['country', 'city'])->where('country_code', $country->code)->where('is_featured', true)->orderBy('name')->take(20)->get();
-        $collections = CollectionKind::with('lists.city.country')->where('is_published', true)->orderBy('title')->get()->filter(fn ($item) => $item->lists->contains(fn ($list) => $list->city?->country_code === $country->code))->values();
+        $collections = CollectionKind::with('lists.city.country')
+            ->where('is_published', true)
+            ->whereHas('lists.city', fn ($query) => $query->where('country_code', $country->code))
+            ->orderBy('title')->get();
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', $country->code)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
         $visitedCityIds = $visits->pluck('city_id')->map(fn ($id) => (string) $id);
-        $orderedCities = $country->cities->sortBy('name')->values();
-        $cities = $orderedCities->take(10)
-            ->merge($orderedCities->filter(fn ($city) => $visitedCityIds->contains((string) $city->geoname_id)))
+        $cities = City::where('country_code', $country->code)
+            ->orderBy('name')->limit(10)->get()
+            ->merge(City::where('country_code', $country->code)
+                ->whereIn('geoname_id', $visitedCityIds)->get())
             ->unique('geoname_id')->values();
 
         return response()->json([
@@ -101,6 +105,12 @@ class ContentController extends Controller
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', 'US')->where('subcountry', $stateName)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
+        $collections = CollectionKind::with('lists.city.country')
+            ->where('is_published', true)
+            ->whereHas('lists.city', fn ($query) => $query
+                ->where('country_code', $country->code)
+                ->where('subcountry', $stateName))
+            ->orderBy('title')->get();
 
         return response()->json([
             'id' => (string) ($stateRecord?->id ?? $stateName),
@@ -109,6 +119,7 @@ class ContentController extends Controller
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
             'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
             'sights' => $sights->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
+            'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
             'stats' => [
                 'cities' => $visits->pluck('city_id')->unique()->count(),
                 'sights' => $completed->intersect($sights->pluck('id'))->count(),
@@ -158,6 +169,10 @@ class ContentController extends Controller
     public function city(Request $request, string $id): JsonResponse
     {
         $city = $this->findCatalogCity($id, ['country']);
+        $collections = CollectionKind::with('lists.city.country')
+            ->where('is_published', true)
+            ->whereHas('lists.city', fn ($query) => $query->where('cities.id', $city->id))
+            ->orderBy('title')->get();
 
         return response()->json([
             'id' => $city->geoname_id, 'name' => $city->name, 'countryId' => $city->country_code,
@@ -168,6 +183,7 @@ class ContentController extends Controller
             'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
             'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url),
             'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
+            'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
         ]);
     }
 
