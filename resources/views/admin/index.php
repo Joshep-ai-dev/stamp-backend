@@ -539,7 +539,7 @@
         [`q${number}Prompt`, `Question ${number}`, 'textarea', required],
         [`q${number}Image`, `Information photo for question ${number}`, 'image'],
         [`q${number}Answers`, `Question ${number} answers (one per line)`, 'textarea', required],
-        [`q${number}Correct`, `Question ${number} correct choice (first is 0)`, 'number', required],
+        [`q${number}Correct`, `Question ${number} correct answer number (1, 2, 3, 4...)`, 'number', required],
         [`q${number}Explanation`, `Question ${number} explanation`, 'textarea', required],
       ];
     }).flat();
@@ -564,8 +564,8 @@
       const previewCount = state.rows.filter(row => Number(row.lessonNumber) === 0).length;
       const publishedCount = state.rows.filter(row => row.isPublished !== false).length;
       summary.innerHTML = `<div class="lesson-summary"><div class="lesson-stat">Total lessons<strong>${state.rows.length}</strong></div><div class="lesson-stat">Published<strong>${publishedCount}</strong></div><div class="lesson-stat">Public preview<strong>${previewCount ? 'Ready' : 'Missing'}</strong></div><div class="lesson-help">Lesson 0 is the one-time public preview with 10 questions. Kroo+ lessons start at Lesson 1, contain 5 questions, and progress in order.</div></div>`;
-      const cols = ['lessonNumber', 'imageUrl', 'country', 'publishDate'];
-      table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Image</th><th>Country</th><th>Available from</th><th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cols.slice(1).map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`;
+      const cols = ['lessonNumber', 'country', 'publishDate'];
+      table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Country</th><th>Available from</th><th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cols.slice(1).map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`;
     };
     function setTableFilter(value) { state.filters[state.tab] = value; render() }
     async function submitCitySearch() { state.filters.cities = document.querySelector('#citySearch')?.value.trim() || ''; state.paging.currentPage = 1; await load() }
@@ -601,7 +601,11 @@
     }
     function updateKrooIqQuestionVisibility() {
       const questionCount = form.elements.isPreview?.checked ? 10 : 5;
-      fields.querySelectorAll('.question-card').forEach(card => card.classList.toggle('hidden', Number(card.dataset.question) > questionCount));
+      fields.querySelectorAll('.question-card').forEach(card => {
+        const visible = Number(card.dataset.question) <= questionCount;
+        card.classList.toggle('hidden', !visible);
+        card.querySelectorAll('textarea, input[type=number]').forEach(control => { control.required = visible && !control.name.endsWith('Image'); });
+      });
     }
     function closeEditor() { modal.classList.add('hidden'); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
     async function normalizeImage(input) { const file = input.files?.[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800; const context = canvas.getContext('2d'); const transparent = input.name === 'explorerImageUrl'; if (!transparent) { context.fillStyle = '#061f18'; context.fillRect(0, 0, 1200, 800) } const scale = transparent ? Math.min(1200 / bitmap.width, 800 / bitmap.height) : Math.max(1200 / bitmap.width, 800 / bitmap.height), width = bitmap.width * scale, height = bitmap.height * scale; context.drawImage(bitmap, (1200 - width) / 2, (800 - height) / 2, width, height); bitmap.close(); const mime = transparent ? 'image/png' : 'image/jpeg'; const extension = transparent ? 'png' : 'jpg'; const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, .9)); if (!blob) throw new Error('The image could not be resized.'); const preview = input.closest('.image-field')?.querySelector('.field-preview'); if (preview) { const reader = new FileReader(); reader.onload = () => { preview.innerHTML = imagePreview(reader.result, input.closest('.image-field').querySelector('label').textContent) }; reader.readAsDataURL(blob) } normalizedFiles.set(input, new File([blob], `${crypto.randomUUID()}.${extension}`, { type: mime })); note(transparent ? 'Explorer image fitted to a transparent 1200 × 800 canvas.' : 'Image center-cropped to 1200 × 800 pixels.') } catch (error) { input.value = ''; normalizedFiles.delete(input); note(error.message || 'The image could not be resized.', true) } }
@@ -619,6 +623,7 @@
         const question = row?.questions?.[Number(questionMatch[1]) - 1] || {};
         value = question[{ Information: 'information', Prompt: 'prompt', Image: 'imageUrl', Answers: 'answers', Correct: 'correctAnswer', Explanation: 'explanation' }[questionMatch[2]]];
         if (questionMatch[2] === 'Answers' && Array.isArray(value)) value = value.join('\n');
+        if (questionMatch[2] === 'Correct' && value !== undefined && value !== null) value = Number(value) + 1;
       }
       if (key === 'collectionKindIds') value = row?.collectionKindIds || [];
       if (key === 'isPreview') value = row ? Number(row.lessonNumber) === 0 : !state.rows.some(lesson => Number(lesson.lessonNumber) === 0);
@@ -635,7 +640,8 @@
       if (type === 'image') return `<div class="${cls} image-field"><label for="image-${key}">${label}</label><div class="field-preview">${value ? imagePreview(value, label) : '<small>No image selected</small>'}</div><input id="image-${key}" name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>${key === 'explorerImageUrl' ? 'Fitted to a transparent 1200 × 800 canvas.' : 'Center-cropped to 1200 × 800 pixels.'} Choose a file to preview before saving.</small></div>`;
       if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${required}>${esc(value || '')}</textarea></label>`;
       const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : '';
-      return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} value="${esc(value ?? '')}" ${required} ${key === 'id' && row ? 'disabled' : ''}></label>`;
+      const answerRange = questionMatch?.[2] === 'Correct' ? `min="1" max="${Math.max(1, (row?.questions?.[Number(questionMatch[1]) - 1]?.answers?.length || 4))}"` : '';
+      return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} ${answerRange} value="${esc(value ?? '')}" ${required} ${key === 'id' && row ? 'disabled' : ''}></label>`;
     }
     form.onsubmit = async e => {
       e.preventDefault();
@@ -663,7 +669,7 @@
             prompt: data[`q${i}Prompt`],
             imageUrl: data[`q${i}Image`],
             answers: data[`q${i}Answers`].split('\n').map(x => x.trim()).filter(Boolean),
-            correctAnswer: data[`q${i}Correct`],
+            correctAnswer: data[`q${i}Correct`] - 1,
             explanation: data[`q${i}Explanation`],
           }));
           Object.keys(data).filter(key => /^q(10|[1-9])/.test(key)).forEach(key => delete data[key]);
