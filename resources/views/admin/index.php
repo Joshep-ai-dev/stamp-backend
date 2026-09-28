@@ -451,6 +451,10 @@
     .ai-empty { padding: 28px; border: 1px dashed #426a55; border-radius: 12px; color: var(--muted); text-align: center }
     .ai-batch-list { display: grid; gap: 10px }
     .ai-batch-sections { display: grid; gap: 24px }
+    .ai-batch-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line) }
+    .ai-batch-tabs button { padding: 8px 12px; color: var(--muted) }
+    .ai-batch-tabs button[aria-selected=true] { background: #245942; border-color: #68c398; color: var(--ink) }
+    .ai-batch-section[hidden] { display: none }
     .ai-batch-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px }
     .ai-batch-section-head h4 { margin: 0; font-size: 16px }
     .ai-batch-section-head small { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 400 }
@@ -693,6 +697,12 @@
       { id: 'cities', icon: '?', label: 'Top 1,000 cities', detail: 'Use the project’s Oxford city list' },
       { id: 'discover-sights', icon: '?', label: 'Top sights', detail: 'Find top attractions and fill missing content for existing sights' }
     ];
+    const aiSections = [
+      { id: 'discover-sights', label: 'Top sights' },
+      { id: 'countries', label: 'Countries' },
+      { id: 'cities', label: 'Cities' },
+      { id: 'states', label: 'US states' }
+    ];
     const aiResultPages = new Map();
     let aiRefreshing = false;
     let aiRunning = false;
@@ -722,12 +732,8 @@
         </section>
         <section class="ai-batches" aria-labelledby="aiBatchesTitle">
           <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches();runAiBatches()">Refresh</button></div>
-          <div id="aiBatches" class="ai-batch-sections">${[
-            { id: 'discover-sights', label: 'Top sights' },
-            { id: 'countries', label: 'Countries' },
-            { id: 'cities', label: 'Cities' },
-            { id: 'states', label: 'US states' }
-          ].map(section => `<section class="ai-batch-section" data-ai-section="${section.id}" aria-labelledby="aiSection-${section.id}"><div class="ai-batch-section-head"><h4 id="aiSection-${section.id}">${section.label}<small data-ai-count></small></h4><button type="button" onclick="selectAiCategory('${section.id}');document.querySelector('#aiForm input[name=limit]').focus()">New batch</button></div><div class="ai-batch-list" data-ai-batch-list></div><p class="ai-section-empty">No batches in this section yet.</p></section>`).join('')}</div>
+          <div class="ai-batch-tabs" role="tablist" aria-label="Batch content types" onkeydown="aiTabKey(event)">${aiSections.map(section => `<button type="button" role="tab" id="aiTab-${section.id}" data-ai-tab="${section.id}" aria-controls="aiPanel-${section.id}" aria-selected="false" tabindex="-1" onclick="selectAiCategory('${section.id}')">${section.label}</button>`).join('')}</div>
+          <div id="aiBatches" class="ai-batch-sections">${aiSections.map(section => `<section class="ai-batch-section" role="tabpanel" id="aiPanel-${section.id}" data-ai-section="${section.id}" aria-labelledby="aiTab-${section.id}" hidden><div class="ai-batch-section-head"><h4 id="aiSection-${section.id}">${section.label}<small data-ai-count></small></h4><button type="button" onclick="selectAiCategory('${section.id}');document.querySelector('#aiForm input[name=limit]').focus()">New batch</button></div><div class="ai-batch-list" data-ai-batch-list></div><p class="ai-section-empty">No batches in this section yet.</p></section>`).join('')}</div>
         </section>`;
       selectAiCategory(aiCategory);
       renderAiBatches(data.batches);
@@ -739,11 +745,13 @@
       const form = document.querySelector('#aiForm');
       if (!form) return;
       form.elements.category.value = category;
-      document.querySelectorAll('[data-ai-type]').forEach(button => {
-        const selected = button.dataset.aiType === category;
-        button.classList.toggle('selected', selected);
-        button.setAttribute('aria-pressed', String(selected));
-        button.querySelector('.ai-type-check').textContent = selected ? '?' : '';
+      document.querySelectorAll('[data-ai-tab]').forEach(button => {
+        const selected = button.dataset.aiTab === category;
+        button.setAttribute('aria-selected', String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      });
+      document.querySelectorAll('[data-ai-section]').forEach(section => {
+        section.hidden = section.dataset.aiSection !== category;
       });
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
@@ -751,6 +759,16 @@
         ? 'Find five top sights for cities without sights, and fill missing images and descriptions for existing sights, including approved ones. Review new sights before showing them in app lists.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
       form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Generate top sights' : 'Start batch';
+    }
+    function aiTabKey(event) {
+      const tabs = [...event.currentTarget.querySelectorAll('[role=tab]')];
+      const index = tabs.indexOf(event.target);
+      if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      selectAiCategory(tabs[next].dataset.aiTab);
+      tabs[next].focus();
     }
     function renderAiBatches(batches) {
       const list = document.querySelector('#aiBatches');
