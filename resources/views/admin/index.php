@@ -450,6 +450,11 @@
     .ai-batches-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px }
     .ai-empty { padding: 28px; border: 1px dashed #426a55; border-radius: 12px; color: var(--muted); text-align: center }
     .ai-batch-list { display: grid; gap: 10px }
+    .ai-batch-sections { display: grid; gap: 24px }
+    .ai-batch-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px }
+    .ai-batch-section-head h4 { margin: 0; font-size: 16px }
+    .ai-batch-section-head small { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 400 }
+    .ai-section-empty { margin: 0; padding: 12px 0; color: var(--muted); font-size: 12px }
     .ai-batch { padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: #09271f }
     .ai-batch-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px }
     .ai-batch-title { display: flex; align-items: center; gap: 9px; font-weight: 750 }
@@ -686,8 +691,7 @@
       { id: 'countries', icon: '?', label: 'Countries', detail: 'National stamp images and descriptions' },
       { id: 'states', icon: '?', label: 'US states', detail: 'All existing US state records' },
       { id: 'cities', icon: '?', label: 'Top 1,000 cities', detail: 'Use the project’s Oxford city list' },
-      { id: 'discover-sights', icon: '?', label: 'Top sights', detail: 'Generate five top attractions per city' },
-      { id: 'sights', icon: '?', label: 'Approved sights', detail: 'Generate content for featured sights' }
+      { id: 'discover-sights', icon: '?', label: 'Top sights', detail: 'Find top attractions and fill missing content for existing sights' }
     ];
     const aiResultPages = new Map();
     let aiRefreshing = false;
@@ -718,7 +722,12 @@
         </section>
         <section class="ai-batches" aria-labelledby="aiBatchesTitle">
           <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches();runAiBatches()">Refresh</button></div>
-          <div id="aiBatches" class="ai-batch-list"></div>
+          <div id="aiBatches" class="ai-batch-sections">${[
+            { id: 'discover-sights', label: 'Top sights' },
+            { id: 'countries', label: 'Countries' },
+            { id: 'cities', label: 'Cities' },
+            { id: 'states', label: 'US states' }
+          ].map(section => `<section class="ai-batch-section" data-ai-section="${section.id}" aria-labelledby="aiSection-${section.id}"><div class="ai-batch-section-head"><h4 id="aiSection-${section.id}">${section.label}<small data-ai-count></small></h4><button type="button" onclick="selectAiCategory('${section.id}');document.querySelector('#aiForm input[name=limit]').focus()">New batch</button></div><div class="ai-batch-list" data-ai-batch-list></div><p class="ai-section-empty">No batches in this section yet.</p></section>`).join('')}</div>
         </section>`;
       selectAiCategory(aiCategory);
       renderAiBatches(data.batches);
@@ -739,25 +748,19 @@
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
       document.querySelector('#aiCategoryHelp').textContent = category === 'discover-sights'
-        ? 'Generate five top sights per city, with descriptions and stamp images. Review and approve them before showing them in app lists.'
-        : category === 'sights' ? 'Only approved sights shown in app lists are included.'
+        ? 'Find five top sights for cities without sights, and fill missing images and descriptions for existing sights, including approved ones. Review new sights before showing them in app lists.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
       form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Generate top sights' : 'Start batch';
     }
     function renderAiBatches(batches) {
       const list = document.querySelector('#aiBatches');
       if (!list) return;
-      if (!batches.length) {
-        list.innerHTML = '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
-        return;
-      }
-      list.querySelector('.ai-empty')?.remove();
       const ids = new Set(batches.map(b => String(b.id)));
       list.querySelectorAll('.ai-batch').forEach(article => {
         if (!ids.has(article.dataset.batchId) && !aiResultPages.has(Number(article.dataset.batchId))) article.remove();
       });
       batches.forEach(b => {
-        const label = aiKinds.find(x => x.id === b.category)?.label || b.category;
+        const label = b.category === 'sights' ? 'Top sights' : aiKinds.find(x => x.id === b.category)?.label || b.category;
         const processed = Math.min(Number(b.total), Number(b.completed) + Number(b.failed));
         const percent = b.total ? Math.round(processed / b.total * 100) : 100;
         const action = b.status === 'running' ? `<button onclick="aiAction(${b.id},'pause')">Pause</button>`
@@ -769,7 +772,12 @@
           article.className = 'ai-batch';
           article.dataset.batchId = b.id;
           article.innerHTML = `<div class="ai-batch-summary"></div><div id="aiDetails-${b.id}" hidden></div>`;
-          list.append(article);
+          const category = b.category === 'sights' ? 'discover-sights' : b.category;
+          const section = list.querySelector(`[data-ai-section="${category}"]`);
+          if (!section) return;
+          const batchList = section.querySelector('[data-ai-batch-list]');
+          const next = [...batchList.children].find(existing => Number(existing.dataset.batchId) < Number(b.id));
+          batchList.insertBefore(article, next || null);
         }
         if (article.dataset.summary !== header) {
           article.querySelector('.ai-batch-summary').innerHTML = header;
@@ -777,6 +785,11 @@
           const update = article.querySelector('[data-ai-update]');
           if (update) update.textContent = 'Update results';
         }
+      });
+      list.querySelectorAll('[data-ai-section]').forEach(section => {
+        const count = section.querySelectorAll('.ai-batch').length;
+        section.querySelector('[data-ai-count]').textContent = `${count} ${count === 1 ? 'batch' : 'batches'}`;
+        section.querySelector('.ai-section-empty').hidden = count > 0;
       });
     }
     async function runAiBatches() {

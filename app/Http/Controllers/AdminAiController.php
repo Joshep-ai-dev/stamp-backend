@@ -31,10 +31,15 @@ class AdminAiController extends Controller
 
     public function index(): JsonResponse
     {
+        $batches = collect();
+        foreach ([['countries'], ['states'], ['cities'], ['sights', 'discover-sights']] as $categories) {
+            $batches = $batches->concat(DB::table('ai_content_batches')->whereIn('category', $categories)->orderByDesc('id')->limit(20)->get());
+        }
+
         return response()->json([
             'configured' => filled(config('services.openai.api_key')),
             'concurrency' => max(1, min(5, (int) config('ai.concurrency', 3))),
-            'batches' => DB::table('ai_content_batches')->orderByDesc('id')->limit(20)->get(),
+            'batches' => $batches->sortByDesc('id')->values(),
             'nextBatchId' => DB::table('ai_content_batches')->where('status', 'running')->orderBy('id')->value('id'),
         ]);
     }

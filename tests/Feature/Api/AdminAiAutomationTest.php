@@ -40,6 +40,26 @@ class AdminAiAutomationTest extends TestCase
         return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
     }
 
+    public function test_recent_batches_are_limited_per_section_with_sight_categories_merged(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        $countryId = DB::table('ai_content_batches')->insertGetId(['category' => 'countries', 'status' => 'complete', 'total' => 0]);
+        DB::table('ai_content_batches')->insert(['category' => 'states', 'status' => 'complete', 'total' => 0]);
+        foreach (range(1, 25) as $index) {
+            DB::table('ai_content_batches')->insert(['category' => 'cities', 'status' => 'complete', 'total' => 0]);
+            DB::table('ai_content_batches')->insert(['category' => $index % 2 ? 'sights' : 'discover-sights', 'status' => 'complete', 'total' => 0]);
+        }
+
+        $response = $this->withHeader('X-Admin-Key', 'test-admin-key')->getJson('/admin/api/ai')->assertOk();
+        $batches = collect($response->json('batches'));
+        $this->assertCount(42, $batches);
+        $this->assertTrue($batches->contains('id', $countryId));
+        $this->assertCount(20, $batches->where('category', 'cities'));
+        $this->assertCount(20, $batches->whereIn('category', ['sights', 'discover-sights']));
+        $this->assertCount(1, $batches->where('category', 'states'));
+        $this->assertSame($batches->sortByDesc('id')->pluck('id')->values()->all(), $batches->pluck('id')->all());
+    }
+
     public function test_admin_can_start_only_countries_with_missing_content_without_queue_worker(): void
     {
         config()->set('services.stampo.admin_key', 'test-admin-key');
@@ -403,6 +423,7 @@ class AdminAiAutomationTest extends TestCase
     public function test_completed_discovery_can_fill_existing_sight_image_without_regenerating_description_or_names(): void
     {
         [$sight, $batch, $city] = $this->sightBatch();
+        $sight->update(['is_featured' => true]);
         config()->set('services.openai.api_key', 'test-key');
         DB::table('ai_content_batches')->where('id', $batch)->update(['category' => 'discover-sights']);
         DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => (string) $city->id]);
@@ -411,6 +432,7 @@ class AdminAiAutomationTest extends TestCase
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.status', 'complete');
         $sight->refresh();
         $this->assertSame('Old description', $sight->description);
+        $this->assertTrue($sight->is_featured);
         $this->assertNotEmpty($sight->image_url);
         $this->get($sight->image_url)->assertOk();
         Http::assertSentCount(1);
