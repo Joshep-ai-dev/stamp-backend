@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\AiRateLimitedException;
 use App\Models\City;
 use App\Models\Sight;
 use App\Services\AiStampGenerator;
@@ -78,6 +79,12 @@ class DiscoverAiSights implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        if ($exception instanceof AiRateLimitedException) {
+            DB::table('ai_content_items')->where('id', $this->itemId)->where('status', 'working')
+                ->update(['status' => 'queued', 'error' => $exception->getMessage(), 'updated_at' => now()]);
+
+            return;
+        }
         $item = DB::table('ai_content_items')->find($this->itemId);
         if (! $item || in_array($item->status, ['complete', 'failed'], true)) {
             return;

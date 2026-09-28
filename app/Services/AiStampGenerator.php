@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiRateLimitedException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +19,7 @@ class AiStampGenerator
 {
     public static function concurrency(): int
     {
-        return max(1, min(12, (int) config('ai.concurrency', 8)));
+        return AiRateLimit::concurrency(max(1, min(12, (int) config('ai.concurrency', 8))));
     }
 
     public function sights(string $city, string $country): array
@@ -198,12 +201,22 @@ PROMPT;
         if (! $key) {
             throw new RuntimeException('OPENAI_API_KEY is missing.');
         }
+        $delay = AiRateLimit::retryAfter();
+        if ($delay > 0) {
+            return array_fill_keys(array_keys($requests), new AiRateLimitedException(now()->timestamp + $delay));
+        }
         $results = [];
         $pending = $requests;
         for ($attempt = 1; $attempt <= 3 && $pending; $attempt++) {
+            if ($attempt > 1 && AiRateLimit::retryAfter() > 0) {
+                foreach ($pending as $id => $request) {
+                    $results[$id] = new AiRateLimitedException(now()->timestamp + AiRateLimit::retryAfter());
+                }
+                break;
+            }
             $responses = Http::pool(function (Pool $pool) use ($pending, $key): void {
                 foreach ($pending as $id => $request) {
-                    $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000)
+                    $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000, fn ($exception) => $exception instanceof ConnectionException || ($exception instanceof RequestException && $exception->response->serverError()), throw: false)
                         ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($request['body'], ['stream' => false]));
                 }
             }, self::concurrency());
@@ -214,6 +227,9 @@ PROMPT;
                         throw $response;
                     }
                     $results[$id] = $this->responseData($response);
+                    if ($pending[$id]['path'] === '/images/generations') {
+                        AiRateLimit::succeeded();
+                    }
                 } catch (UnexpectedValueException $exception) {
                     $results[$id] = $exception;
                     if ($attempt < 3) {
@@ -310,6 +326,9 @@ PROMPT;
 
     private function responseData(Response $response): array
     {
+        if (AiRateLimit::isTemporary($response)) {
+            throw AiRateLimit::pause($response);
+        }
         if (! $response->successful()) {
             throw new RuntimeException('OpenAI API returned HTTP '.$response->status().': '.Str::limit((string) ($response->json('error.message') ?? $response->body()), 300));
         }

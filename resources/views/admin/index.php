@@ -717,6 +717,7 @@
     let aiMutating = false;
     let aiCategory = 'cities';
     async function loadAi() {
+      await call('/admin/api/ai/recover-rate-limits', { method: 'POST' });
       const data = await call('/admin/api/ai');
       title.textContent = 'AI automation';
       document.querySelector('.page-description').textContent = 'Create destination content in batches and track every run.';
@@ -837,11 +838,16 @@
             document.querySelector('#aiRunStatus').textContent = 'No batches running. Start or resume a batch to continue.';
             break;
           }
+          if (Number(data.retryAfterSeconds) > 0) {
+            await waitAiRateLimit(data.retryAfterSeconds);
+            continue;
+          }
           document.querySelector('#aiRunStatus').textContent = `Processing batch #${batch.id} · ${data.concurrency || 8} parallel generations · Keep this page open.`;
           const result = await call(`/admin/api/ai/${batch.id}/process`, { method: 'POST' });
           if (state.tab !== 'ai') break;
           await refreshAiBatches();
-          if (!result.processed) await new Promise(resolve => setTimeout(resolve, 3000));
+          if (Number(result.retryAfterSeconds) > 0) await waitAiRateLimit(result.retryAfterSeconds);
+          else if (!result.processed) await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (error) {
         if (state.tab === 'ai') {
@@ -849,6 +855,13 @@
           note(error.message, true);
         }
       } finally { aiRunning = false }
+    }
+    async function waitAiRateLimit(seconds) {
+      const until = Date.now() + Number(seconds) * 1000;
+      while (state.tab === 'ai' && Date.now() < until) {
+        document.querySelector('#aiRunStatus').textContent = `OpenAI rate limit · Continuing automatically in ${Math.ceil((until - Date.now()) / 1000)} seconds. Keep this page open.`;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
     async function refreshAiBatches() {
       if (aiRefreshing || aiMutating || document.querySelector('#aiContentEditor').open) return;

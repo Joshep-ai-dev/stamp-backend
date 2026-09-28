@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Api;
 
+use App\Exceptions\AiRateLimitedException;
 use App\Jobs\GenerateAiContent;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\Sight;
+use App\Services\AiRateLimit;
 use App\Services\AiStampGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -40,6 +42,101 @@ class AdminAiAutomationTest extends TestCase
     private function fakeImage(): array
     {
         return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
+    }
+
+    public static function rateLimitedSightCategories(): array
+    {
+        return ['existing sight' => ['sights'], 'city top sights' => ['discover-sights']];
+    }
+
+    #[DataProvider('rateLimitedSightCategories')]
+    public function test_image_rate_limit_waits_then_resumes_without_losing_content(string $category): void
+    {
+        [$sight, $batch, $city] = $this->sightBatch('running');
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('ai.concurrency', 8);
+        DB::table('ai_content_batches')->where('id', $batch)->update(['category' => $category]);
+        if ($category === 'discover-sights') {
+            DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => (string) $city->id]);
+        }
+        Http::fake(['api.openai.com/v1/images/generations' => Http::sequence()
+            ->push(['error' => ['message' => 'Rate limit reached for image generation.', 'code' => 'rate_limit_exceeded']], 429, ['Retry-After' => '60'])
+            ->push($this->fakeImage())]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()
+            ->assertJsonPath('batch.status', 'running')->assertJsonPath('batch.failed', 0)->assertJsonPath('retryAfterSeconds', 60);
+        $this->assertDatabaseHas('ai_content_items', ['batch_id' => $batch, 'status' => 'queued']);
+        $this->assertSame('Old description', $sight->fresh()->description);
+        $this->getJson('/admin/api/ai')->assertJsonPath('concurrency', 4)->assertJsonPath('retryAfterSeconds', 60);
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertJsonPath('processed', false);
+        Http::assertSentCount(1);
+        $this->travel(61)->seconds();
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.status', 'complete')
+            ->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.failed', 0)->assertJsonPath('retryAfterSeconds', 0);
+        $this->assertSame('Old description', $sight->fresh()->description);
+        $this->get($sight->fresh()->image_url)->assertOk();
+        Http::assertSentCount(2);
+    }
+
+    public function test_parallel_rate_limits_share_one_cooldown_and_reduce_parallelism_once(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('ai.concurrency', 8);
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response(['error' => ['message' => 'Rate limit reached.']], 429, ['Retry-After' => '45'])]);
+        $tasks = [];
+        foreach (range(1, 3) as $id) {
+            $tasks[$id] = ['category' => 'Country', 'name' => 'Example '.$id, 'image' => true, 'folder' => 'countries'];
+        }
+        $results = app(AiStampGenerator::class)->generateMany($tasks);
+        foreach ($results as $result) {
+            $this->assertInstanceOf(AiRateLimitedException::class, $result['error']);
+        }
+        $this->assertSame(4, AiStampGenerator::concurrency());
+        $this->assertSame(45, AiRateLimit::retryAfter());
+        app(AiStampGenerator::class)->generateMany($tasks);
+        Http::assertSentCount(3);
+    }
+
+    public function test_quota_429_is_not_treated_as_a_temporary_rate_limit(): void
+    {
+        [$sight, $batch] = $this->sightBatch('running');
+        config()->set('services.openai.api_key', 'test-key');
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response(['error' => ['message' => 'You exceeded your current quota.', 'code' => 'insufficient_quota']], 429)]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()
+            ->assertJsonPath('batch.failed', 1)->assertJsonPath('retryAfterSeconds', 0);
+        $this->postJson('/admin/api/ai/recover-rate-limits')->assertOk()->assertJsonPath('recovered', 0);
+        Http::assertSentCount(1);
+    }
+
+    public function test_old_rate_limit_failures_are_recovered_automatically_without_resuming_paused_batches(): void
+    {
+        [$sight, $batch] = $this->sightBatch();
+        DB::table('ai_content_batches')->where('id', $batch)->update(['completed' => 0, 'failed' => 1]);
+        DB::table('ai_content_items')->where('batch_id', $batch)->update(['status' => 'failed', 'error' => 'HTTP request returned status code 429: Rate limit reached for gpt-image (truncated...)']);
+        $paused = DB::table('ai_content_batches')->insertGetId(['category' => 'sights', 'status' => 'paused', 'total' => 1, 'failed' => 1]);
+        DB::table('ai_content_items')->insert(['batch_id' => $paused, 'target_id' => (string) $sight->id, 'status' => 'failed', 'error' => 'Rate limit reached.']);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai/recover-rate-limits')->assertOk()->assertJsonPath('recovered', 1);
+        $this->assertDatabaseHas('ai_content_batches', ['id' => $batch, 'status' => 'running', 'failed' => 0]);
+        $this->assertDatabaseHas('ai_content_items', ['batch_id' => $batch, 'status' => 'queued', 'error' => null]);
+        $this->assertDatabaseHas('ai_content_batches', ['id' => $paused, 'status' => 'paused', 'failed' => 1]);
+        $this->postJson('/admin/api/ai/recover-rate-limits')->assertJsonPath('recovered', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_retry_delay_uses_reset_headers_and_increases_when_no_hint_is_available(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('ai.concurrency', 8);
+        Http::fake(['api.openai.com/v1/images/generations' => Http::sequence()
+            ->push(['error' => ['message' => 'Rate limit reached.']], 429, ['x-ratelimit-reset-requests' => '1m5s'])
+            ->push(['error' => ['message' => 'Rate limit reached.']], 429)]);
+        $task = ['x' => ['category' => 'Country', 'name' => 'France', 'image' => true, 'folder' => 'countries']];
+        app(AiStampGenerator::class)->generateMany($task);
+        $this->assertSame(65, AiRateLimit::retryAfter());
+        $this->travel(66)->seconds();
+        app(AiStampGenerator::class)->generateMany($task);
+        $this->assertSame(60, AiRateLimit::retryAfter());
+        $this->assertSame(2, AiStampGenerator::concurrency());
+        Http::assertSentCount(2);
     }
 
     public function test_empty_success_responses_are_retried_for_standalone_generation(): void
@@ -233,6 +330,7 @@ class AdminAiAutomationTest extends TestCase
     public function test_ai_endpoints_require_admin_key(): void
     {
         $this->getJson('/admin/api/ai')->assertUnauthorized();
+        $this->postJson('/admin/api/ai/recover-rate-limits')->assertUnauthorized();
         $this->getJson('/admin/api/ai/1/results')->assertUnauthorized();
         $this->postJson('/admin/api/ai', ['category' => 'countries'])->assertUnauthorized();
         $this->postJson('/admin/api/ai/1/process')->assertUnauthorized();

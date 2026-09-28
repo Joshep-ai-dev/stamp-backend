@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiRateLimitedException;
 use App\Jobs\DiscoverAiSights;
 use App\Jobs\GenerateAiContent;
 use App\Models\City;
@@ -15,6 +16,9 @@ class AiBatchRunner
 {
     public function processNext(int $id): bool
     {
+        if (AiRateLimit::retryAfter() > 0) {
+            return false;
+        }
         $lock = Cache::store('database')->lock('ai-content-batch:'.$id, 1200);
         if (! $lock->get()) {
             return false;
@@ -141,7 +145,7 @@ class AiBatchRunner
             try {
                 (new GenerateAiContent($context['itemId']))->saveContent($context, $content[$key] ?? [], false);
             } catch (Throwable $exception) {
-                $errors[$context['itemId']] ??= new \RuntimeException($context['model']->name.': '.$exception->getMessage(), 0, $exception);
+                $errors[$context['itemId']] ??= $exception instanceof AiRateLimitedException ? $exception : new \RuntimeException($context['model']->name.': '.$exception->getMessage(), 0, $exception);
             }
         }
         foreach ($contexts as $itemId => $context) {
