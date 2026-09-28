@@ -164,6 +164,32 @@ class AdminAiAutomationTest extends TestCase
         }
     }
 
+    public function test_section_counts_include_all_history_and_count_each_sight_only_once(): void
+    {
+        [$sight, $batch, $city] = $this->sightBatch();
+        $sight->update(['image_url' => '/images/sights/saved.webp']);
+        $discovery = DB::table('ai_content_batches')->insertGetId(['category' => 'discover-sights', 'status' => 'running', 'total' => 3, 'completed' => 1, 'failed' => 1]);
+        DB::table('ai_content_items')->insert(['batch_id' => $discovery, 'target_id' => (string) $city->id, 'status' => 'complete']);
+        Country::where('code', 'FR')->update(['hero_image' => '/images/countries/fr.webp', 'description' => 'Country description.']);
+        foreach (range(1, 25) as $index) {
+            $id = DB::table('ai_content_batches')->insertGetId(['category' => 'countries', 'status' => 'complete', 'total' => 1, 'completed' => 1]);
+            DB::table('ai_content_items')->insert(['batch_id' => $id, 'target_id' => 'FR', 'status' => 'complete']);
+        }
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->getJson('/admin/api/ai')->assertOk()
+            ->assertJsonPath('sectionCounts.countries.completed', 25)
+            ->assertJsonPath('sectionCounts.countries.images', 1)
+            ->assertJsonPath('sectionCounts.countries.descriptions', 1)
+            ->assertJsonPath('sectionCounts.countries.records', 1)
+            ->assertJsonPath('sectionCounts.discover-sights.completed', 2)
+            ->assertJsonPath('sectionCounts.discover-sights.pending', 1)
+            ->assertJsonPath('sectionCounts.discover-sights.failed', 1)
+            ->assertJsonPath('sectionCounts.discover-sights.images', 1)
+            ->assertJsonPath('sectionCounts.discover-sights.descriptions', 1)
+            ->assertJsonPath('sectionCounts.discover-sights.records', 1)
+            ->assertJsonPath('sectionCounts.states.images', 0)
+            ->assertJsonPath('sectionCounts.cities.total', 0);
+    }
+
     public function test_recent_batches_are_limited_per_section_with_sight_categories_merged(): void
     {
         config()->set('services.stampo.admin_key', 'test-admin-key');

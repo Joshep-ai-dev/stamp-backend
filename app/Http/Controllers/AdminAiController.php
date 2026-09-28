@@ -41,8 +41,53 @@ class AdminAiController extends Controller
             'configured' => filled(config('services.openai.api_key')),
             'concurrency' => AiStampGenerator::concurrency(),
             'batches' => $batches->sortByDesc('id')->values(),
+            'sectionCounts' => $this->sectionCounts(),
             'nextBatchId' => DB::table('ai_content_batches')->where('status', 'running')->orderBy('id')->value('id'),
         ]);
+    }
+
+    private function sectionCounts(): array
+    {
+        $batchTotals = DB::table('ai_content_batches')->selectRaw('category, SUM(total) AS total, SUM(completed) AS completed, SUM(failed) AS failed')
+            ->groupBy('category')->get()->keyBy('category');
+        $counts = [];
+        foreach ([
+            'countries' => ['countries', ['countries'], 'code', 'hero_image'],
+            'states' => ['country_states', ['states'], 'id', 'image_url'],
+            'cities' => ['cities', ['cities'], 'id', 'image_url'],
+            'discover-sights' => ['sights', ['sights', 'discover-sights'], 'id', 'image_url'],
+        ] as $section => [$table, $categories, $idColumn, $imageColumn]) {
+            $query = DB::table($table)->whereExists(function ($query) use ($table, $categories, $idColumn): void {
+                $query->selectRaw('1')->from('ai_content_items as items')
+                    ->join('ai_content_batches as batches', 'batches.id', '=', 'items.batch_id')->whereIn('batches.category', $categories);
+                if ($table === 'sights') {
+                    $query->where(function ($query): void {
+                        $query->where(fn ($q) => $q->where('batches.category', 'sights')->whereRaw('items.target_id = CAST(sights.id AS VARCHAR)'))
+                            ->orWhere(fn ($q) => $q->where('batches.category', 'discover-sights')->whereRaw('items.target_id = CAST(sights.city_id AS VARCHAR)'));
+                    });
+                } else {
+                    $query->whereRaw('items.target_id = CAST('.$table.'.'.$idColumn.' AS VARCHAR)');
+                }
+            });
+            if ($section === 'states') {
+                $query->where('country_code', 'US');
+            }
+            $hasImage = "TRIM(COALESCE({$imageColumn}, '')) <> ''";
+            $hasDescription = "TRIM(COALESCE(description, '')) <> ''";
+            $content = $query->selectRaw("COUNT(*) AS records, SUM(CASE WHEN {$hasImage} THEN 1 ELSE 0 END) AS images, SUM(CASE WHEN {$hasDescription} THEN 1 ELSE 0 END) AS descriptions")->first();
+            $totals = ['total' => 0, 'completed' => 0, 'failed' => 0];
+            foreach ($categories as $category) {
+                foreach ($totals as $field => $value) {
+                    $totals[$field] += (int) ($batchTotals->get($category)?->{$field} ?? 0);
+                }
+            }
+            $counts[$section] = array_merge($totals, [
+                'pending' => max(0, $totals['total'] - $totals['completed'] - $totals['failed']),
+                'records' => (int) $content->records, 'images' => (int) $content->images, 'descriptions' => (int) $content->descriptions,
+            ]);
+        }
+
+        return $counts;
     }
 
     public function show(int $id): JsonResponse

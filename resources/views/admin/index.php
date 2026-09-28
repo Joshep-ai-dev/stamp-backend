@@ -455,6 +455,11 @@
     .ai-batch-tabs button { padding: 8px 12px; color: var(--muted) }
     .ai-batch-tabs button[aria-selected=true] { background: #245942; border-color: #68c398; color: var(--ink) }
     .ai-batch-section[hidden] { display: none }
+    .ai-tab-count { margin-left: 6px; padding: 2px 6px; border-radius: 5px; background: #123b2c; color: var(--ink); font-size: 11px }
+    .ai-generation-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 10px }
+    .ai-generation-counts div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 11px }
+    .ai-generation-counts strong { display: block; margin-top: 4px; color: var(--ink); font-size: 20px }
+    .ai-count-help { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5 }
     .ai-batch-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px }
     .ai-batch-section-head h4 { margin: 0; font-size: 16px }
     .ai-batch-section-head small { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 400 }
@@ -732,11 +737,11 @@
         </section>
         <section class="ai-batches" aria-labelledby="aiBatchesTitle">
           <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches();runAiBatches()">Refresh</button></div>
-          <div class="ai-batch-tabs" role="tablist" aria-label="Batch content types" onkeydown="aiTabKey(event)">${aiSections.map(section => `<button type="button" role="tab" id="aiTab-${section.id}" data-ai-tab="${section.id}" aria-controls="aiPanel-${section.id}" aria-selected="false" tabindex="-1" onclick="selectAiCategory('${section.id}')">${section.label}</button>`).join('')}</div>
-          <div id="aiBatches" class="ai-batch-sections">${aiSections.map(section => `<section class="ai-batch-section" role="tabpanel" id="aiPanel-${section.id}" data-ai-section="${section.id}" aria-labelledby="aiTab-${section.id}" hidden><div class="ai-batch-section-head"><h4 id="aiSection-${section.id}">${section.label}<small data-ai-count></small></h4><button type="button" onclick="selectAiCategory('${section.id}');document.querySelector('#aiForm input[name=limit]').focus()">New batch</button></div><div class="ai-batch-list" data-ai-batch-list></div><p class="ai-section-empty">No batches in this section yet.</p></section>`).join('')}</div>
+          <div class="ai-batch-tabs" role="tablist" aria-label="Batch content types" onkeydown="aiTabKey(event)">${aiSections.map(section => `<button type="button" role="tab" id="aiTab-${section.id}" data-ai-tab="${section.id}" aria-controls="aiPanel-${section.id}" aria-selected="false" tabindex="-1" onclick="selectAiCategory('${section.id}')">${section.label}<span class="ai-tab-count" data-ai-tab-count aria-hidden="true" title="Saved images in this section’s batches">0</span></button>`).join('')}</div>
+          <div id="aiBatches" class="ai-batch-sections">${aiSections.map(section => `<section class="ai-batch-section" role="tabpanel" id="aiPanel-${section.id}" data-ai-section="${section.id}" aria-labelledby="aiTab-${section.id}" hidden><div class="ai-batch-section-head"><h4 id="aiSection-${section.id}">${section.label}<small data-ai-count></small></h4><button type="button" onclick="selectAiCategory('${section.id}');document.querySelector('#aiForm input[name=limit]').focus()">New batch</button></div><div class="ai-generation-counts">${[['images', 'Images saved'], ['descriptions', 'Descriptions saved'], ['completed', 'Batch items completed'], ['pending', 'Pending'], ['failed', 'Failed']].map(([key, label]) => `<div>${label}<strong data-ai-generation-count="${key}">0</strong></div>`).join('')}</div><p class="ai-count-help">Counts cover all batches. Saved content counts each ${section.id === 'discover-sights' ? 'sight' : section.id === 'countries' ? 'country' : section.id === 'states' ? 'US state' : 'city'} once.${section.id === 'discover-sights' ? ' City entries count as one batch item; each sight has its own image and description.' : ''}</p><div class="ai-batch-list" data-ai-batch-list></div><p class="ai-section-empty">No batches in this section yet.</p></section>`).join('')}</div>
         </section>`;
       selectAiCategory(aiCategory);
-      renderAiBatches(data.batches);
+      renderAiBatches(data.batches, data.sectionCounts);
       note('');
       void runAiBatches();
     }
@@ -770,7 +775,7 @@
       selectAiCategory(tabs[next].dataset.aiTab);
       tabs[next].focus();
     }
-    function renderAiBatches(batches) {
+    function renderAiBatches(batches, sectionCounts = {}) {
       const list = document.querySelector('#aiBatches');
       if (!list) return;
       const ids = new Set(batches.map(b => String(b.id)));
@@ -808,6 +813,12 @@
         const count = section.querySelectorAll('.ai-batch').length;
         section.querySelector('[data-ai-count]').textContent = `${count} ${count === 1 ? 'batch' : 'batches'}`;
         section.querySelector('.ai-section-empty').hidden = count > 0;
+        const category = section.dataset.aiSection;
+        const counts = sectionCounts[category] || {};
+        section.querySelectorAll('[data-ai-generation-count]').forEach(value => {
+          value.textContent = Number(counts[value.dataset.aiGenerationCount] || 0).toLocaleString();
+        });
+        document.querySelector(`[data-ai-tab="${category}"] [data-ai-tab-count]`).textContent = Number(counts.images || 0).toLocaleString();
       });
     }
     async function runAiBatches() {
@@ -845,7 +856,7 @@
       try {
         const data = await call('/admin/api/ai');
         if (state.tab !== 'ai') return;
-        renderAiBatches(data.batches);
+        renderAiBatches(data.batches, data.sectionCounts);
       } catch (error) { note(error.message, true) }
       finally { aiRefreshing = false }
     }
