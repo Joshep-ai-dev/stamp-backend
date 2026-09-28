@@ -44,12 +44,12 @@ class ContentController extends Controller
 
         return response()->json([
             'isEnriching' => false,
-            'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image)],
+            'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image), 'description' => $country->description],
             'featuredIn' => [],
             'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]),
             'states' => $country->code === 'US'
                 ? CountryState::where('country_code', 'US')->orderBy('name')->get()
-                    ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url)])
+                    ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description])
                 : [],
             // Always return the ordered catalog so clients can render locked
             // previews. Access to items after the first three is enforced by
@@ -116,6 +116,7 @@ class ContentController extends Controller
             'id' => (string) ($stateRecord?->id ?? $stateName),
             'name' => $stateName,
             'imageUrl' => ImageUrl::public($stateRecord?->image_url),
+            'description' => $stateRecord?->description,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
             'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
             'sights' => $sights->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
@@ -181,7 +182,7 @@ class ContentController extends Controller
             'country' => $city->country?->name ?? $city->country_code,
             'countryCode' => $city->country_code,
             'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
-            'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url),
+            'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url), 'description' => $city->description,
             'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
         ]);

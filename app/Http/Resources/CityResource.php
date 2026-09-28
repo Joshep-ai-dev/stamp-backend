@@ -12,6 +12,6 @@ class CityResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        return ['id' => $this->geoname_id, 'name' => $this->name, 'country' => $this->country->name, 'countryCode' => $this->country_code, 'continentCode' => $this->country->continent_code, 'subcountry' => $this->subcountry, 'latitude' => $this->latitude, 'longitude' => $this->longitude, 'population' => $this->population, 'image' => ImageUrl::public($this->image_url)];
+        return ['id' => $this->geoname_id, 'name' => $this->name, 'country' => $this->country->name, 'countryCode' => $this->country_code, 'continentCode' => $this->country->continent_code, 'subcountry' => $this->subcountry, 'latitude' => $this->latitude, 'longitude' => $this->longitude, 'population' => $this->population, 'image' => ImageUrl::public($this->image_url), 'description' => $this->description];
     }
 }

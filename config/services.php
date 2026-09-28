@@ -5,6 +5,12 @@ return [
         'admin_key' => env('ADMIN_API_KEY', 'stampo-local-admin'),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'text_model' => env('OPENAI_TEXT_MODEL', 'gpt-5-mini'),
+        'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2.5-sunburst'),
+    ],
+
     'revenuecat' => [
         'secret_api_key' => env('REVENUECAT_SECRET_API_KEY', ''),
         'entitlement_id' => env('REVENUECAT_ENTITLEMENT_ID', 'kroo_plus'),

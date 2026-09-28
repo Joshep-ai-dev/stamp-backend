@@ -122,9 +122,9 @@ class AdminController extends Controller
     public function updateState(Request $request, string $id): JsonResponse
     {
         $state = CountryState::where('country_code', 'US')->findOrFail($id);
-        $data = $request->validate(['imageUrl' => ['nullable', 'string']]);
+        $data = $request->validate(['imageUrl' => ['nullable', 'string'], 'description' => ['nullable', 'string']]);
         $oldImage = $state->image_url;
-        $state->update(['image_url' => $data['imageUrl'] ?? null]);
+        $state->update(['image_url' => $data['imageUrl'] ?? $state->image_url, 'description' => $data['description'] ?? $state->description]);
         if ($oldImage && $oldImage !== $state->image_url) {
             app(ImageStorage::class)->delete($oldImage);
         }
@@ -228,12 +228,14 @@ class AdminController extends Controller
             $data = $request->validate([
                 'name' => ['required', 'string', 'max:150'],
                 'heroImage' => ['nullable', 'string'],
+                'description' => ['nullable', 'string'],
             ]);
             $name = Str::of($data['name'])->squish()->toString();
             $values = [
                 'name' => $name,
                 'normalized_name' => Str::of($name)->ascii()->lower()->toString(),
                 'hero_image' => $data['heroImage'] ?? $model->hero_image,
+                'description' => $data['description'] ?? $model->description,
             ];
         } elseif ($type === 'cities') {
             $cityIdRule = Rule::unique('cities', 'geoname_id');
@@ -249,6 +251,7 @@ class AdminController extends Controller
                 'longitude' => ['nullable', 'numeric', 'between:-180,180'],
                 'population' => ['nullable', 'integer', 'min:0'],
                 'imageUrl' => ['nullable', 'string'],
+                'description' => ['nullable', 'string'],
             ]);
             $normalizedName = Str::of($data['name'])->ascii()->lower()->squish()->toString();
             $normalizedState = filled($data['state'] ?? null)
@@ -266,6 +269,7 @@ class AdminController extends Controller
                 'longitude' => $data['longitude'] ?? null,
                 'population' => $data['population'] ?? null,
                 'image_url' => $data['imageUrl'] ?? $model?->image_url,
+                'description' => $data['description'] ?? $model?->description,
             ];
             if (filled($data['state'] ?? null) && Schema::hasTable('country_states')) {
                 CountryState::firstOrCreate(
@@ -401,17 +405,17 @@ class AdminController extends Controller
 
     private function adminCountry(Country $country): array
     {
-        return ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'heroImage' => ImageUrl::public($country->hero_image)];
+        return ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'heroImage' => ImageUrl::public($country->hero_image), 'description' => $country->description];
     }
 
     private function adminState(CountryState $state): array
     {
-        return ['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name, 'imageUrl' => ImageUrl::public($state->image_url)];
+        return ['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name, 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description];
     }
 
     private function adminCity(City $city): array
     {
-        return ['id' => $city->geoname_id, 'countryId' => $city->country_code, 'country' => $city->country?->name, 'state' => $city->subcountry, 'name' => $city->name, 'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'imageUrl' => ImageUrl::public($city->image_url)];
+        return ['id' => $city->geoname_id, 'countryId' => $city->country_code, 'country' => $city->country?->name, 'state' => $city->subcountry, 'name' => $city->name, 'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'imageUrl' => ImageUrl::public($city->image_url), 'description' => $city->description];
     }
 
     private function adminSight(Sight $x): array
