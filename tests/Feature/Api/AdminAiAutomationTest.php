@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 class AdminAiAutomationTest extends TestCase
@@ -38,6 +39,118 @@ class AdminAiAutomationTest extends TestCase
     private function fakeImage(): array
     {
         return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
+    }
+
+    public function test_empty_success_responses_are_retried_for_standalone_generation(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Sleep::fake();
+        Http::fake(['api.openai.com/v1/responses' => Http::sequence()
+            ->push('', 200)->push('{"output":', 200)
+            ->push(['output' => [['content' => [['type' => 'output_text', 'text' => 'Recovered description.']]]]])]);
+
+        $this->assertSame('Recovered description.', app(AiStampGenerator::class)->description('Country', 'France'));
+        Http::assertSentCount(3);
+        Http::assertSent(fn ($request) => $request['stream'] === false);
+    }
+
+    public function test_parallel_generation_retries_only_the_unreadable_response(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Sleep::fake();
+        $calls = ['France' => 0, 'Italy' => 0];
+        Http::fake(['api.openai.com/v1/responses' => function ($request) use (&$calls) {
+            $name = str_contains($request['input'], 'France') ? 'France' : 'Italy';
+            $calls[$name]++;
+
+            return $name === 'France' && $calls[$name] === 1 ? Http::response('', 200)
+                : Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => $name.' description.']]]]]);
+        }]);
+
+        $result = app(AiStampGenerator::class)->generateMany([
+            'fr' => ['category' => 'Country', 'name' => 'France', 'description' => true],
+            'it' => ['category' => 'Country', 'name' => 'Italy', 'description' => true],
+        ]);
+        $this->assertSame('France description.', $result['fr']['description']);
+        $this->assertSame('Italy description.', $result['it']['description']);
+        $this->assertSame(['France' => 2, 'Italy' => 1], $calls);
+        Http::assertSentCount(3);
+    }
+
+    public function test_response_with_utf8_bom_is_decoded_without_retry(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Http::fake(['api.openai.com/v1/responses' => Http::response("\xEF\xBB\xBF".json_encode([
+            'output' => [['content' => [['type' => 'output_text', 'text' => 'Valid description.']]]]], JSON_THROW_ON_ERROR))]);
+
+        $this->assertSame('Valid description.', app(AiStampGenerator::class)->description('Country', 'France'));
+        Http::assertSentCount(1);
+    }
+
+    public function test_completed_text_event_stream_is_read_as_a_response(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        $event = ['type' => 'response.completed', 'response' => ['output' => [['content' => [['type' => 'output_text', 'text' => 'Streamed description.']]]]]];
+        Http::fake(['api.openai.com/v1/responses' => Http::response(
+            "event: response.created\r\ndata: {\"type\":\"response.created\"}\r\n\r\nevent: response.completed\r\ndata: ".json_encode($event)."\r\n\r\ndata: [DONE]\r\n\r\n",
+            200, ['Content-Type' => 'text/event-stream'],
+        )]);
+
+        $this->assertSame('Streamed description.', app(AiStampGenerator::class)->description('Country', 'France'));
+        Http::assertSentCount(1);
+    }
+
+    public function test_completed_image_event_stream_is_saved_as_an_image(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        $event = ['type' => 'image_generation.completed', 'b64_json' => $this->fakeImage()['data'][0]['b64_json']];
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response(
+            "event: image_generation.completed\ndata: ".json_encode($event)."\n\n", 200, ['Content-Type' => 'text/event-stream'],
+        )]);
+
+        $image = app(AiStampGenerator::class)->image('Country', 'France', 'countries');
+        $this->get($image)->assertOk();
+        Http::assertSentCount(1);
+    }
+
+    public function test_unreadable_image_exhausts_retries_and_keeps_the_description_and_other_results(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Sleep::fake();
+        Http::fake([
+            'api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Saved description.']]]]]),
+            'api.openai.com/v1/images/generations' => fn ($request) => str_contains($request['prompt'], 'France')
+                ? Http::response('<html>Private gateway details</html>', 200, ['Content-Type' => 'text/html', 'x-request-id' => 'req-test'])
+                : Http::response($this->fakeImage()),
+        ]);
+
+        $result = app(AiStampGenerator::class)->generateMany([
+            'fr' => ['category' => 'Country', 'name' => 'France', 'description' => true, 'image' => true, 'folder' => 'countries'],
+            'it' => ['category' => 'Country', 'name' => 'Italy', 'description' => true, 'image' => true, 'folder' => 'countries'],
+        ]);
+        $this->assertSame('Saved description.', $result['fr']['description']);
+        $this->assertInstanceOf(\UnexpectedValueException::class, $result['fr']['error']);
+        $this->assertStringContainsString('text/html', $result['fr']['error']->getMessage());
+        $this->assertStringContainsString('req-test', $result['fr']['error']->getMessage());
+        $this->assertStringNotContainsString('Private gateway details', $result['fr']['error']->getMessage());
+        $this->assertArrayNotHasKey('image', $result['fr']);
+        $this->get($result['it']['image'])->assertOk();
+        Http::assertSentCount(6);
+    }
+
+    public function test_partial_image_event_stream_is_retried_instead_of_saved(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        Sleep::fake();
+        $event = ['type' => 'image_generation.partial_image', 'b64_json' => $this->fakeImage()['data'][0]['b64_json']];
+        Http::fake(['api.openai.com/v1/images/generations' => Http::sequence()
+            ->push('data: '.json_encode($event)."\n\n", 200, ['Content-Type' => 'text/event-stream'])
+            ->push($this->fakeImage())]);
+
+        $image = app(AiStampGenerator::class)->image('Country', 'France', 'countries');
+        $this->get($image)->assertOk();
+        Http::assertSentCount(2);
+        $this->assertCount(1, File::files(public_path('images/countries')));
     }
 
     public function test_recent_batches_are_limited_per_section_with_sight_categories_merged(): void

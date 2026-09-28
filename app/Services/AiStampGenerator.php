@@ -5,9 +5,12 @@ namespace App\Services;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
+use UnexpectedValueException;
 
 class AiStampGenerator
 {
@@ -188,21 +191,38 @@ PROMPT;
         if (! $key) {
             throw new RuntimeException('OPENAI_API_KEY is missing.');
         }
-        $responses = Http::pool(function (Pool $pool) use ($requests, $key): void {
-            foreach ($requests as $id => $request) {
-                $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000)
-                    ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], $request['body']);
-            }
-        }, max(1, min(5, (int) config('ai.concurrency', 3))));
         $results = [];
-        foreach ($responses as $id => $response) {
-            try {
-                if ($response instanceof Throwable) {
-                    throw $response;
+        $pending = $requests;
+        for ($attempt = 1; $attempt <= 3 && $pending; $attempt++) {
+            $responses = Http::pool(function (Pool $pool) use ($pending, $key): void {
+                foreach ($pending as $id => $request) {
+                    $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000)
+                        ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($request['body'], ['stream' => false]));
                 }
-                $results[$id] = $this->responseData($response);
-            } catch (Throwable $exception) {
-                $results[$id] = $exception;
+            }, max(1, min(5, (int) config('ai.concurrency', 3))));
+            $retry = [];
+            foreach ($responses as $id => $response) {
+                try {
+                    if ($response instanceof Throwable) {
+                        throw $response;
+                    }
+                    $results[$id] = $this->responseData($response);
+                } catch (UnexpectedValueException $exception) {
+                    $results[$id] = $exception;
+                    if ($attempt < 3) {
+                        $retry[$id] = $pending[$id];
+                    } else {
+                        Log::warning('OpenAI response could not be decoded after three attempts.', [
+                            'endpoint' => $pending[$id]['path'], 'error' => $exception->getMessage(),
+                        ]);
+                    }
+                } catch (Throwable $exception) {
+                    $results[$id] = $exception;
+                }
+            }
+            $pending = $retry;
+            if ($pending) {
+                Sleep::for($attempt)->seconds();
             }
         }
 
@@ -273,14 +293,12 @@ PROMPT;
 
     private function request(string $path, array $body): array
     {
-        $key = config('services.openai.api_key');
-        if (! $key) {
-            throw new RuntimeException('OPENAI_API_KEY is missing.');
+        $result = $this->requestMany([['path' => $path, 'body' => $body]])[0];
+        if ($result instanceof Throwable) {
+            throw $result;
         }
-        $response = Http::withToken($key)->acceptJson()->timeout(180)->retry(3, 2000)
-            ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$path, $body);
 
-        return $this->responseData($response);
+        return $result;
     }
 
     private function responseData(Response $response): array
@@ -288,11 +306,49 @@ PROMPT;
         if (! $response->successful()) {
             throw new RuntimeException('OpenAI API returned HTTP '.$response->status().': '.Str::limit((string) ($response->json('error.message') ?? $response->body()), 300));
         }
-        $data = $response->json();
+        $body = trim($response->body());
+        if (str_starts_with($body, "\xEF\xBB\xBF")) {
+            $body = trim(substr($body, 3));
+        }
+        $data = json_decode($body, true);
+        $reason = $body === '' ? 'empty response body' : json_last_error_msg();
+        if (! is_array($data) && (str_contains(strtolower($response->header('Content-Type') ?? ''), 'text/event-stream') || str_starts_with($body, 'event:') || str_starts_with($body, 'data:'))) {
+            $data = $this->streamData($body);
+            $reason = 'event stream ended without a completed response';
+        }
         if (! is_array($data)) {
-            throw new RuntimeException('OpenAI returned an invalid JSON response.');
+            throw new UnexpectedValueException('OpenAI returned an unreadable response after HTTP '.$response->status()
+                .' ('.($response->header('Content-Type') ?: 'unknown content type').', '.strlen($body).' bytes; '.$reason.').'
+                .($response->header('x-request-id') ? ' Request ID: '.$response->header('x-request-id').'.' : ''));
         }
 
         return $data;
+    }
+
+    private function streamData(string $body): ?array
+    {
+        foreach (preg_split('/\r?\n\r?\n/', $body) as $block) {
+            $lines = [];
+            foreach (preg_split('/\r?\n/', $block) as $line) {
+                if (str_starts_with($line, 'data:')) {
+                    $lines[] = ltrim(substr($line, 5), ' ');
+                }
+            }
+            $event = json_decode(implode("\n", $lines), true);
+            if (! is_array($event)) {
+                continue;
+            }
+            if (($event['type'] ?? '') === 'response.completed' && is_array($event['response'] ?? null)) {
+                return $event['response'];
+            }
+            if (($event['type'] ?? '') === 'image_generation.completed' && is_string($event['b64_json'] ?? null)) {
+                return ['data' => [['b64_json' => $event['b64_json']]]];
+            }
+            if (in_array($event['type'] ?? '', ['error', 'response.failed', 'response.incomplete'], true)) {
+                throw new RuntimeException('OpenAI generation did not complete: '.Str::limit((string) ($event['message'] ?? $event['response']['error']['message'] ?? $event['response']['incomplete_details']['reason'] ?? 'stream error'), 300));
+            }
+        }
+
+        return null;
     }
 }
