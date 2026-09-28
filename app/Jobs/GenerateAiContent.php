@@ -7,15 +7,15 @@ use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\Sight;
 use App\Services\AiStampGenerator;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-class GenerateAiContent implements ShouldQueue, ShouldBeUnique
+class GenerateAiContent implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -39,13 +39,26 @@ class GenerateAiContent implements ShouldQueue, ShouldBeUnique
 
     public function handle(AiStampGenerator $generator): void
     {
+        $lock = Cache::store('database')->lock('ai-content-item:'.$this->itemId, 1200);
+        if (! $lock->get()) {
+            return;
+        }
+        try {
+            $this->generate($generator);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function prepareContent(): ?array
+    {
         $item = DB::table('ai_content_items')->find($this->itemId);
         if (! $item || $item->status === 'complete') {
-            return;
+            return null;
         }
         $batch = DB::table('ai_content_batches')->find($item->batch_id);
         if (! $batch || $batch->status !== 'running') {
-            return;
+            return null;
         }
         DB::table('ai_content_items')->where('id', $item->id)->update(['status' => 'working', 'error' => null, 'updated_at' => now()]);
         $model = match ($batch->category) {
@@ -67,18 +80,64 @@ class GenerateAiContent implements ShouldQueue, ShouldBeUnique
             'countries' => 'Country', 'states' => 'State', 'cities' => 'City', 'sights' => 'Top Sight',
         };
         $imageField = $batch->category === 'countries' ? 'hero_image' : 'image_url';
+
+        return compact('model', 'category', 'name', 'imageField') + ['folder' => $batch->category];
+    }
+
+    private function generate(AiStampGenerator $generator): void
+    {
+        $context = $this->prepareContent();
+        if (! $context) {
+            return;
+        }
+        ['model' => $model, 'category' => $category, 'name' => $name, 'imageField' => $imageField] = $context;
         if (blank($model->description)) {
             $model->description = $generator->description($category, $name);
             $model->save();
         }
         if (blank($model->{$imageField})) {
-            $url = $generator->image($category, $name, $batch->category);
+            $url = $generator->image($category, $name, $context['folder']);
             $model->{$imageField} = $url;
             $model->save();
         }
+        $this->completeItem();
+    }
+
+    public function saveContent(array $context, array $result, bool $complete = true): void
+    {
+        $model = $context['model'];
+        $imageField = $context['imageField'];
+        $model->refresh();
+        if (isset($result['description']) && blank($model->description)) {
+            $model->description = $result['description'];
+        }
+        if (isset($result['image']) && blank($model->{$imageField})) {
+            $model->{$imageField} = $result['image'];
+        }
+        $model->save();
+        if (isset($result['error'])) {
+            throw $result['error'];
+        }
+        if (blank($model->description) || blank($model->{$imageField})) {
+            throw new \RuntimeException('Description or image generation did not finish.');
+        }
+        if ($complete) {
+            $this->completeItem();
+        }
+    }
+
+    private function completeItem(): void
+    {
+        $item = DB::table('ai_content_items')->find($this->itemId);
+        if (! $item) {
+            return;
+        }
         DB::transaction(function () use ($item): void {
-            DB::table('ai_content_items')->where('id', $item->id)->update(['status' => 'complete', 'error' => null, 'updated_at' => now()]);
-            DB::table('ai_content_batches')->where('id', $item->batch_id)->increment('completed');
+            $changed = DB::table('ai_content_items')->where('id', $item->id)->where('status', 'working')
+                ->update(['status' => 'complete', 'error' => null, 'updated_at' => now()]);
+            if ($changed) {
+                DB::table('ai_content_batches')->where('id', $item->batch_id)->increment('completed');
+            }
         });
         $this->finishBatch($item->batch_id);
     }
@@ -86,7 +145,7 @@ class GenerateAiContent implements ShouldQueue, ShouldBeUnique
     public function failed(Throwable $exception): void
     {
         $item = DB::table('ai_content_items')->find($this->itemId);
-        if (! $item || $item->status === 'failed') {
+        if (! $item || in_array($item->status, ['complete', 'failed'], true)) {
             return;
         }
         DB::transaction(function () use ($item, $exception): void {

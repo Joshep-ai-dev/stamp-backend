@@ -6,8 +6,12 @@ use App\Jobs\GenerateAiContent;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\Sight;
+use App\Services\AiStampGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -15,7 +19,28 @@ class AdminAiAutomationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_queue_only_countries_with_missing_content(): void
+    private string $testPublicPath;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->testPublicPath = sys_get_temp_dir().'/kroo-ai-test-'.bin2hex(random_bytes(8));
+        $this->app->usePublicPath($this->testPublicPath);
+        Http::preventStrayRequests();
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->testPublicPath);
+        parent::tearDown();
+    }
+
+    private function fakeImage(): array
+    {
+        return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
+    }
+
+    public function test_admin_can_start_only_countries_with_missing_content_without_queue_worker(): void
     {
         config()->set('services.stampo.admin_key', 'test-admin-key');
         config()->set('services.openai.api_key', 'test-openai-key');
@@ -32,7 +57,7 @@ class AdminAiAutomationTest extends TestCase
         $response->assertOk()->assertJsonPath('batch.total', 1);
         $this->assertDatabaseHas('ai_content_items', ['batch_id' => $response->json('batch.id'), 'target_id' => 'AA']);
         $this->assertDatabaseMissing('ai_content_items', ['batch_id' => $response->json('batch.id'), 'target_id' => 'BB']);
-        Queue::assertPushed(GenerateAiContent::class, 1);
+        Queue::assertNothingPushed();
     }
 
     public function test_ai_endpoints_require_admin_key(): void
@@ -40,6 +65,7 @@ class AdminAiAutomationTest extends TestCase
         $this->getJson('/admin/api/ai')->assertUnauthorized();
         $this->getJson('/admin/api/ai/1/results')->assertUnauthorized();
         $this->postJson('/admin/api/ai', ['category' => 'countries'])->assertUnauthorized();
+        $this->postJson('/admin/api/ai/1/process')->assertUnauthorized();
     }
 
     public function test_project_city_csv_uses_largest_match_and_creates_missing_catalog_cities(): void
@@ -74,7 +100,7 @@ class AdminAiAutomationTest extends TestCase
         $this->assertDatabaseHas('ai_content_items', ['batch_id' => $batchId, 'target_id' => (string) $paris->id]);
         $this->assertDatabaseHas('ai_content_items', ['batch_id' => $batchId, 'target_id' => (string) $newYork->id]);
         $this->assertDatabaseHas('cities', ['geoname_id' => 'oxford-2026-3', 'name' => 'Missing City']);
-        Queue::assertPushed(GenerateAiContent::class, 3);
+        Queue::assertNothingPushed();
     }
 
     public function test_missing_project_csv_returns_actionable_error(): void
@@ -201,5 +227,212 @@ class AdminAiAutomationTest extends TestCase
         Country::where('code', 'FR')->update(['hero_image' => '/images/countries/fr.webp', 'description' => 'France description']);
         $this->withHeader('X-Admin-Key', 'test-admin-key')->deleteJson("/admin/api/ai/{$batch}/content/FR")->assertNoContent();
         $this->assertDatabaseHas('countries', ['code' => 'FR', 'hero_image' => '', 'description' => '']);
+    }
+
+    public function test_city_batch_entry_can_be_removed_while_preserving_saved_catalog_content(): void
+    {
+        [$sight, $batch, $city] = $this->sightBatch();
+        DB::table('ai_content_batches')->where('id', $batch)->update(['category' => 'discover-sights']);
+        DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => (string) $city->id]);
+        $item = DB::table('ai_content_items')->where('batch_id', $batch)->first();
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->deleteJson("/admin/api/ai/{$batch}/items/{$item->id}")->assertNoContent();
+        $this->assertDatabaseMissing('ai_content_items', ['id' => $item->id]);
+        $this->assertDatabaseHas('ai_content_batches', ['id' => $batch, 'total' => 0, 'completed' => 0, 'failed' => 0]);
+        $this->assertDatabaseHas('cities', ['id' => $city->id]);
+        $this->assertDatabaseHas('sights', ['id' => $sight->id]);
+        $this->getJson("/admin/api/ai/{$batch}/results")->assertJsonCount(0, 'results.data');
+    }
+
+    public function test_batch_entry_removal_requires_authentication_and_batch_membership(): void
+    {
+        [$sight, $batch] = $this->sightBatch();
+        $item = DB::table('ai_content_items')->where('batch_id', $batch)->first();
+        $this->deleteJson("/admin/api/ai/{$batch}/items/{$item->id}")->assertUnauthorized();
+        $other = DB::table('ai_content_batches')->insertGetId(['category' => 'sights', 'status' => 'complete', 'total' => 0]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->deleteJson("/admin/api/ai/{$other}/items/{$item->id}")->assertNotFound();
+        $this->assertDatabaseHas('ai_content_items', ['id' => $item->id]);
+    }
+
+    public function test_removing_paused_entry_cancels_job_and_preserves_batch_counts(): void
+    {
+        [$sight, $batch] = $this->sightBatch('running');
+        $item = DB::table('ai_content_items')->where('batch_id', $batch)->first();
+        $url = "/admin/api/ai/{$batch}/items/{$item->id}";
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->deleteJson($url)->assertStatus(409);
+        DB::table('ai_content_batches')->where('id', $batch)->update(['status' => 'paused']);
+        DB::table('ai_content_items')->where('id', $item->id)->update(['status' => 'working']);
+        $this->deleteJson($url)->assertStatus(409);
+        DB::table('ai_content_items')->where('id', $item->id)->update(['status' => 'queued']);
+        $this->deleteJson($url)->assertNoContent();
+        $generator = \Mockery::mock(AiStampGenerator::class);
+        $generator->shouldNotReceive('description');
+        $generator->shouldNotReceive('image');
+        (new GenerateAiContent($item->id))->handle($generator);
+        $this->assertDatabaseHas('ai_content_batches', ['id' => $batch, 'total' => 0, 'completed' => 0, 'status' => 'complete']);
+        $this->assertDatabaseHas('sights', ['id' => $sight->id]);
+    }
+
+    public function test_removing_failed_entry_updates_failed_counter(): void
+    {
+        [$sight, $batch] = $this->sightBatch('complete');
+        DB::table('ai_content_batches')->where('id', $batch)->update(['completed' => 0, 'failed' => 1]);
+        $item = DB::table('ai_content_items')->where('batch_id', $batch)->first();
+        DB::table('ai_content_items')->where('id', $item->id)->update(['status' => 'failed']);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->deleteJson("/admin/api/ai/{$batch}/items/{$item->id}")->assertNoContent();
+        $this->assertDatabaseHas('ai_content_batches', ['id' => $batch, 'total' => 0, 'failed' => 0, 'completed' => 0]);
+    }
+
+    public function test_batch_processes_real_generation_code_without_queue_worker(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('queue.default', 'sync');
+        config()->set('ai.concurrency', 1);
+        Queue::fake();
+        Http::fake(['api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Generated travel description.']]]]])]);
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU', 'hero_image' => '/images/countries/fr.webp']);
+        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA', 'hero_image' => '/images/countries/us.webp']);
+        $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->assertOk()->json('batch.id');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', true)->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.status', 'running');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 2)->assertJsonPath('batch.status', 'complete');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', false)->assertJsonPath('batch.completed', 2);
+        $this->assertDatabaseHas('countries', ['code' => 'FR', 'description' => 'Generated travel description.', 'hero_image' => '/images/countries/fr.webp']);
+        Http::assertSentCount(2);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_waiting_discovery_batch_processes_existing_items_directly(): void
+    {
+        [$sight, $batch, $city] = $this->sightBatch('running');
+        config()->set('services.openai.api_key', 'test-key');
+        DB::table('ai_content_batches')->where('id', $batch)->update(['category' => 'discover-sights']);
+        DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => (string) $city->id]);
+        $sight->delete();
+        Http::fake([
+            'api.openai.com/v1/responses' => fn ($request) => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => str_starts_with($request['input'], 'Identify')
+                ? '["Louvre", "Eiffel Tower", "Notre Dame", "Arc de Triomphe", "Sacre Coeur"]' : 'Saved sight description.']]]]]),
+            'api.openai.com/v1/images/generations' => Http::response($this->fakeImage()),
+        ]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.status', 'complete');
+        $this->assertDatabaseHas('sights', ['city_id' => $city->id, 'name' => 'Louvre', 'is_featured' => false]);
+        $louvre = Sight::where('name', 'Louvre')->first();
+        $this->assertSame('Saved sight description.', $louvre->description);
+        $this->assertNotEmpty($louvre->image_url);
+        $this->get($louvre->image_url)->assertOk();
+        Http::assertSentCount(11);
+    }
+
+    public function test_direct_processing_respects_pause_and_records_errors_for_retry(): void
+    {
+        [$sight, $batch] = $this->sightBatch('paused');
+        config()->set('services.openai.api_key', 'test-key');
+        $generator = $this->mock(AiStampGenerator::class);
+        $itemId = DB::table('ai_content_items')->where('batch_id', $batch)->value('id');
+        $generator->shouldReceive('generateMany')->once()->andReturn([$itemId => ['error' => new \RuntimeException('Image generation unavailable.')]]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', false);
+        $this->postJson("/admin/api/ai/{$batch}/resume")->assertOk();
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.failed', 1)->assertJsonPath('errors.0.error', 'Image generation unavailable.');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', false)->assertJsonPath('batch.failed', 1);
+    }
+
+    public function test_direct_processing_does_not_duplicate_work_when_another_page_holds_the_lock(): void
+    {
+        [$sight, $batch] = $this->sightBatch('running');
+        config()->set('services.openai.api_key', 'test-key');
+        $generator = $this->mock(AiStampGenerator::class);
+        $generator->shouldNotReceive('image');
+        $lock = Cache::store('database')->lock('ai-content-batch:'.$batch, 1200);
+        $this->assertTrue($lock->get());
+        try {
+            $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', false)->assertJsonPath('batch.completed', 0);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function test_parallel_group_saves_generated_images_and_descriptions_and_preserves_item_order(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('ai.concurrency', 3);
+        Http::fake([
+            'api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Generated description.']]]]]),
+            'api.openai.com/v1/images/generations' => Http::response($this->fakeImage()),
+        ]);
+        foreach (['AA', 'BB', 'CC', 'DD'] as $code) {
+            Country::create(['code' => $code, 'name' => 'Example '.$code, 'normalized_name' => 'example '.strtolower($code), 'continent_code' => 'EU']);
+        }
+        $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->assertOk()->json('batch.id');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 3)->assertJsonPath('batch.status', 'running');
+        foreach (['AA', 'BB', 'CC'] as $code) {
+            $country = Country::find($code);
+            $this->assertSame('Generated description.', $country->description);
+            $this->assertNotEmpty($country->hero_image);
+            $this->assertFileExists(public_path(ltrim($country->hero_image, '/')));
+            $this->get($country->hero_image)->assertOk();
+        }
+        $this->assertEmpty(Country::find('DD')->hero_image);
+        $this->getJson("/admin/api/ai/{$batch}/results")->assertJsonPath('results.data.0.targetId', 'AA')
+            ->assertJsonPath('results.data.1.targetId', 'BB')->assertJsonPath('results.data.2.targetId', 'CC');
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations')
+            && $request['output_format'] === 'webp' && str_contains($request['prompt'], 'deep forest-green ink'));
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 4)->assertJsonPath('batch.status', 'complete');
+        Http::assertSentCount(8);
+    }
+
+    public function test_failed_image_does_not_discard_description_or_block_other_parallel_items(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('ai.concurrency', 3);
+        Http::fake([
+            'api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Saved description.']]]]]),
+            'api.openai.com/v1/images/generations' => fn ($request) => Http::response(str_contains($request['prompt'], 'Example AA') ? ['data' => []] : $this->fakeImage()),
+        ]);
+        foreach (['AA', 'BB', 'CC'] as $code) {
+            Country::create(['code' => $code, 'name' => 'Example '.$code, 'normalized_name' => 'example '.strtolower($code), 'continent_code' => 'EU']);
+        }
+        $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->json('batch.id');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 2)->assertJsonPath('batch.failed', 1)
+            ->assertJsonPath('errors.0.error', 'The image model returned no readable image.');
+        $this->assertDatabaseHas('countries', ['code' => 'AA', 'description' => 'Saved description.']);
+        $this->assertNotEmpty(Country::find('BB')->hero_image);
+        $this->assertNotEmpty(Country::find('CC')->hero_image);
+    }
+
+    public function test_completed_discovery_can_fill_existing_sight_image_without_regenerating_description_or_names(): void
+    {
+        [$sight, $batch, $city] = $this->sightBatch();
+        config()->set('services.openai.api_key', 'test-key');
+        DB::table('ai_content_batches')->where('id', $batch)->update(['category' => 'discover-sights']);
+        DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => (string) $city->id]);
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response($this->fakeImage())]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/fill-missing")->assertOk()->assertJsonPath('batch.status', 'running')->assertJsonPath('batch.completed', 0);
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.status', 'complete');
+        $sight->refresh();
+        $this->assertSame('Old description', $sight->description);
+        $this->assertNotEmpty($sight->image_url);
+        $this->get($sight->image_url)->assertOk();
+        Http::assertSentCount(1);
+        $this->postJson("/admin/api/ai/{$batch}/fill-missing")->assertOk()->assertJsonPath('batch.status', 'complete')->assertJsonPath('batch.completed', 1);
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertJsonPath('processed', false);
+        Http::assertSentCount(1);
+    }
+
+    public function test_fill_missing_repairs_a_saved_image_url_whose_file_is_missing(): void
+    {
+        [$sight, $batch] = $this->sightBatch();
+        config()->set('services.openai.api_key', 'test-key');
+        DB::table('ai_content_batches')->where('id', $batch)->update(['category' => 'countries']);
+        DB::table('ai_content_items')->where('batch_id', $batch)->update(['target_id' => 'FR']);
+        Country::where('code', 'FR')->update(['description' => 'Reviewed description.', 'hero_image' => '/images/countries/missing.webp']);
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response($this->fakeImage())]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/fill-missing")->assertOk()->assertJsonPath('batch.status', 'running');
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 1);
+        $country = Country::find('FR');
+        $this->assertSame('Reviewed description.', $country->description);
+        $this->assertNotSame('/images/countries/missing.webp', $country->hero_image);
+        $this->get($country->hero_image)->assertOk();
+        Http::assertSentCount(1);
     }
 }

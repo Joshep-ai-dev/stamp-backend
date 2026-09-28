@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class AiStampGenerator
 {
@@ -100,32 +103,140 @@ PROMPT;
 
     public function image(string $category, string $name, string $folder, string $extra = ''): string
     {
+        return $this->storeImage($this->request('/images/generations', $this->imageBody($category, $name, $extra)), $folder);
+    }
+
+    public function generateMany(array $tasks): array
+    {
+        $results = array_fill_keys(array_keys($tasks), []);
+        $textRequests = [];
+        foreach ($tasks as $id => $task) {
+            if (($task['discover'] ?? false) || ($task['description'] ?? false)) {
+                $textRequests[$id] = [
+                    'path' => '/responses',
+                    'body' => ['model' => config('services.openai.text_model'), 'input' => ($task['discover'] ?? false)
+                        ? "Identify exactly five distinct, real, notable visitor sights within {$task['name']}. Return only a JSON array of five short sight names. Do not invent attractions or choose sights outside this city. No markdown."
+                        : "Write a factual 90–150 word travel description for the {$task['category']} {$task['name']}. Explain its location, significance, and visitor highlights in two short paragraphs. Return only the description."],
+                ];
+            }
+        }
+        foreach ($this->requestMany($textRequests) as $id => $response) {
+            try {
+                if ($response instanceof Throwable) {
+                    throw $response;
+                }
+                $text = collect($response['output'] ?? [])->flatMap(fn ($item) => $item['content'] ?? [])
+                    ->where('type', 'output_text')->pluck('text')->implode("\n");
+                if ($tasks[$id]['discover'] ?? false) {
+                    $names = json_decode(trim($text), true);
+                    if (! is_array($names) || count($names) !== 5 ||
+                        collect($names)->contains(fn ($name) => ! is_string($name) || trim($name) === '' || mb_strlen($name) > 150)) {
+                        throw new RuntimeException('Sight discovery did not return five distinct names.');
+                    }
+                    $names = array_values(array_map('trim', $names));
+                    if (count(array_unique($names)) !== 5) {
+                        throw new RuntimeException('Sight discovery did not return five distinct names.');
+                    }
+                    $results[$id]['names'] = $names;
+                } else {
+                    if (trim($text) === '') {
+                        throw new RuntimeException('The text model returned no description.');
+                    }
+                    $results[$id]['description'] = trim($text);
+                }
+            } catch (Throwable $exception) {
+                $results[$id]['error'] = $exception;
+            }
+        }
+        $imageRequests = [];
+        foreach ($tasks as $id => $task) {
+            if (($task['image'] ?? false) && ! isset($results[$id]['error'])) {
+                $imageRequests[$id] = ['path' => '/images/generations', 'body' => $this->imageBody($task['category'], $task['name'])];
+            }
+        }
+        foreach ($this->requestMany($imageRequests) as $id => $response) {
+            try {
+                if ($response instanceof Throwable) {
+                    throw $response;
+                }
+                $results[$id]['image'] = $this->storeImage($response, $tasks[$id]['folder']);
+            } catch (Throwable $exception) {
+                $results[$id]['error'] = $exception;
+            }
+        }
+
+        return $results;
+    }
+
+    private function imageBody(string $category, string $name, string $extra = ''): array
+    {
         $model = config('services.openai.image_model');
-        $response = $this->request('/images/generations', [
-            'model' => $model,
-            'prompt' => $this->imagePrompt($category, $name, $extra),
+
+        return [
+            'model' => $model, 'prompt' => $this->imagePrompt($category, $name, $extra),
             'size' => str_starts_with($model, 'gpt-image-2') ? '1200x800' : '1536x1024',
-            'quality' => 'high',
-        ]);
+            'quality' => 'high', 'output_format' => 'webp', 'output_compression' => 60,
+        ];
+    }
+
+    private function requestMany(array $requests): array
+    {
+        if (! $requests) {
+            return [];
+        }
+        $key = config('services.openai.api_key');
+        if (! $key) {
+            throw new RuntimeException('OPENAI_API_KEY is missing.');
+        }
+        $responses = Http::pool(function (Pool $pool) use ($requests, $key): void {
+            foreach ($requests as $id => $request) {
+                $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000)
+                    ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], $request['body']);
+            }
+        }, max(1, min(5, (int) config('ai.concurrency', 3))));
+        $results = [];
+        foreach ($responses as $id => $response) {
+            try {
+                if ($response instanceof Throwable) {
+                    throw $response;
+                }
+                $results[$id] = $this->responseData($response);
+            } catch (Throwable $exception) {
+                $results[$id] = $exception;
+            }
+        }
+
+        return $results;
+    }
+
+    public function storeImage(array $response, string $folder): string
+    {
         $encoded = $response['data'][0]['b64_json'] ?? null;
-        $sourceBytes = $encoded ? base64_decode($encoded, true) : false;
-        if (! $sourceBytes || ! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
-            throw new RuntimeException('Image generation or PHP GD WebP support is unavailable.');
+        $bytes = $encoded ? base64_decode($encoded, true) : false;
+        $details = $bytes ? @getimagesizefromstring($bytes) : false;
+        $extension = match ($details['mime'] ?? '') {
+            'image/webp' => 'webp', 'image/png' => 'png', 'image/jpeg' => 'jpg', default => null,
+        };
+        if (! $bytes || ! $extension) {
+            throw new RuntimeException('The image model returned no readable image.');
         }
-        $source = @imagecreatefromstring($sourceBytes);
-        if (! $source) {
-            throw new RuntimeException('The image model returned an unreadable image.');
-        }
-        try {
-            $bytes = $this->smallWebp($source);
-        } finally {
-            imagedestroy($source);
+        if (function_exists('imagecreatefromstring') && function_exists('imagewebp') && ($extension !== 'webp' || strlen($bytes) >= 299000)) {
+            $source = @imagecreatefromstring($bytes);
+            if (! $source) {
+                throw new RuntimeException('The image model returned an unreadable image.');
+            }
+            try {
+                $bytes = $this->smallWebp($source);
+                $extension = 'webp';
+            } finally {
+                imagedestroy($source);
+            }
         }
         $directory = public_path('images/'.$folder);
         if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
             throw new RuntimeException('Could not create the image directory.');
         }
-        $filename = Str::uuid().'.webp';
+        $filename = Str::uuid().'.'.$extension;
         if (file_put_contents($directory.'/'.$filename, $bytes) === false) {
             throw new RuntimeException('Could not store the generated image.');
         }
@@ -167,11 +278,21 @@ PROMPT;
             throw new RuntimeException('OPENAI_API_KEY is missing.');
         }
         $response = Http::withToken($key)->acceptJson()->timeout(180)->retry(3, 2000)
-            ->post('https://api.openai.com/v1'.$path, $body);
+            ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$path, $body);
+
+        return $this->responseData($response);
+    }
+
+    private function responseData(Response $response): array
+    {
         if (! $response->successful()) {
             throw new RuntimeException('OpenAI API returned HTTP '.$response->status().': '.Str::limit((string) ($response->json('error.message') ?? $response->body()), 300));
         }
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw new RuntimeException('OpenAI returned an invalid JSON response.');
+        }
 
-        return $response->json();
+        return $data;
     }
 }

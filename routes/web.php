@@ -24,10 +24,13 @@ Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
     Route::get('/ai', [AdminAiController::class, 'index']);
     Route::post('/ai', [AdminAiController::class, 'start']);
+    Route::delete('/ai/{id}/items/{itemId}', [AdminAiController::class, 'removeItem']);
     Route::put('/ai/{id}/content/{target}', [AdminAiController::class, 'updateContent']);
     Route::delete('/ai/{id}/content/{target}', [AdminAiController::class, 'removeContent']);
     Route::get('/ai/{id}/results', [AdminAiController::class, 'results']);
     Route::get('/ai/{id}', [AdminAiController::class, 'show']);
+    Route::post('/ai/{id}/fill-missing', [AdminAiController::class, 'fillMissing']);
+    Route::post('/ai/{id}/process', [AdminAiController::class, 'process']);
     Route::post('/ai/{id}/pause', [AdminAiController::class, 'pause']);
     Route::post('/ai/{id}/resume', [AdminAiController::class, 'resume']);
     Route::get('/meta', [AdminController::class, 'meta']);

@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\DiscoverAiSights;
-use App\Jobs\GenerateAiContent;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\Sight;
+use App\Services\AiBatchRunner;
 use App\Services\CountryResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -32,18 +31,11 @@ class AdminAiController extends Controller
 
     public function index(): JsonResponse
     {
-        $waitingForWorker = DB::table('ai_content_batches')
-            ->where('status', 'running')->where('completed', 0)->where('failed', 0)
-            ->where('created_at', '<', now()->subMinutes(2))
-            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('ai_content_items')
-                ->whereColumn('ai_content_items.batch_id', 'ai_content_batches.id')
-                ->where('ai_content_items.status', 'working'))
-            ->exists();
-
         return response()->json([
             'configured' => filled(config('services.openai.api_key')),
+            'concurrency' => max(1, min(5, (int) config('ai.concurrency', 3))),
             'batches' => DB::table('ai_content_batches')->orderByDesc('id')->limit(20)->get(),
-            'waitingForWorker' => $waitingForWorker,
+            'nextBatchId' => DB::table('ai_content_batches')->where('status', 'running')->orderBy('id')->value('id'),
         ]);
     }
 
@@ -102,6 +94,29 @@ class AdminAiController extends Controller
         }));
 
         return response()->json(['batch' => $batch, 'results' => $items]);
+    }
+
+    public function removeItem(int $id, int $itemId): Response
+    {
+        DB::transaction(function () use ($id, $itemId): void {
+            $batch = DB::table('ai_content_batches')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($batch, 404);
+            $item = DB::table('ai_content_items')->where('batch_id', $id)->where('id', $itemId)->lockForUpdate()->first();
+            abort_unless($item, 404);
+            abort_if($item->status === 'working' || ($item->status === 'queued' && $batch->status === 'running'),
+                409, 'Pause the batch and wait for this item to finish before removing it.');
+            $total = max(0, $batch->total - 1);
+            $completed = max(0, $batch->completed - ($item->status === 'complete' ? 1 : 0));
+            $failed = max(0, $batch->failed - ($item->status === 'failed' ? 1 : 0));
+            DB::table('ai_content_items')->where('id', $itemId)->delete();
+            DB::table('ai_content_batches')->where('id', $id)->update([
+                'total' => $total, 'completed' => $completed, 'failed' => $failed,
+                'status' => $completed + $failed >= $total ? 'complete' : $batch->status,
+                'updated_at' => now(),
+            ]);
+        });
+
+        return response()->noContent();
     }
 
     public function updateContent(Request $request, int $id, string $target): JsonResponse
@@ -208,7 +223,6 @@ class AdminAiController extends Controller
 
     public function start(Request $request): JsonResponse
     {
-        abort_unless(config('queue.default') !== 'sync', 503, 'Set QUEUE_CONNECTION=database and start a queue worker.');
         abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
         $data = $request->validate([
             'category' => ['required', Rule::in(['countries', 'states', 'cities', 'sights', 'discover-sights'])],
@@ -244,10 +258,97 @@ class AdminAiController extends Controller
                 'created_at' => now(), 'updated_at' => now(),
             ], $chunk));
         }
-        DB::table('ai_content_items')->where('batch_id', $batchId)->orderBy('id')->pluck('id')
-            ->each(fn ($id) => $this->dispatch($category, $id));
 
         return $this->show($batchId);
+    }
+
+    public function fillMissing(int $id): JsonResponse
+    {
+        $batch = DB::table('ai_content_batches')->find($id);
+        abort_unless($batch, 404);
+        abort_if($batch->status === 'running' || DB::table('ai_content_items')->where('batch_id', $id)->where('status', 'working')->exists(),
+            409, 'Pause this batch and wait for active generation to finish first.');
+        $missing = [];
+        DB::table('ai_content_items')->where('batch_id', $id)->orderBy('id')->chunkById(100, function ($items) use ($batch, &$missing): void {
+            $query = match ($batch->category) {
+                'countries' => Country::query(), 'states' => CountryState::query(),
+                'cities' => City::query(), 'sights' => Sight::query(), 'discover-sights' => City::with('sights'),
+            };
+            $key = $batch->category === 'countries' ? 'code' : 'id';
+            $models = $query->whereIn($key, $items->pluck('target_id'))->get()->keyBy($key);
+            foreach ($items as $item) {
+                $model = $models->get($item->target_id);
+                if (! $model) {
+                    continue;
+                }
+                $records = $batch->category === 'discover-sights' ? $model->sights : collect([$model]);
+                $needsContent = $batch->category === 'discover-sights' && $records->isEmpty();
+                foreach ($records as $record) {
+                    $imageField = $record instanceof Country ? 'hero_image' : 'image_url';
+                    if (! $this->imageAvailable($record->{$imageField})) {
+                        $record->{$imageField} = '';
+                        $record->save();
+                        $needsContent = true;
+                    }
+                    $needsContent = $needsContent || blank($record->description);
+                }
+                if ($needsContent) {
+                    $missing[] = $item->id;
+                }
+            }
+        });
+        DB::transaction(function () use ($id, $missing): void {
+            foreach (array_chunk($missing, 400) as $chunk) {
+                DB::table('ai_content_items')->where('batch_id', $id)->whereIn('id', $chunk)
+                    ->update(['status' => 'queued', 'error' => null, 'updated_at' => now()]);
+            }
+            $counts = DB::table('ai_content_items')->where('batch_id', $id)->selectRaw('status, count(*) as count')->groupBy('status')->pluck('count', 'status');
+            DB::table('ai_content_batches')->where('id', $id)->update([
+                'status' => $missing ? 'running' : 'complete', 'completed' => $counts['complete'] ?? 0,
+                'failed' => $counts['failed'] ?? 0, 'updated_at' => now(),
+            ]);
+        });
+
+        return $this->show($id);
+    }
+
+    private function imageAvailable(?string $image): bool
+    {
+        if (blank($image)) {
+            return false;
+        }
+        $host = parse_url($image, PHP_URL_HOST);
+        if ($host && ! in_array(strtolower($host), array_filter([
+            'localhost', '127.0.0.1', strtolower(request()->getHost()),
+            strtolower((string) parse_url(config('app.url'), PHP_URL_HOST)),
+        ]), true)) {
+            return true;
+        }
+        $path = rawurldecode((string) parse_url($image, PHP_URL_PATH));
+        if (str_contains($path, '..')) {
+            return false;
+        }
+        $file = match (true) {
+            str_starts_with($path, '/storage/images/') => storage_path('app/public/images/'.basename($path)),
+            str_starts_with($path, '/images/') => public_path(ltrim($path, '/')),
+            default => null,
+        };
+
+        return $file ? is_file($file) && @getimagesize($file) !== false : true;
+    }
+
+    public function process(int $id, AiBatchRunner $runner): JsonResponse
+    {
+        abort_unless(DB::table('ai_content_batches')->where('id', $id)->exists(), 404);
+        abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(1200);
+        }
+        ignore_user_abort(true);
+        $processed = $runner->processNext($id);
+        $data = $this->show($id)->getData(true);
+
+        return response()->json([...$data, 'processed' => $processed]);
     }
 
     public function pause(int $id): JsonResponse
@@ -267,8 +368,6 @@ class AdminAiController extends Controller
         DB::table('ai_content_items')->where('batch_id', $id)->where('status', 'failed')
             ->update(['status' => 'queued', 'error' => null, 'updated_at' => now()]);
         DB::table('ai_content_batches')->where('id', $id)->update(['failed' => 0]);
-        DB::table('ai_content_items')->where('batch_id', $id)->whereIn('status', ['queued', 'working'])
-            ->orderBy('id')->pluck('id')->each(fn ($itemId) => $this->dispatch($batch->category, $itemId));
         DB::table('ai_content_batches')->where('id', $id)->whereRaw('completed >= total')
             ->update(['status' => 'complete', 'updated_at' => now()]);
 
@@ -391,14 +490,5 @@ class AdminAiController extends Controller
 
             return array_values($ids);
         });
-    }
-
-    private function dispatch(string $category, int $itemId): void
-    {
-        if ($category === 'discover-sights') {
-            DiscoverAiSights::dispatch($itemId)->onQueue('ai-content');
-        } else {
-            GenerateAiContent::dispatch($itemId)->onQueue('ai-content');
-        }
     }
 }

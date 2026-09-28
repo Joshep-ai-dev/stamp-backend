@@ -462,8 +462,6 @@
     .ai-progress { height: 7px; overflow: hidden; border-radius: 100px; background: #264637 }
     .ai-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #47ba88, #a8e5a0) }
     .ai-errors { margin-top: 12px; padding: 12px; border-radius: 9px; background: #442a26; color: #ffd8c7; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere }
-    .ai-worker-warning { padding: 14px 18px; border: 1px solid #a66b43; border-radius: 11px; background: #483323; color: #ffe0bc; line-height: 1.5 }
-    .ai-worker-warning[hidden] { display: none }
     @media(max-width:1100px) { .ai-grid { grid-template-columns: 1fr } }
     @media(max-width:760px) {
       .top { align-items: flex-start; flex-wrap: wrap }
@@ -496,6 +494,9 @@
     .ai-results { margin-top: 14px; color: var(--ink); }
     .ai-results-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     .ai-results-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+    .ai-city-entry { position: relative; }
+    .ai-city-entry .ai-result-group > summary { padding-right: 90px; min-height: 43px; }
+    .ai-city-remove { position: absolute; top: 7px; right: 0; padding: 5px 9px; font-size: 12px; }
     .ai-result-group { border-top: 1px solid var(--line); }
     .ai-result-group > summary { cursor: pointer; padding: 11px 0; color: var(--ink); font-weight: 600; }
     .ai-result-group > summary small { margin-left: 8px; color: var(--muted); font-weight: 400; }
@@ -512,6 +513,7 @@
     .ai-description[open] summary span { display: none; }
     .ai-description[open] summary strong::after { content: ' · Collapse'; }
     .ai-description p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #f8ead4; }
+    .ai-image-error { display: block; padding: 8px; color: var(--danger); font-size: 12px; }
     .ai-result-actions { display: flex; gap: 6px; }
     .ai-result-actions button { padding: 6px 9px; font-size: 12px; }
     .ai-result-row .ai-image-empty { display: grid; place-items: center; width: 120px; height: 80px; padding: 8px; background: #143a2c; border: 1px dashed #426451; color: #b6c9c0; border-radius: 7px; font-size: 12px; }
@@ -528,7 +530,8 @@
     @media(max-width:700px) {
       .ai-result-row { grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
       .ai-result-row .image-trigger, .ai-result-row .ai-image-empty { width: 90px; height: 60px; }
-      .ai-result-actions { grid-column: 2; }
+      .ai-image-error { display: block; padding: 8px; color: var(--danger); font-size: 12px; }
+    .ai-result-actions { grid-column: 2; }
       .ai-toolbar-form .field { flex-basis: 100%; }
       .ai-batch-top { flex-wrap: wrap; }
     }
@@ -688,6 +691,7 @@
     ];
     const aiResultPages = new Map();
     let aiRefreshing = false;
+    let aiRunning = false;
     const aiContentCache = new Map();
     const aiOpenDetails = new Map();
     let aiEditing = null;
@@ -710,15 +714,16 @@
           </form>
           <p id="aiCsv" class="ai-help">Oxford 2026 · Project list of 1,000 cities.</p>
           <p id="aiCategoryHelp" class="ai-help"></p>
+          <p id="aiRunStatus" class="ai-help" role="status">Keep this page open while batches run.</p>
         </section>
-        <div id="aiWorkerWarning" class="ai-worker-warning" role="alert" ${data.waitingForWorker ? '' : 'hidden'}>Batches are waiting for the AI worker. Start the server’s AI queue worker to continue.</div>
         <section class="ai-batches" aria-labelledby="aiBatchesTitle">
-          <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches()">Refresh</button></div>
+          <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches();runAiBatches()">Refresh</button></div>
           <div id="aiBatches" class="ai-batch-list"></div>
         </section>`;
       selectAiCategory(aiCategory);
       renderAiBatches(data.batches);
       note('');
+      void runAiBatches();
     }
     function selectAiCategory(category) {
       aiCategory = category;
@@ -734,7 +739,7 @@
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
       document.querySelector('#aiCategoryHelp').textContent = category === 'discover-sights'
-        ? 'New sight candidates stay hidden from app lists until you review and feature them in Top sights.'
+        ? 'Discover sights and generate their descriptions and images. Review and approve them before showing them in app lists.'
         : category === 'sights' ? 'Only approved sights shown in app lists are included.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
       form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Discover sights' : 'Start batch';
@@ -748,8 +753,37 @@
         const percent = b.total ? Math.round(processed / b.total * 100) : 100;
         const action = b.status === 'running' ? `<button onclick="aiAction(${b.id},'pause')">Pause</button>`
           : (b.status === 'paused' || Number(b.failed) > 0) ? `<button onclick="aiAction(${b.id},'resume')">${b.status === 'paused' ? 'Resume' : 'Retry failed'}</button>` : '';
-        return `<article class="ai-batch"><div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} · ${b.completed} complete · ${b.failed} failed · ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">View results</button>${action}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div><div id="aiDetails-${b.id}" hidden></div></article>`;
+        return `<article class="ai-batch"><div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} · ${b.completed} complete · ${b.failed} failed · ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">View results</button>${action}${b.status === 'complete' ? `<button onclick="aiAction(${b.id},'fill-missing')">Generate missing content</button>` : ''}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div><div id="aiDetails-${b.id}" hidden></div></article>`;
       }).join('') : '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
+    }
+    async function runAiBatches() {
+      if (aiRunning || state.tab !== 'ai') return;
+      aiRunning = true;
+      try {
+        while (state.tab === 'ai') {
+          if (aiMutating || document.querySelector('#aiContentEditor').open) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          const data = await call('/admin/api/ai');
+          if (state.tab !== 'ai') break;
+          const batch = data.nextBatchId ? { id: data.nextBatchId } : data.batches.filter(b => b.status === 'running').sort((a, b) => a.id - b.id)[0];
+          if (!batch) {
+            document.querySelector('#aiRunStatus').textContent = 'No batches running. Start or resume a batch to continue.';
+            break;
+          }
+          document.querySelector('#aiRunStatus').textContent = `Processing batch #${batch.id} · ${data.concurrency || 3} parallel generations · Keep this page open.`;
+          const result = await call(`/admin/api/ai/${batch.id}/process`, { method: 'POST' });
+          if (state.tab !== 'ai') break;
+          await refreshAiBatches();
+          if (!result.processed) await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      } catch (error) {
+        if (state.tab === 'ai') {
+          document.querySelector('#aiRunStatus').textContent = 'Processing stopped. Refresh to continue.';
+          note(error.message, true);
+        }
+      } finally { aiRunning = false }
     }
     async function refreshAiBatches() {
       if (aiRefreshing || aiMutating || document.querySelector('#aiContentEditor').open) return;
@@ -762,7 +796,6 @@
           aiOpenDetails.set(id, new Set([...panel.querySelectorAll('details[open]')].map(x => x.dataset.groupKey || x.dataset.descriptionKey)));
         });
         renderAiBatches(data.batches);
-        document.querySelector('#aiWorkerWarning').hidden = !data.waitingForWorker;
         await Promise.all(data.batches.filter(b => aiResultPages.has(b.id)).map(b => showAiBatch(b.id, aiResultPages.get(b.id))));
       } catch (error) { note(error.message, true) }
       finally { aiRefreshing = false }
@@ -778,8 +811,9 @@
         const data = await response.json();
         if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join(' ') || data.message || 'Could not start batch.');
         await refreshAiBatches();
-        note(`Batch #${data.batch.id} started. ${data.batch.total} items queued.`);
+        note(`Batch #${data.batch.id} started. ${data.batch.total} items ready.`);
         await showAiBatch(data.batch.id);
+        void runAiBatches();
       } catch (error) { note(error.message, true) }
       finally { button.disabled = false }
     }
@@ -790,7 +824,7 @@
       const disabled = item.status === 'working' || (item.status === 'queued' && batch.status === 'running');
       const actionKey = esc(JSON.stringify(key));
       return `<article class="ai-result-row">
-        ${content.image ? imagePreview(content.image, content.name) : '<div class="ai-image-empty">No image</div>'}
+        ${content.image ? imagePreview(content.image, content.name).replace('<img ', '<img onerror="this.parentElement.innerHTML=\'<span class=ai-image-error>Image could not load</span>\'" ') : '<div class="ai-image-empty">No image</div>'}
         <div class="ai-result-text"><h4>${esc(content.name)}</h4><small>${esc(item.location || item.name)} · ${esc(item.status)}${sight ? ` · ${content.isFeatured ? 'Approved' : 'Needs review'}` : ''}</small>
           ${content.description ? `<details class="ai-description" data-description-key="${esc(key)}"><summary><span>${esc(content.description.replace(/\s+/g, ' '))}</span><strong>Full description</strong></summary><p>${esc(content.description)}</p></details>` : '<p class="ai-no-description">No description yet</p>'}
           ${item.error ? `<p class="notice error">${esc(item.error)}</p>` : ''}</div>
@@ -808,11 +842,12 @@
         panel.hidden = false;
         panel.className = 'ai-results';
         const results = data.results;
+        if (page > results.last_page) return showAiBatch(id, results.last_page);
         const discovery = data.batch.category === 'discover-sights';
-        panel.innerHTML = `<div class="ai-results-heading"><p>${discovery ? 'Review sights by city. Open a city to edit, approve, or remove its sights.' : 'Saved images and descriptions. Click an image to zoom.'}</p><button onclick="closeAiResults(${id})">Close results</button></div>
+        panel.innerHTML = `<div class="ai-results-heading"><p>${discovery ? 'Open a city to review its sights. Remove takes a city out of this batch.' : 'Saved images and descriptions. Click an image to zoom.'}</p><button onclick="closeAiResults(${id})">Close results</button></div>
           ${results.data.map((item, index) => {
             const rows = item.content.map(content => aiContentRow(data.batch, item, content)).join('') || `<p class="ai-help">${esc(item.error || (discovery ? 'No sights saved yet.' : 'Catalog record removed.'))}</p>`;
-            return discovery ? `<details class="ai-result-group" data-group-key="city-${id}-${item.id}" ${openDetails.has(`city-${id}-${item.id}`) || (!wasOpen && index === 0) ? 'open' : ''}><summary>${esc(item.name)}<small>${esc(item.location || '')} · ${item.content.length} sights · ${esc(item.status)}</small></summary>${rows}</details>` : rows;
+            return discovery ? `<div class="ai-city-entry"><details class="ai-result-group" data-group-key="city-${id}-${item.id}" ${openDetails.has(`city-${id}-${item.id}`) || (!wasOpen && index === 0) ? 'open' : ''}><summary>${esc(item.name)}<small>${esc(item.location || '')} · ${item.content.length} sights · ${esc(item.status)}</small></summary>${rows}</details><button class="danger ai-city-remove" title="Remove this city from the batch" onclick="removeAiBatchItem(${id},${item.id},${esc(JSON.stringify(item.name))})" ${item.status === 'working' || (item.status === 'queued' && data.batch.status === 'running') ? 'disabled' : ''}>Remove</button></div>` : rows;
           }).join('') || '<p class="ai-help">No items in this batch.</p>'}
           <div class="ai-result-pagination"><button onclick="showAiBatch(${id},${page - 1})" ${page <= 1 ? 'disabled' : ''}>Previous</button><span>Page ${results.current_page} of ${results.last_page} · ${results.total} items</span><button onclick="showAiBatch(${id},${page + 1})" ${page >= results.last_page ? 'disabled' : ''}>Next</button></div>`;
         panel.querySelectorAll('[data-description-key]').forEach(x => { x.open = openDetails.has(x.dataset.descriptionKey) });
@@ -886,11 +921,24 @@
       } catch (error) { note(error.message, true) }
       finally { aiMutating = false }
     }
+    async function removeAiBatchItem(id, itemId, name) {
+      if (aiMutating) return;
+      if (!confirm(`Remove “${name}” from this batch? Its saved city and sights remain in the catalog.`)) return;
+      aiMutating = true;
+      try {
+        await call(`/admin/api/ai/${id}/items/${itemId}`, { method: 'DELETE' });
+        aiOpenDetails.delete(id);
+        aiMutating = false;
+        await refreshAiBatches();
+        note('City removed from this batch.');
+      } catch (error) { note(error.message, true) }
+      finally { aiMutating = false }
+    }
     async function aiAction(id, action) {
-      try { await call(`/admin/api/ai/${id}/${action}`, { method: 'POST' }); await refreshAiBatches(); await showAiBatch(id) }
+      try { await call(`/admin/api/ai/${id}/${action}`, { method: 'POST' }); await refreshAiBatches(); await showAiBatch(id); void runAiBatches() }
       catch (error) { note(error.message, true) }
     }
-    setInterval(() => { if (state.tab === 'ai' && document.visibilityState === 'visible') refreshAiBatches() }, 15000);
+    setInterval(() => { if (state.tab === 'ai' && document.visibilityState === 'visible') { void refreshAiBatches(); void runAiBatches() } }, 15000);
     function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
     function render() { const names = { 'countries': 'Country hero images', 'cities': 'Cities', 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Kroo IQ lessons and questions' }; title.textContent = names[state.tab]; document.querySelector('#addButton').style.display = ['countries', 'cities'].includes(state.tab) ? 'none' : ''; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'sights' ? !filter || row.countryCode === filter : state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; const cityTools = state.tab === 'cities' ? `<div class="city-tools"><div class="city-search-row"><input id="citySearch" type="search" value="${esc(filter)}" placeholder="Search city, state, or country" aria-label="Search cities" onkeydown="if(event.key === 'Enter'){event.preventDefault();submitCitySearch()}"><button class="primary" onclick="withButtonLoading(this, &quot;Searching...&quot;, () => submitCitySearch())">Search</button>${filter ? `<button onclick="withButtonLoading(this, &quot;Clearing...&quot;, () => clearCitySearch())">Clear</button>` : ''}<button class="primary" onclick="openEditor()">+ Add new</button></div><div class="city-pagination"><span>${state.paging.total} records</span><button ${state.paging.currentPage <= 1 ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(-1))">Previous</button><span>Page ${state.paging.currentPage} of ${state.paging.lastPage}</span><button ${state.paging.currentPage >= state.paging.lastPage ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(1))">Next</button></div></div>` : ''; const krooIqHelp = state.tab === 'daily-destinations' ? '<small>Each record is one Kroo IQ question. The app uses up to five published records for the selected quiz date.</small>' : ''; summary.innerHTML = `<div class="summarybar">${cityTools || `<span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records ${krooIqHelp}</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}`}</div>`; const cols = state.tab === 'countries' ? ['heroImage', 'code', 'name'] : state.tab === 'cities' ? ['imageUrl', 'name', 'country', 'state', 'population', 'latitude', 'longitude'] : state.tab === 'sights' ? ['image', 'name', 'country', 'state', 'city'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'city', 'question', 'publishDate']; const numberOffset = state.tab === 'cities' ? (state.paging.currentPage - 1) * state.paging.perPage : 0; table.innerHTML = `<table><thead><tr><th>No.</th>${cols.map(x => `<th>${esc(({heroImage:'Image',imageUrl:'Image',collectionKind:'Collection',publishDate:'Available from'})[x] || x.replace(/([A-Z])/g, ' $1'))}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }, displayIndex) => `<tr><td>${numberOffset + displayIndex + 1}</td>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button>${state.tab === 'countries' ? '' : `<button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${i}))">Delete</button>`}</div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>` }
     const renderDefaultResource = render;

@@ -5,16 +5,16 @@ namespace App\Jobs;
 use App\Models\City;
 use App\Models\Sight;
 use App\Services\AiStampGenerator;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
 
-class DiscoverAiSights implements ShouldQueue, ShouldBeUnique
+class DiscoverAiSights implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -37,6 +37,19 @@ class DiscoverAiSights implements ShouldQueue, ShouldBeUnique
     }
 
     public function handle(AiStampGenerator $generator): void
+    {
+        $lock = Cache::store('database')->lock('ai-content-item:'.$this->itemId, 1200);
+        if (! $lock->get()) {
+            return;
+        }
+        try {
+            $this->generate($generator);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function generate(AiStampGenerator $generator): void
     {
         $item = DB::table('ai_content_items')->find($this->itemId);
         if (! $item || $item->status === 'complete') {
@@ -66,7 +79,7 @@ class DiscoverAiSights implements ShouldQueue, ShouldBeUnique
     public function failed(Throwable $exception): void
     {
         $item = DB::table('ai_content_items')->find($this->itemId);
-        if (! $item || $item->status === 'failed') {
+        if (! $item || in_array($item->status, ['complete', 'failed'], true)) {
             return;
         }
         DB::transaction(function () use ($item, $exception): void {
