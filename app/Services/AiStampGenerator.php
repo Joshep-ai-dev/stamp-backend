@@ -14,6 +14,11 @@ use UnexpectedValueException;
 
 class AiStampGenerator
 {
+    public static function concurrency(): int
+    {
+        return max(1, min(12, (int) config('ai.concurrency', 8)));
+    }
+
     public function sights(string $city, string $country): array
     {
         $response = $this->request('/responses', [
@@ -157,14 +162,16 @@ PROMPT;
                 $imageRequests[$id] = ['path' => '/images/generations', 'body' => $this->imageBody($task['category'], $task['name'])];
             }
         }
-        foreach ($this->requestMany($imageRequests) as $id => $response) {
-            try {
-                if ($response instanceof Throwable) {
-                    throw $response;
+        foreach (array_chunk($imageRequests, self::concurrency(), true) as $group) {
+            foreach ($this->requestMany($group) as $id => $response) {
+                try {
+                    if ($response instanceof Throwable) {
+                        throw $response;
+                    }
+                    $results[$id]['image'] = $this->storeImage($response, $tasks[$id]['folder']);
+                } catch (Throwable $exception) {
+                    $results[$id]['error'] = $exception;
                 }
-                $results[$id]['image'] = $this->storeImage($response, $tasks[$id]['folder']);
-            } catch (Throwable $exception) {
-                $results[$id]['error'] = $exception;
             }
         }
 
@@ -199,7 +206,7 @@ PROMPT;
                     $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000)
                         ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($request['body'], ['stream' => false]));
                 }
-            }, max(1, min(5, (int) config('ai.concurrency', 3))));
+            }, self::concurrency());
             $retry = [];
             foreach ($responses as $id => $response) {
                 try {

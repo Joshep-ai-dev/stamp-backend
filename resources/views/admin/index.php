@@ -826,7 +826,7 @@
             document.querySelector('#aiRunStatus').textContent = 'No batches running. Start or resume a batch to continue.';
             break;
           }
-          document.querySelector('#aiRunStatus').textContent = `Processing batch #${batch.id} · ${data.concurrency || 3} parallel generations · Keep this page open.`;
+          document.querySelector('#aiRunStatus').textContent = `Processing batch #${batch.id} · ${data.concurrency || 8} parallel generations · Keep this page open.`;
           const result = await call(`/admin/api/ai/${batch.id}/process`, { method: 'POST' });
           if (state.tab !== 'ai') break;
           await refreshAiBatches();

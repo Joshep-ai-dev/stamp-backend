@@ -32,7 +32,7 @@ class AiBatchRunner
             }
             $items = DB::table('ai_content_items')->where('batch_id', $id)
                 ->whereIn('status', ['queued', 'working'])->orderBy('id')
-                ->limit(max(1, min(5, (int) config('ai.concurrency', 3))))->get();
+                ->limit(AiStampGenerator::concurrency())->get();
             if ($items->isEmpty()) {
                 $this->finishBatch($id);
 

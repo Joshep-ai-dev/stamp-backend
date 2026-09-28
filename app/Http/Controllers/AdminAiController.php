@@ -7,6 +7,7 @@ use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\Sight;
 use App\Services\AiBatchRunner;
+use App\Services\AiStampGenerator;
 use App\Services\CountryResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -38,7 +39,7 @@ class AdminAiController extends Controller
 
         return response()->json([
             'configured' => filled(config('services.openai.api_key')),
-            'concurrency' => max(1, min(5, (int) config('ai.concurrency', 3))),
+            'concurrency' => AiStampGenerator::concurrency(),
             'batches' => $batches->sortByDesc('id')->values(),
             'nextBatchId' => DB::table('ai_content_batches')->where('status', 'running')->orderBy('id')->value('id'),
         ]);

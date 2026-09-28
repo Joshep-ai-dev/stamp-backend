@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AdminAiAutomationTest extends TestCase
@@ -151,6 +152,16 @@ class AdminAiAutomationTest extends TestCase
         $this->get($image)->assertOk();
         Http::assertSentCount(2);
         $this->assertCount(1, File::files(public_path('images/countries')));
+    }
+
+    public function test_parallel_limit_is_reported_consistently_and_capped_at_twelve(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        foreach ([8 => 8, 99 => 12, 0 => 1] as $configured => $expected) {
+            config()->set('ai.concurrency', $configured);
+            $this->withHeader('X-Admin-Key', 'test-admin-key')->getJson('/admin/api/ai')->assertOk()->assertJsonPath('concurrency', $expected);
+            $this->assertSame($expected, AiStampGenerator::concurrency());
+        }
     }
 
     public function test_recent_batches_are_limited_per_section_with_sight_categories_merged(): void
@@ -483,34 +494,41 @@ class AdminAiAutomationTest extends TestCase
         }
     }
 
-    public function test_parallel_group_saves_generated_images_and_descriptions_and_preserves_item_order(): void
+    public static function parallelLimits(): array
+    {
+        return ['three at a time' => [3], 'eight at a time' => [8]];
+    }
+
+    #[DataProvider('parallelLimits')]
+    public function test_parallel_group_saves_generated_images_and_descriptions_and_preserves_item_order(int $concurrency): void
     {
         config()->set('services.stampo.admin_key', 'test-admin-key');
         config()->set('services.openai.api_key', 'test-key');
-        config()->set('ai.concurrency', 3);
+        config()->set('ai.concurrency', $concurrency);
         Http::fake([
             'api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Generated description.']]]]]),
             'api.openai.com/v1/images/generations' => Http::response($this->fakeImage()),
         ]);
-        foreach (['AA', 'BB', 'CC', 'DD'] as $code) {
+        $codes = array_map(fn ($index) => str_repeat(chr(65 + $index), 2), range(0, $concurrency));
+        foreach ($codes as $code) {
             Country::create(['code' => $code, 'name' => 'Example '.$code, 'normalized_name' => 'example '.strtolower($code), 'continent_code' => 'EU']);
         }
         $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->assertOk()->json('batch.id');
-        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 3)->assertJsonPath('batch.status', 'running');
-        foreach (['AA', 'BB', 'CC'] as $code) {
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', $concurrency)->assertJsonPath('batch.status', 'running');
+        foreach (array_slice($codes, 0, $concurrency) as $code) {
             $country = Country::find($code);
             $this->assertSame('Generated description.', $country->description);
             $this->assertNotEmpty($country->hero_image);
             $this->assertFileExists(public_path(ltrim($country->hero_image, '/')));
             $this->get($country->hero_image)->assertOk();
         }
-        $this->assertEmpty(Country::find('DD')->hero_image);
+        $this->assertEmpty(Country::find($codes[$concurrency])->hero_image);
         $this->getJson("/admin/api/ai/{$batch}/results")->assertJsonPath('results.data.0.targetId', 'AA')
             ->assertJsonPath('results.data.1.targetId', 'BB')->assertJsonPath('results.data.2.targetId', 'CC');
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations')
             && $request['output_format'] === 'webp' && str_contains($request['prompt'], 'deep forest-green ink'));
-        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 4)->assertJsonPath('batch.status', 'complete');
-        Http::assertSentCount(8);
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', $concurrency + 1)->assertJsonPath('batch.status', 'complete');
+        Http::assertSentCount(($concurrency + 1) * 2);
     }
 
     public function test_failed_image_does_not_discard_description_or_block_other_parallel_items(): void
