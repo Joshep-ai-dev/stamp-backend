@@ -44,6 +44,46 @@ class AdminAiAutomationTest extends TestCase
         return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
     }
 
+    public function test_text_requests_reduce_reasoning_and_limit_tokens_without_changing_description_prompt(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('services.openai.text_model', 'gpt-5-mini');
+        Http::fake(['api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Description.']]]]])]);
+        app(AiStampGenerator::class)->description('Country', 'France');
+        app(AiStampGenerator::class)->generateMany(['x' => ['category' => 'Country', 'name' => 'France', 'description' => true]]);
+        $expected = 'Write a factual 90–150 word travel description for the Country France. Explain its location, significance, and visitor highlights in two short paragraphs. Return only the description.';
+        foreach (Http::recorded() as [$request, $response]) {
+            $this->assertSame($expected, $request['input']);
+            $this->assertSame('minimal', $request['reasoning']['effort']);
+            $this->assertSame(1024, $request['max_output_tokens']);
+        }
+        Http::assertSentCount(2);
+    }
+
+    public function test_non_reasoning_model_gets_token_limit_without_unsupported_reasoning_option(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+        config()->set('services.openai.text_model', 'gpt-4.1-mini');
+        config()->set('ai.text_max_output_tokens', 2048);
+        Http::fake(['api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Description.']]]]])]);
+        app(AiStampGenerator::class)->description('Country', 'France');
+        Http::assertSent(fn ($request) => $request['max_output_tokens'] === 2048 && ! isset($request['reasoning']));
+    }
+
+    public function test_token_truncated_description_is_not_saved(): void
+    {
+        [$sight, $batch] = $this->sightBatch('running');
+        $sight->update(['description' => '']);
+        config()->set('services.openai.api_key', 'test-key');
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens'],
+            'output' => [['content' => [['type' => 'output_text', 'text' => 'Truncated description']]]],
+        ])]);
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.failed', 1);
+        $this->assertSame('', $sight->fresh()->description);
+        Http::assertSentCount(1);
+    }
+
     public static function rateLimitedSightCategories(): array
     {
         return ['existing sight' => ['sights'], 'city top sights' => ['discover-sights']];

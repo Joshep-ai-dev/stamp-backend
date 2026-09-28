@@ -192,6 +192,16 @@ PROMPT;
         ];
     }
 
+    private function textOptions(array $body): array
+    {
+        $body['max_output_tokens'] = max(256, (int) config('ai.text_max_output_tokens', 1024));
+        if (preg_match('/^gpt-5(?:-(?:mini|nano))?(?:-\d{4}-\d{2}-\d{2})?$/', (string) $body['model'])) {
+            $body['reasoning'] = ['effort' => config('ai.text_reasoning_effort', 'minimal')];
+        }
+
+        return $body;
+    }
+
     private function requestMany(array $requests): array
     {
         if (! $requests) {
@@ -216,8 +226,9 @@ PROMPT;
             }
             $responses = Http::pool(function (Pool $pool) use ($pending, $key): void {
                 foreach ($pending as $id => $request) {
+                    $body = $request['path'] === '/responses' ? $this->textOptions($request['body']) : $request['body'];
                     $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000, fn ($exception) => $exception instanceof ConnectionException || ($exception instanceof RequestException && $exception->response->serverError()), throw: false)
-                        ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($request['body'], ['stream' => false]));
+                        ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($body, ['stream' => false]));
                 }
             }, self::concurrency());
             $retry = [];
@@ -346,6 +357,12 @@ PROMPT;
             throw new UnexpectedValueException('OpenAI returned an unreadable response after HTTP '.$response->status()
                 .' ('.($response->header('Content-Type') ?: 'unknown content type').', '.strlen($body).' bytes; '.$reason.').'
                 .($response->header('x-request-id') ? ' Request ID: '.$response->header('x-request-id').'.' : ''));
+        }
+
+        if (($data['status'] ?? '') === 'incomplete') {
+            throw new RuntimeException(($data['incomplete_details']['reason'] ?? '') === 'max_output_tokens'
+                ? 'The text model reached its token limit. Increase AI_TEXT_MAX_OUTPUT_TOKENS before retrying.'
+                : 'The text model returned an incomplete response.');
         }
 
         return $data;
