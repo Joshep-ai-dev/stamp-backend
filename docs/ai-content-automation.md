@@ -11,6 +11,6 @@ The admin page has an **AI automation** tab. It generates missing descriptions a
 
 Start with a small batch of 25 from the admin page. The page shows progress and failure details and supports pause and retry. Pausing stops queued work when the worker next picks it up; an in-flight API request may still finish.
 
-For cities, upload the private Oxford CSV with `rank`, `city`, and `country` columns and ranks 1 through 1000. The file is read for the request only and is not stored publicly. Every row must match exactly one catalog city. If a row cannot be matched, the request reports examples and starts no batch.
+For cities, upload the private Oxford CSV with `rank`, `city`, and `country` columns and ranks 1 through 1000. The file is read for the request only and is not stored publicly. Existing catalog cities are matched by country and normalized name; the most populous record is chosen when names repeat. Common name variants are mapped explicitly. Ranked cities absent from the catalog are added with stable `oxford-2026-{rank}` IDs so the full list can be processed.
 
 To build top sights, run **Discover five sights per city** with the same CSV. The resulting sights are unfeatured so they can be reviewed in the Sights admin page. Mark approved sights as **Shown in lists**, then run **Existing top sights** to generate their descriptions and images. AI sight discovery can return incorrect attractions; check the names and locations before featuring them.

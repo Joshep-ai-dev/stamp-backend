@@ -17,6 +17,17 @@ use Illuminate\Validation\Rule;
 
 class AdminAiController extends Controller
 {
+    private const CITY_ALIASES = [
+        'new york city' => 'new york',
+        'washington, dc' => 'washington',
+        'luxembourg city' => 'luxembourg',
+        'frankfurt am main' => 'frankfurt',
+        'ghent' => 'gent',
+        'hanover' => 'hannover',
+        'seville' => 'sevilla',
+        'palma de mallorca' => 'palma',
+    ];
+
     public function index(): JsonResponse
     {
         return response()->json([
@@ -57,7 +68,10 @@ class AdminAiController extends Controller
         };
         if (in_array($category, ['cities', 'discover-sights'], true)) {
             $rankedIds = $this->cityIdsFromCsv($data['cityCsv']->getRealPath());
-            $eligible = $query->whereIn('id', $rankedIds)->pluck('id')->all();
+            $eligible = [];
+            foreach (array_chunk($rankedIds, 400) as $chunk) {
+                $eligible = array_merge($eligible, (clone $query)->whereIn('id', $chunk)->pluck('id')->all());
+            }
             $ids = array_slice(array_values(array_intersect($rankedIds, $eligible)), 0, $data['limit'] ?? 10000);
         } else {
             $ids = $query->orderBy($category === 'countries' ? 'code' : 'id')->limit($data['limit'] ?? 10000)
@@ -131,25 +145,93 @@ class AdminAiController extends Controller
         abort_unless(count($rows) === 1000, 422, 'The city CSV must contain ranks 1 through 1000.');
         ksort($rows);
         $resolver = app(CountryResolver::class);
-        $ids = [];
-        $missing = [];
-        foreach ($rows as $row) {
+        $resolved = [];
+        $unknownCountries = [];
+        foreach ($rows as $rank => $row) {
             try {
-                $code = $resolver->resolve($row['country'])['code'];
+                $resolved[$rank] = ['row' => $row, 'country' => $resolver->resolve($row['country'])];
             } catch (\RuntimeException) {
-                $code = null;
-            }
-            $name = Str::of($row['city'])->ascii()->lower()->squish()->toString();
-            $matches = $code ? City::where('country_code', $code)->where('normalized_name', $name)->pluck('id') : collect();
-            if ($matches->count() !== 1) {
-                $missing[] = $row['city'].', '.$row['country'];
-            } else {
-                $ids[] = $matches->first();
+                $unknownCountries[] = $row['country'];
             }
         }
-        abort_if($missing, 422, 'Could not uniquely match '.count($missing).' cities. First: '.implode('; ', array_slice($missing, 0, 5)));
+        abort_if($unknownCountries, 422, 'Unknown CSV countries: '.implode(', ', array_slice(array_unique($unknownCountries), 0, 10)));
 
-        return $ids;
+        return DB::transaction(function () use ($resolved): array {
+            $countries = [];
+            $names = [];
+            foreach ($resolved as $entry) {
+                $country = $entry['country'];
+                $countries[$country['code']] = $country;
+                $name = Str::of($entry['row']['city'])->ascii()->lower()->squish()->toString();
+                $names[$name] = true;
+                if (isset(self::CITY_ALIASES[$name])) {
+                    $names[self::CITY_ALIASES[$name]] = true;
+                }
+            }
+            $codes = array_keys($countries);
+            $existingCountries = Country::whereIn('code', $codes)->pluck('code')->all();
+            $newCountries = [];
+            foreach (array_diff($codes, $existingCountries) as $code) {
+                $country = $countries[$code];
+                $newCountries[] = [
+                    'code' => $code, 'name' => $country['name'],
+                    'normalized_name' => Str::of($country['name'])->ascii()->lower()->squish()->toString(),
+                    'continent_code' => $country['continent_code'], 'flag' => $country['flag'],
+                    'created_at' => now(), 'updated_at' => now(),
+                ];
+            }
+            if ($newCountries) {
+                Country::insertOrIgnore($newCountries);
+            }
+
+            $matches = [];
+            foreach (array_chunk(array_keys($names), 400) as $chunk) {
+                City::whereIn('country_code', $codes)->whereIn('normalized_name', $chunk)
+                    ->orderByDesc('population')->orderBy('id')->get(['id', 'country_code', 'normalized_name'])
+                    ->each(function (City $city) use (&$matches): void {
+                        $key = $city->country_code.':'.$city->normalized_name;
+                        $matches[$key] ??= $city->id;
+                    });
+            }
+            $syntheticIds = array_map(fn ($rank) => 'oxford-2026-'.$rank, array_keys($resolved));
+            $synthetic = collect();
+            foreach (array_chunk($syntheticIds, 400) as $chunk) {
+                $synthetic = $synthetic->merge(City::whereIn('geoname_id', $chunk)->pluck('id', 'geoname_id'));
+            }
+            $ids = [];
+            $newCities = [];
+            foreach ($resolved as $rank => $entry) {
+                $row = $entry['row'];
+                $code = $entry['country']['code'];
+                $name = Str::of($row['city'])->ascii()->lower()->squish()->toString();
+                $key = $code.':'.$name;
+                $alias = self::CITY_ALIASES[$name] ?? null;
+                $candidateId = $matches[$key] ?? ($alias ? ($matches[$code.':'.$alias] ?? null) : null);
+                $syntheticId = 'oxford-2026-'.$rank;
+                if ($candidateId || isset($synthetic[$syntheticId])) {
+                    $ids[$rank] = $candidateId ?? $synthetic[$syntheticId];
+                    continue;
+                }
+                $newCities[] = [
+                    'geoname_id' => $syntheticId, 'name' => $row['city'],
+                    'ascii_name' => Str::ascii($row['city']), 'normalized_name' => $name,
+                    'country_code' => $code, 'created_at' => now(), 'updated_at' => now(),
+                ];
+            }
+            foreach (array_chunk($newCities, 400) as $chunk) {
+                City::insertOrIgnore($chunk);
+            }
+            $inserted = collect();
+            foreach (array_chunk(array_column($newCities, 'geoname_id'), 400) as $chunk) {
+                $inserted = $inserted->merge(City::whereIn('geoname_id', $chunk)->pluck('id', 'geoname_id'));
+            }
+            foreach ($resolved as $rank => $entry) {
+                $ids[$rank] ??= $inserted['oxford-2026-'.$rank];
+            }
+            ksort($ids);
+
+            return array_values($ids);
+        });
     }
 
     private function dispatch(string $category, int $itemId): void
