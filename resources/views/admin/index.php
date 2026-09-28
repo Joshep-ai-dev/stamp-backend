@@ -686,7 +686,7 @@
       { id: 'countries', icon: '?', label: 'Countries', detail: 'National stamp images and descriptions' },
       { id: 'states', icon: '?', label: 'US states', detail: 'All existing US state records' },
       { id: 'cities', icon: '?', label: 'Top 1,000 cities', detail: 'Use the project’s Oxford city list' },
-      { id: 'discover-sights', icon: '?', label: 'Discover sights', detail: 'Find five candidates for each city' },
+      { id: 'discover-sights', icon: '?', label: 'Top sights', detail: 'Generate five top attractions per city' },
       { id: 'sights', icon: '?', label: 'Approved sights', detail: 'Generate content for featured sights' }
     ];
     const aiResultPages = new Map();
@@ -739,22 +739,45 @@
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
       document.querySelector('#aiCategoryHelp').textContent = category === 'discover-sights'
-        ? 'Discover sights and generate their descriptions and images. Review and approve them before showing them in app lists.'
+        ? 'Generate five top sights per city, with descriptions and stamp images. Review and approve them before showing them in app lists.'
         : category === 'sights' ? 'Only approved sights shown in app lists are included.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
-      form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Discover sights' : 'Start batch';
+      form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Generate top sights' : 'Start batch';
     }
     function renderAiBatches(batches) {
       const list = document.querySelector('#aiBatches');
       if (!list) return;
-      list.innerHTML = batches.length ? batches.map(b => {
+      if (!batches.length) {
+        list.innerHTML = '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
+        return;
+      }
+      list.querySelector('.ai-empty')?.remove();
+      const ids = new Set(batches.map(b => String(b.id)));
+      list.querySelectorAll('.ai-batch').forEach(article => {
+        if (!ids.has(article.dataset.batchId) && !aiResultPages.has(Number(article.dataset.batchId))) article.remove();
+      });
+      batches.forEach(b => {
         const label = aiKinds.find(x => x.id === b.category)?.label || b.category;
         const processed = Math.min(Number(b.total), Number(b.completed) + Number(b.failed));
         const percent = b.total ? Math.round(processed / b.total * 100) : 100;
         const action = b.status === 'running' ? `<button onclick="aiAction(${b.id},'pause')">Pause</button>`
           : (b.status === 'paused' || Number(b.failed) > 0) ? `<button onclick="aiAction(${b.id},'resume')">${b.status === 'paused' ? 'Resume' : 'Retry failed'}</button>` : '';
-        return `<article class="ai-batch"><div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} · ${b.completed} complete · ${b.failed} failed · ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">View results</button>${action}${b.status === 'complete' ? `<button onclick="aiAction(${b.id},'fill-missing')">Generate missing content</button>` : ''}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div><div id="aiDetails-${b.id}" hidden></div></article>`;
-      }).join('') : '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
+        const header = `<div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} · ${b.completed} complete · ${b.failed} failed · ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">View results</button>${action}${b.status === 'complete' ? `<button onclick="aiAction(${b.id},'fill-missing')">Generate missing content</button>` : ''}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div>`;
+        let article = list.querySelector(`[data-batch-id="${b.id}"]`);
+        if (!article) {
+          article = document.createElement('article');
+          article.className = 'ai-batch';
+          article.dataset.batchId = b.id;
+          article.innerHTML = `<div class="ai-batch-summary"></div><div id="aiDetails-${b.id}" hidden></div>`;
+          list.append(article);
+        }
+        if (article.dataset.summary !== header) {
+          article.querySelector('.ai-batch-summary').innerHTML = header;
+          article.dataset.summary = header;
+          const update = article.querySelector('[data-ai-update]');
+          if (update) update.textContent = 'Update results';
+        }
+      });
     }
     async function runAiBatches() {
       if (aiRunning || state.tab !== 'ai') return;
@@ -791,12 +814,7 @@
       try {
         const data = await call('/admin/api/ai');
         if (state.tab !== 'ai') return;
-        document.querySelectorAll('.ai-results').forEach(panel => {
-          const id = Number(panel.id.replace('aiDetails-', ''));
-          aiOpenDetails.set(id, new Set([...panel.querySelectorAll('details[open]')].map(x => x.dataset.groupKey || x.dataset.descriptionKey)));
-        });
         renderAiBatches(data.batches);
-        await Promise.all(data.batches.filter(b => aiResultPages.has(b.id)).map(b => showAiBatch(b.id, aiResultPages.get(b.id))));
       } catch (error) { note(error.message, true) }
       finally { aiRefreshing = false }
     }
@@ -844,7 +862,7 @@
         const results = data.results;
         if (page > results.last_page) return showAiBatch(id, results.last_page);
         const discovery = data.batch.category === 'discover-sights';
-        panel.innerHTML = `<div class="ai-results-heading"><p>${discovery ? 'Open a city to review its sights. Remove takes a city out of this batch.' : 'Saved images and descriptions. Click an image to zoom.'}</p><button onclick="closeAiResults(${id})">Close results</button></div>
+        panel.innerHTML = `<div class="ai-results-heading"><p>${discovery ? 'Open a city to review its top sights. Results stay in place while batch progress updates.' : 'Saved images and descriptions. Click an image to zoom.'}</p><div><button data-ai-update onclick="showAiBatch(${id},${page})">Refresh results</button><button onclick="closeAiResults(${id})">Close results</button></div></div>
           ${results.data.map((item, index) => {
             const rows = item.content.map(content => aiContentRow(data.batch, item, content)).join('') || `<p class="ai-help">${esc(item.error || (discovery ? 'No sights saved yet.' : 'Catalog record removed.'))}</p>`;
             return discovery ? `<div class="ai-city-entry"><details class="ai-result-group" data-group-key="city-${id}-${item.id}" ${openDetails.has(`city-${id}-${item.id}`) || (!wasOpen && index === 0) ? 'open' : ''}><summary>${esc(item.name)}<small>${esc(item.location || '')} · ${item.content.length} sights · ${esc(item.status)}</small></summary>${rows}</details><button class="danger ai-city-remove" title="Remove this city from the batch" onclick="removeAiBatchItem(${id},${item.id},${esc(JSON.stringify(item.name))})" ${item.status === 'working' || (item.status === 'queued' && data.batch.status === 'running') ? 'disabled' : ''}>Remove</button></div>` : rows;
@@ -930,6 +948,7 @@
         aiOpenDetails.delete(id);
         aiMutating = false;
         await refreshAiBatches();
+        await showAiBatch(id, aiResultPages.get(id) || 1);
         note('City removed from this batch.');
       } catch (error) { note(error.message, true) }
       finally { aiMutating = false }

@@ -15,7 +15,7 @@ class AiStampGenerator
     {
         $response = $this->request('/responses', [
             'model' => config('services.openai.text_model'),
-            'input' => "Identify exactly five distinct, real, notable visitor sights within {$city}, {$country}. Return only a JSON array of five short sight names. Do not invent attractions or choose sights outside this city. No markdown.",
+            'input' => "Identify the top five distinct, real tourist attractions within {$city}, {$country}. Prioritize the most recognized and significant sights for visitors. Return only a JSON array of five short sight names. Do not invent attractions or choose sights outside this city. No markdown.",
         ]);
         $text = collect($response['output'] ?? [])->flatMap(fn ($item) => $item['content'] ?? [])
             ->where('type', 'output_text')->pluck('text')->implode("\n");
@@ -115,7 +115,7 @@ PROMPT;
                 $textRequests[$id] = [
                     'path' => '/responses',
                     'body' => ['model' => config('services.openai.text_model'), 'input' => ($task['discover'] ?? false)
-                        ? "Identify exactly five distinct, real, notable visitor sights within {$task['name']}. Return only a JSON array of five short sight names. Do not invent attractions or choose sights outside this city. No markdown."
+                        ? "Identify the top five distinct, real tourist attractions within {$task['name']}. Prioritize the most recognized and significant sights for visitors. Return only a JSON array of five short sight names. Do not invent attractions or choose sights outside this city. No markdown."
                         : "Write a factual 90–150 word travel description for the {$task['category']} {$task['name']}. Explain its location, significance, and visitor highlights in two short paragraphs. Return only the description."],
                 ];
             }
