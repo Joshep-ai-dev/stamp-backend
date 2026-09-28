@@ -462,6 +462,8 @@
     .ai-progress { height: 7px; overflow: hidden; border-radius: 100px; background: #264637 }
     .ai-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #47ba88, #a8e5a0) }
     .ai-errors { margin-top: 12px; padding: 12px; border-radius: 9px; background: #442a26; color: #ffd8c7; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere }
+    .ai-worker-warning { padding: 14px 18px; border: 1px solid #a66b43; border-radius: 11px; background: #483323; color: #ffe0bc; line-height: 1.5 }
+    .ai-worker-warning[hidden] { display: none }
     @media(max-width:1100px) { .ai-grid { grid-template-columns: 1fr } }
     @media(max-width:760px) {
       .top { align-items: flex-start; flex-wrap: wrap }
@@ -631,6 +633,7 @@
           <div><span class="ai-eyebrow">Content studio</span><h2>Build your destination library at scale</h2><p>Choose a collection, start with a small batch, and follow its progress here. Generated images and descriptions fill empty fields.</p></div>
           <span class="ai-status ${data.configured ? '' : 'missing'}">${data.configured ? 'API ready' : 'API key needed'}</span>
         </section>
+        <div id="aiWorkerWarning" class="ai-worker-warning" role="alert" ${data.waitingForWorker ? '' : 'hidden'}>No worker has picked up these AI jobs. In the Laravel app directory, run <code>php artisan queue:work database --queue=ai-content --tries=2 --timeout=600</code>. Keep that process running; queued batches will then continue automatically.</div>
         <div class="ai-grid">
           <section class="ai-card" aria-labelledby="aiTypeTitle">
             <div class="ai-card-heading"><span class="ai-step">1</span><h3 id="aiTypeTitle">Choose content</h3></div>
@@ -687,7 +690,7 @@
       }).join('') : '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
     }
     async function refreshAiBatches() {
-      try { const data = await call('/admin/api/ai'); renderAiBatches(data.batches) }
+      try { const data = await call('/admin/api/ai'); renderAiBatches(data.batches); document.querySelector('#aiWorkerWarning').hidden = !data.waitingForWorker }
       catch (error) { note(error.message, true) }
     }
     async function startAi(event) {

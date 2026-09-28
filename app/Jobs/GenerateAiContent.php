@@ -9,7 +9,9 @@ use App\Models\Sight;
 use App\Services\AiStampGenerator;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -28,6 +30,11 @@ class GenerateAiContent implements ShouldQueue, ShouldBeUnique
     public function uniqueId(): string
     {
         return (string) $this->itemId;
+    }
+
+    public function uniqueVia(): CacheRepository
+    {
+        return Cache::store('database');
     }
 
     public function handle(AiStampGenerator $generator): void

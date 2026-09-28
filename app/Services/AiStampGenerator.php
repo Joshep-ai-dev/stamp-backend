@@ -40,23 +40,70 @@ class AiStampGenerator
         return trim($text);
     }
 
-    public function image(string $category, string $name, string $folder): string
+    public function imagePrompt(string $category, string $name, string $extra = ''): string
     {
-        $title = $category === 'Top Sight' ? '' : ($category === 'City' || $category === 'State' ? explode(', ', $name)[0] : $name);
-        $titleInstruction = $title === ''
-            ? 'Include no visible text, title panel, letters or numbers.'
-            : 'At the top center print exactly "'.$title.'" in bold old-style serif lettering and no other text. Put a tiny centered diamond under the title with a short thin rule on each side.';
+        if ($category === 'Top Sight') {
+            $titleInstruction = 'This is a top-sight stamp: include NO title, place name, city name, '
+                .'country name, letters, numbers, signs, captions, or other visible text. '
+                .'Let the engraving continue through the upper part of the frame. '
+                .'Do not leave an empty title panel.';
+        } else {
+            $lastComma = strrpos($name, ', ');
+            $title = in_array($category, ['City', 'State'], true) && $lastComma !== false
+                ? substr($name, 0, $lastComma) : $name;
+            $titleInstruction = 'At the top center print exactly "'.$title.'" and no other words or numbers. '
+                .'Use bold old-style serif lettering, preserving this capitalization. '
+                .'Keep the title prominent but within the inner border; for a long name '
+                .'reduce its size to fit. Put a short thin horizontal rule on each side '
+                .'of one tiny centered diamond ornament directly beneath the title.';
+        }
         $subject = match ($category) {
-            'Country' => 'Depict defining real landmarks, architecture, landscape, and plants in a coherent panorama.',
-            'State' => 'Depict defining real landmarks, architecture, landscape, and plants of this US state.',
-            'City' => 'Show recognizable real landmarks in a geographically accurate city panorama.',
-            default => 'Show this exact attraction as the central subject with accurate surroundings.',
+            'Country' => 'Depict defining real landmarks, architecture, landscape, and plants from this country in one coherent panorama.',
+            'State' => 'Depict defining real landmarks, architecture, landscape, and plants from this US state in one coherent panorama.',
+            'City' => 'Show recognizable real landmarks in one geographically accurate city panorama.',
+            'Top Sight' => 'Show this exact attraction as the central subject with accurate surroundings; the city and country identify its location only.',
         };
-        $prompt = "Generate a complete vintage postage stamp for {$name} ({$category}). Warm aged cream paper and deep forest-green ink only. Use lighter and darker tones of that same green for depth. Draw a narrow dark-green margin outside a finely scalloped perforated paper edge. Leave a narrow, consistent cream strip between perforations and two thin close rounded rectangular border lines. Keep border thickness the same on all sides and do not crop perforations. Draw about 30–35 shallow scallops across each horizontal edge and 24–25 down each vertical edge, with softly rounded corners. {$titleInstruction} {$subject} Fine etched lines, dense cross-hatching, layered depth, subtle aged-paper grain. Accurate local geography. Landscape 3:2 composition. No collage, invented landmarks, bright colors, logo, or watermark. Draw the entire stamp; the app adds no border or text afterward.";
+        $direction = trim($extra) ?: 'none';
+
+        return <<<PROMPT
+Generate the COMPLETE vintage postage-stamp image for {$name} ({$category}).
+Use the same overall design for every place: warm aged cream paper, a finely
+scalloped perforated paper edge, two thin rounded rectangular border lines,
+and one richly detailed engraved landscape inside. Draw the whole stamp as
+one coherent image; the app adds no border, lettering, or ornament afterward.
+
+{$titleInstruction}
+
+Use ONLY the reference image's color treatment: deep forest-green ink for the
+engraving, title if present, double border, and the narrow background outside
+the perforated paper. Use warm aged cream for the paper. Build depth with lighter
+and darker tones of that same green. Do not use red, brown, blue, purple, teal,
+or other colored inks. Keep this exact green-and-cream palette across all places.
+
+Keep the same border proportions for countries, US states, cities, and sights.
+At 1200x800, leave a consistent dark margin of roughly 12 pixels from each
+canvas edge to the outer tips of the cream perforations. Then leave a consistent
+cream strip of roughly 12 pixels from the inner base of the perforations to
+the first ink border line. Use the same visual thickness on all four sides;
+the top and bottom bands must not be taller than the side bands. Keep both
+inner border lines thin and close together. Do not crop the perforations.
+Draw approximately 30-35 small shallow scallops across each horizontal edge
+and 24-25 down each vertical edge, with softly rounded corners.
+
+{$subject} Use fine etched lines, dense cross-hatching, layered depth, subtle
+aged-paper grain, and accurate local geography. Let the scene reach near the
+inner border. Landscape 3:2 composition. No collage, invented landmarks,
+modern bright colors, logo, or watermark.
+Additional direction: {$direction}.
+PROMPT;
+    }
+
+    public function image(string $category, string $name, string $folder, string $extra = ''): string
+    {
         $model = config('services.openai.image_model');
         $response = $this->request('/images/generations', [
             'model' => $model,
-            'prompt' => $prompt,
+            'prompt' => $this->imagePrompt($category, $name, $extra),
             'size' => str_starts_with($model, 'gpt-image-2') ? '1200x800' : '1536x1024',
             'quality' => 'high',
         ]);

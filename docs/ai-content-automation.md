@@ -7,7 +7,13 @@ The admin page has an **AI automation** tab. It generates missing descriptions a
 1. Set `OPENAI_API_KEY` in the server environment. Optional model settings are `OPENAI_TEXT_MODEL` and `OPENAI_IMAGE_MODEL`.
 2. Run `php artisan migrate`.
 3. Ensure PHP GD has WebP support (`imagewebp`).
-4. Run a persistent worker: `php artisan queue:work database --queue=ai-content --tries=2 --timeout=600`. Keep `DB_QUEUE_RETRY_AFTER` greater than 600; the default in this project is 660.
+4. Start a PHP queue worker from the `laravel_app` directory in a separate terminal or worker process:
+
+    ```bash
+    php artisan queue:work database --queue=ai-content --tries=2 --timeout=600 --sleep=2
+    ```
+
+    Keep `DB_QUEUE_RETRY_AFTER` greater than 600; the default in this project is 660. On a server, configure the hosting provider's background worker, Supervisor, systemd, or an equivalent process manager to keep this command running. On Windows, keep the terminal open while generating content, or use Task Scheduler to run the command at login. The queued batches start processing as soon as the worker is running; paused batches need to be resumed from the admin page.
 
 Start with a small batch of 25 from the admin page. The page shows progress and failure details and supports pause and retry. Pausing stops queued work when the worker next picks it up; an in-flight API request may still finish.
 

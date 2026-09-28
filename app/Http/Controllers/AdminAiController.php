@@ -30,9 +30,18 @@ class AdminAiController extends Controller
 
     public function index(): JsonResponse
     {
+        $waitingForWorker = DB::table('ai_content_batches')
+            ->where('status', 'running')->where('completed', 0)->where('failed', 0)
+            ->where('created_at', '<', now()->subMinutes(2))
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('ai_content_items')
+                ->whereColumn('ai_content_items.batch_id', 'ai_content_batches.id')
+                ->where('ai_content_items.status', 'working'))
+            ->exists();
+
         return response()->json([
             'configured' => filled(config('services.openai.api_key')),
             'batches' => DB::table('ai_content_batches')->orderByDesc('id')->limit(20)->get(),
+            'waitingForWorker' => $waitingForWorker,
         ]);
     }
 
