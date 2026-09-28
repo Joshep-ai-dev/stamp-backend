@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\GenerateAiContent;
 use App\Jobs\DiscoverAiSights;
+use App\Jobs\GenerateAiContent;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\CountryState;
 use App\Models\Sight;
 use App\Services\CountryResolver;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -57,13 +59,159 @@ class AdminAiController extends Controller
         ]);
     }
 
+    public function results(Request $request, int $id): JsonResponse
+    {
+        $batch = DB::table('ai_content_batches')->find($id);
+        abort_unless($batch, 404);
+        $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:25'],
+        ]);
+        $items = DB::table('ai_content_items')->where('batch_id', $id)->orderBy('id')->paginate($request->integer('per_page', 25));
+        $query = match ($batch->category) {
+            'countries' => Country::query(),
+            'states' => CountryState::query(),
+            'cities' => City::with('country'),
+            'sights' => Sight::with('city.country'),
+            'discover-sights' => City::with(['country', 'sights']),
+        };
+        $key = $batch->category === 'countries' ? 'code' : 'id';
+        $models = $query->whereIn($key, $items->getCollection()->pluck('target_id'))->get()->keyBy($key);
+        $content = fn ($model) => [
+            'id' => $model->getKey(), 'name' => $model->name,
+            'image' => $model instanceof Country ? $model->hero_image : $model->image_url,
+            'description' => $model->description,
+            'isFeatured' => $model instanceof Sight ? $model->is_featured : null,
+        ];
+        $items->setCollection($items->getCollection()->map(function ($item) use ($batch, $models, $content) {
+            $model = $models->get($item->target_id);
+
+            return [
+                'id' => $item->id, 'targetId' => $item->target_id,
+                'status' => $item->status, 'error' => $item->error,
+                'name' => $model?->name ?? 'Deleted catalog record',
+                'location' => match ($batch->category) {
+                    'cities', 'discover-sights' => $model?->country?->name,
+                    'sights' => $model ? implode(', ', array_filter([$model->city?->name, $model->city?->country?->name])) : null,
+                    'states' => 'United States',
+                    default => null,
+                },
+                'content' => ! $model ? [] : ($batch->category === 'discover-sights'
+                    ? $model->sights->map($content)->values()->all() : [$content($model)]),
+            ];
+        }));
+
+        return response()->json(['batch' => $batch, 'results' => $items]);
+    }
+
+    public function updateContent(Request $request, int $id, string $target): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'description' => ['present', 'nullable', 'string', 'max:20000'],
+            'image' => ['present', 'nullable', 'string', 'max:2048', function ($attribute, $value, $fail): void {
+                if (filled($value) && ! preg_match('~^/images/[a-z-]+/[a-zA-Z0-9._-]+$~', $value)
+                    && ! (filter_var($value, FILTER_VALIDATE_URL) && in_array(parse_url($value, PHP_URL_SCHEME), ['http', 'https'], true))) {
+                    $fail('Use a saved image path or an HTTP(S) image URL.');
+                }
+            }],
+            'isFeatured' => ['sometimes', 'boolean'],
+        ]);
+        $model = $this->contentModel($id, $target);
+        $this->ensureContentEditable($model);
+        $model->name = trim($data['name']);
+        abort_if($model->name === '', 422, 'Name cannot be blank.');
+        if (! $model instanceof Sight) {
+            $model->normalized_name = Str::of($model->name)->ascii()->lower()->squish()->toString();
+        }
+        $model->description = $data['description'] ?? '';
+        $model->{$model instanceof Country ? 'hero_image' : 'image_url'} = $data['image'] ?? '';
+        if ($model instanceof Sight && array_key_exists('isFeatured', $data)) {
+            $model->is_featured = $data['isFeatured'];
+        }
+        $model->save();
+
+        return response()->json(['message' => 'Content saved.']);
+    }
+
+    public function removeContent(int $id, string $target): Response
+    {
+        $model = $this->contentModel($id, $target);
+        $this->ensureContentEditable($model);
+        if ($model instanceof Sight) {
+            DB::transaction(function () use ($model): void {
+                $items = DB::table('ai_content_items')->where('target_id', (string) $model->id)
+                    ->whereIn('batch_id', DB::table('ai_content_batches')->where('category', 'sights')->select('id'))
+                    ->lockForUpdate()->get();
+                foreach ($items as $item) {
+                    DB::table('ai_content_items')->where('id', $item->id)->delete();
+                    $batch = DB::table('ai_content_batches')->where('id', $item->batch_id)->lockForUpdate()->first();
+                    DB::table('ai_content_batches')->where('id', $batch->id)->update([
+                        'total' => max(0, $batch->total - 1),
+                        'completed' => max(0, $batch->completed - ($item->status === 'complete' ? 1 : 0)),
+                        'failed' => max(0, $batch->failed - ($item->status === 'failed' ? 1 : 0)),
+                        'updated_at' => now(),
+                    ]);
+                    DB::table('ai_content_batches')->where('id', $batch->id)
+                        ->whereRaw('completed + failed >= total')->update(['status' => 'complete']);
+                }
+                $model->delete();
+            });
+        } else {
+            $model->description = '';
+            $model->{$model instanceof Country ? 'hero_image' : 'image_url'} = '';
+            $model->save();
+        }
+
+        return response()->noContent();
+    }
+
+    private function contentModel(int $id, string $target): Model
+    {
+        $batch = DB::table('ai_content_batches')->find($id);
+        abort_unless($batch, 404);
+        $items = DB::table('ai_content_items')->where('batch_id', $id);
+        if ($batch->category === 'discover-sights') {
+            return Sight::whereIn('city_id', $items->select('target_id'))->findOrFail($target);
+        }
+        abort_unless($items->where('target_id', $target)->exists(), 404);
+
+        return match ($batch->category) {
+            'countries' => Country::findOrFail($target),
+            'states' => CountryState::findOrFail($target),
+            'cities' => City::findOrFail($target),
+            'sights' => Sight::findOrFail($target),
+        };
+    }
+
+    private function ensureContentEditable(Model $model): void
+    {
+        $category = match (true) {
+            $model instanceof Country => 'countries',
+            $model instanceof CountryState => 'states',
+            $model instanceof City => 'cities',
+            $model instanceof Sight => 'sights',
+        };
+        $pending = DB::table('ai_content_items as items')
+            ->join('ai_content_batches as batches', 'batches.id', '=', 'items.batch_id')
+            ->where(function ($query) use ($category, $model): void {
+                $query->where(fn ($q) => $q->where('batches.category', $category)->where('items.target_id', (string) $model->getKey()));
+                if ($model instanceof Sight) {
+                    $query->orWhere(fn ($q) => $q->where('batches.category', 'discover-sights')->where('items.target_id', (string) $model->city_id));
+                }
+            })
+            ->where(fn ($q) => $q->where('items.status', 'working')
+                ->orWhere(fn ($q) => $q->where('items.status', 'queued')->where('batches.status', 'running')))
+            ->exists();
+        abort_if($pending, 409, 'Pause the batch and wait for this item to finish before editing or removing it.');
+    }
+
     public function start(Request $request): JsonResponse
     {
         abort_unless(config('queue.default') !== 'sync', 503, 'Set QUEUE_CONNECTION=database and start a queue worker.');
         abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
         $data = $request->validate([
             'category' => ['required', Rule::in(['countries', 'states', 'cities', 'sights', 'discover-sights'])],
-            'cityCsv' => ['required_if:category,cities,discover-sights', 'nullable', 'file', 'mimes:csv,txt', 'max:2048'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:10000'],
         ]);
         $category = $data['category'];
@@ -76,7 +224,7 @@ class AdminAiController extends Controller
             'discover-sights' => City::query(),
         };
         if (in_array($category, ['cities', 'discover-sights'], true)) {
-            $rankedIds = $this->cityIdsFromCsv($data['cityCsv']->getRealPath());
+            $rankedIds = $this->cityIdsFromCsv(config('ai.city_csv'));
             $eligible = [];
             foreach (array_chunk($rankedIds, 400) as $chunk) {
                 $eligible = array_merge($eligible, (clone $query)->whereIn('id', $chunk)->pluck('id')->all());
@@ -129,6 +277,7 @@ class AdminAiController extends Controller
 
     private function cityIdsFromCsv(string $path): array
     {
+        abort_unless(is_readable($path), 503, 'The project Oxford city CSV is missing or unreadable.');
         $file = fopen($path, 'rb');
         if (! $file) {
             abort(422, 'Could not read the city CSV.');
@@ -219,6 +368,7 @@ class AdminAiController extends Controller
                 $syntheticId = 'oxford-2026-'.$rank;
                 if ($candidateId || isset($synthetic[$syntheticId])) {
                     $ids[$rank] = $candidateId ?? $synthetic[$syntheticId];
+
                     continue;
                 }
                 $newCities[] = [

@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminAiController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPageController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\LegacyImageController;
@@ -24,6 +24,9 @@ Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
     Route::get('/ai', [AdminAiController::class, 'index']);
     Route::post('/ai', [AdminAiController::class, 'start']);
+    Route::put('/ai/{id}/content/{target}', [AdminAiController::class, 'updateContent']);
+    Route::delete('/ai/{id}/content/{target}', [AdminAiController::class, 'removeContent']);
+    Route::get('/ai/{id}/results', [AdminAiController::class, 'results']);
     Route::get('/ai/{id}', [AdminAiController::class, 'show']);
     Route::post('/ai/{id}/pause', [AdminAiController::class, 'pause']);
     Route::post('/ai/{id}/resume', [AdminAiController::class, 'resume']);

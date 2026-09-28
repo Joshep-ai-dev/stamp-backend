@@ -26,4 +26,16 @@ class AiStampPromptTest extends TestCase
         $this->assertStringContainsString('the city and country identify its location only.', $prompt);
         $this->assertStringNotContainsString('At the top center print exactly', $prompt);
     }
+
+    public function test_stamp_palette_and_layout_match_the_supplied_prompt_for_every_category(): void
+    {
+        foreach (['Country', 'State', 'City', 'Top Sight'] as $category) {
+            $prompt = (new AiStampGenerator)->imagePrompt($category, 'Example, Location', '  More engraving  ');
+            $this->assertStringContainsString('deep forest-green ink', $prompt);
+            $this->assertStringContainsString('Do not use red, brown, blue, purple, teal,', $prompt);
+            $this->assertStringContainsString('At 1200x800', $prompt);
+            $this->assertStringContainsString('top and bottom bands must not be taller than the side bands.', $prompt);
+            $this->assertStringContainsString('Additional direction: More engraving.', $prompt);
+        }
+    }
 }

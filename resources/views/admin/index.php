@@ -479,6 +479,59 @@
       .ai-batch-top { flex-direction: column }
       .ai-batch-actions { justify-content: flex-start }
     }
+    .ai-workspace { gap: 16px; }
+    .ai-toolbar { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .ai-toolbar-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .ai-toolbar-head h2 { margin: 0; font-size: 17px; }
+    .ai-toolbar-form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+    .ai-toolbar-form .field { margin: 0; min-width: 190px; flex: 1; }
+    .ai-toolbar-form .ai-limit { flex: 0 1 130px; min-width: 100px; }
+    .ai-toolbar-form select, .ai-toolbar-form input { width: 100%; height: 40px; background: #09271f; color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; }
+    .ai-toolbar-form button { height: 40px; }
+    .ai-toolbar .ai-help { margin: 10px 0 0; }
+    .ai-toolbar [hidden] { display: none; }
+    .ai-batches { padding: 18px; border-radius: 12px; }
+    .ai-batch { padding: 12px; }
+    .ai-progress { height: 4px; }
+    .ai-results { margin-top: 14px; color: var(--ink); }
+    .ai-results-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .ai-results-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+    .ai-result-group { border-top: 1px solid var(--line); }
+    .ai-result-group > summary { cursor: pointer; padding: 11px 0; color: var(--ink); font-weight: 600; }
+    .ai-result-group > summary small { margin-left: 8px; color: var(--muted); font-weight: 400; }
+    .ai-result-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 12px 0; border-top: 1px solid #284a3c; color: var(--ink); background: transparent; }
+    .ai-result-row .image-trigger { display: block; width: 120px; height: 80px; margin: 0; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+    .ai-result-row .image-trigger img { width: 100%; height: 100%; object-fit: contain; }
+    .ai-result-text { min-width: 0; }
+    .ai-result-text h4 { margin: 0 0 4px; font-size: 14px; color: #f8ead4; }
+    .ai-result-text small, .ai-no-description { color: #b6c9c0; font-size: 12px; }
+    .ai-description { margin-top: 8px; font-size: 13px; line-height: 1.55; }
+    .ai-description summary { display: block; cursor: pointer; color: #d9e4dc; }
+    .ai-description summary span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ai-description summary strong { display: block; margin-top: 3px; color: #88c6a6; font-size: 12px; font-weight: 500; }
+    .ai-description[open] summary span { display: none; }
+    .ai-description[open] summary strong::after { content: ' · Collapse'; }
+    .ai-description p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #f8ead4; }
+    .ai-result-actions { display: flex; gap: 6px; }
+    .ai-result-actions button { padding: 6px 9px; font-size: 12px; }
+    .ai-result-row .ai-image-empty { display: grid; place-items: center; width: 120px; height: 80px; padding: 8px; background: #143a2c; border: 1px dashed #426451; color: #b6c9c0; border-radius: 7px; font-size: 12px; }
+    .ai-result-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .ai-content-editor { width: min(640px, calc(100vw - 32px)); max-height: 90vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 22px; background: var(--panel); color: var(--ink); }
+    .ai-content-editor::backdrop { background: #0009; }
+    .ai-content-editor h2 { margin: 0 0 16px; font-size: 20px; }
+    .ai-content-editor .field { margin-bottom: 14px; }
+    .ai-content-editor input, .ai-content-editor textarea { width: 100%; background: #09271f; color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 9px; }
+    .ai-content-editor textarea { min-height: 180px; resize: vertical; }
+    .ai-content-editor .check input { width: auto; }
+    .ai-content-editor [hidden] { display: none; }
+    .ai-edit-preview { max-width: 180px; max-height: 120px; object-fit: contain; margin-bottom: 10px; }
+    @media(max-width:700px) {
+      .ai-result-row { grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+      .ai-result-row .image-trigger, .ai-result-row .ai-image-empty { width: 90px; height: 60px; }
+      .ai-result-actions { grid-column: 2; }
+      .ai-toolbar-form .field { flex-basis: 100%; }
+      .ai-batch-top { flex-wrap: wrap; }
+    }
   </style>
 </head>
 
@@ -515,6 +568,19 @@
           type="submit">Save</button></div>
     </form>
   </div>
+  <dialog id="aiContentEditor" class="ai-content-editor" aria-labelledby="aiEditTitle">
+    <form id="aiContentForm" onsubmit="saveAiContent(event)">
+      <h2 id="aiEditTitle">Edit content</h2>
+      <p id="aiEditNotice" class="notice error" role="alert"></p>
+      <label class="field">Name<input name="name" required maxlength="150"></label>
+      <label class="field">Description<textarea name="description" maxlength="20000"></textarea></label>
+      <img id="aiEditPreview" class="ai-edit-preview" alt="Current image" hidden>
+      <label class="field">Image path or URL<input name="image" placeholder="/images/sights/stamp.webp"><small>Clear this field to remove the image.</small></label>
+      <label class="field">Replace image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+      <label id="aiFeatureField" class="check"><input name="isFeatured" type="checkbox">Approved · Shown in app lists</label>
+      <div class="dialogfoot"><button type="button" onclick="document.querySelector('#aiContentEditor').close()">Cancel</button><button class="primary" type="submit">Save changes</button></div>
+    </form>
+  </dialog>
   <dialog id="imageViewer" class="image-viewer" aria-labelledby="viewerTitle">
     <div class="viewer-toolbar">
       <h2 id="viewerTitle">Image preview</h2>
@@ -616,10 +682,16 @@
     const aiKinds = [
       { id: 'countries', icon: '?', label: 'Countries', detail: 'National stamp images and descriptions' },
       { id: 'states', icon: '?', label: 'US states', detail: 'All existing US state records' },
-      { id: 'cities', icon: '?', label: 'Top 1,000 cities', detail: 'Use your ranked Oxford CSV' },
+      { id: 'cities', icon: '?', label: 'Top 1,000 cities', detail: 'Use the project’s Oxford city list' },
       { id: 'discover-sights', icon: '?', label: 'Discover sights', detail: 'Find five candidates for each city' },
       { id: 'sights', icon: '?', label: 'Approved sights', detail: 'Generate content for featured sights' }
     ];
+    const aiResultPages = new Map();
+    let aiRefreshing = false;
+    const aiContentCache = new Map();
+    const aiOpenDetails = new Map();
+    let aiEditing = null;
+    let aiMutating = false;
     let aiCategory = 'cities';
     async function loadAi() {
       const data = await call('/admin/api/ai');
@@ -629,26 +701,17 @@
       summary.style.display = 'none';
       table.classList.add('ai-workspace');
       table.innerHTML = `
-        <section class="ai-hero">
-          <div><span class="ai-eyebrow">Content studio</span><h2>Build your destination library at scale</h2><p>Choose a collection, start with a small batch, and follow its progress here. Generated images and descriptions fill empty fields.</p></div>
-          <span class="ai-status ${data.configured ? '' : 'missing'}">${data.configured ? 'API ready' : 'API key needed'}</span>
-        </section>
-        <div id="aiWorkerWarning" class="ai-worker-warning" role="alert" ${data.waitingForWorker ? '' : 'hidden'}>No worker has picked up these AI jobs. In the Laravel app directory, run <code>php artisan queue:work database --queue=ai-content --tries=2 --timeout=600</code>. Keep that process running; queued batches will then continue automatically.</div>
-        <div class="ai-grid">
-          <section class="ai-card" aria-labelledby="aiTypeTitle">
-            <div class="ai-card-heading"><span class="ai-step">1</span><h3 id="aiTypeTitle">Choose content</h3></div>
-            <p class="ai-card-intro">Select what this run should work on.</p>
-            <div class="ai-types">${aiKinds.map(x => `<button type="button" class="ai-type" data-ai-type="${x.id}" onclick="selectAiCategory('${x.id}')"><span class="ai-type-icon" aria-hidden="true">${x.icon}</span><span><strong>${x.label}</strong><small>${x.detail}</small></span><span class="ai-type-check" aria-hidden="true"></span></button>`).join('')}</div>
-          </section>
-          <form id="aiForm" class="ai-card ai-config" onsubmit="startAi(event)">
-            <div><div class="ai-card-heading"><span class="ai-step">2</span><h3>Configure batch</h3></div><p class="ai-card-intro">Start with 25 items, then increase the batch size after reviewing results.</p></div>
-            <input name="category" type="hidden" value="${aiCategory}">
-            <label id="aiCsv" class="field">Ranked cities CSV<input name="cityCsv" type="file" accept=".csv,text/csv"><small>Upload the Oxford file with rank, city, and country columns. All 1,000 ranks must be present.</small></label>
-            <label class="field">Maximum items<input name="limit" type="number" min="1" max="10000" value="25"><small>Only records with missing content are included.</small></label>
-            <p id="aiCategoryHelp" class="ai-help"></p>
-            <div class="ai-submit-row"><button class="primary" type="submit" ${data.configured ? '' : 'disabled'}>Start batch</button><small>${data.configured ? 'Runs continue after you close this page.' : 'Set OPENAI_API_KEY on the server to enable batches.'}</small></div>
+        <section class="ai-toolbar">
+          <div class="ai-toolbar-head"><h2>Generate content</h2><span class="ai-status ${data.configured ? '' : 'missing'}">${data.configured ? 'API ready' : 'API key needed'}</span></div>
+          <form id="aiForm" class="ai-toolbar-form" onsubmit="startAi(event)">
+            <label class="field">Content type<select name="category" onchange="selectAiCategory(this.value)">${aiKinds.map(x => `<option value="${x.id}" ${x.id === aiCategory ? 'selected' : ''}>${x.label}</option>`).join('')}</select></label>
+            <label class="field ai-limit">Maximum items<input name="limit" type="number" min="1" max="10000" value="25"></label>
+            <button class="primary" type="submit" ${data.configured ? '' : 'disabled'}>Start batch</button>
           </form>
-        </div>
+          <p id="aiCsv" class="ai-help">Oxford 2026 · Project list of 1,000 cities.</p>
+          <p id="aiCategoryHelp" class="ai-help"></p>
+        </section>
+        <div id="aiWorkerWarning" class="ai-worker-warning" role="alert" ${data.waitingForWorker ? '' : 'hidden'}>Batches are waiting for the AI worker. Start the server’s AI queue worker to continue.</div>
         <section class="ai-batches" aria-labelledby="aiBatchesTitle">
           <div class="ai-batches-head"><div><span class="ai-eyebrow">Activity</span><h3 id="aiBatchesTitle">Recent batches</h3></div><button type="button" onclick="refreshAiBatches()">Refresh</button></div>
           <div id="aiBatches" class="ai-batch-list"></div>
@@ -670,10 +733,9 @@
       });
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
-      form.elements.cityCsv.required = needsCsv;
       document.querySelector('#aiCategoryHelp').textContent = category === 'discover-sights'
         ? 'New sight candidates stay hidden from app lists until you review and feature them in Top sights.'
-        : category === 'sights' ? 'Only sights marked ?Shown in lists? are included.'
+        : category === 'sights' ? 'Only approved sights shown in app lists are included.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
       form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Discover sights' : 'Start batch';
     }
@@ -686,19 +748,30 @@
         const percent = b.total ? Math.round(processed / b.total * 100) : 100;
         const action = b.status === 'running' ? `<button onclick="aiAction(${b.id},'pause')">Pause</button>`
           : (b.status === 'paused' || Number(b.failed) > 0) ? `<button onclick="aiAction(${b.id},'resume')">${b.status === 'paused' ? 'Resume' : 'Retry failed'}</button>` : '';
-        return `<article class="ai-batch"><div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} ? ${b.completed} complete ? ${b.failed} failed ? ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">Details</button>${action}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div><div id="aiDetails-${b.id}" hidden></div></article>`;
+        return `<article class="ai-batch"><div class="ai-batch-top"><div><div class="ai-batch-title">${esc(label)} <span class="ai-pill ${esc(b.status)}">${esc(b.status)}</span></div><p class="ai-batch-meta">Batch #${b.id} · ${b.completed} complete · ${b.failed} failed · ${b.total} total</p></div><div class="ai-batch-actions"><button onclick="showAiBatch(${b.id})">View results</button>${action}</div></div><div class="ai-progress" role="progressbar" aria-label="Batch ${b.id} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div><div id="aiDetails-${b.id}" hidden></div></article>`;
       }).join('') : '<div class="ai-empty">No batches yet. Choose a content type and start with a small run.</div>';
     }
     async function refreshAiBatches() {
-      try { const data = await call('/admin/api/ai'); renderAiBatches(data.batches); document.querySelector('#aiWorkerWarning').hidden = !data.waitingForWorker }
-      catch (error) { note(error.message, true) }
+      if (aiRefreshing || aiMutating || document.querySelector('#aiContentEditor').open) return;
+      aiRefreshing = true;
+      try {
+        const data = await call('/admin/api/ai');
+        if (state.tab !== 'ai') return;
+        document.querySelectorAll('.ai-results').forEach(panel => {
+          const id = Number(panel.id.replace('aiDetails-', ''));
+          aiOpenDetails.set(id, new Set([...panel.querySelectorAll('details[open]')].map(x => x.dataset.groupKey || x.dataset.descriptionKey)));
+        });
+        renderAiBatches(data.batches);
+        document.querySelector('#aiWorkerWarning').hidden = !data.waitingForWorker;
+        await Promise.all(data.batches.filter(b => aiResultPages.has(b.id)).map(b => showAiBatch(b.id, aiResultPages.get(b.id))));
+      } catch (error) { note(error.message, true) }
+      finally { aiRefreshing = false }
     }
     async function startAi(event) {
       event.preventDefault();
       const form = event.target;
       const button = form.querySelector('button[type=submit]');
       const body = new FormData(form);
-      if (!['cities', 'discover-sights'].includes(body.get('category'))) body.delete('cityCsv');
       button.disabled = true;
       try {
         const response = await fetch('/admin/api/ai', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}` }, body });
@@ -710,15 +783,108 @@
       } catch (error) { note(error.message, true) }
       finally { button.disabled = false }
     }
-    async function showAiBatch(id) {
+    function aiContentRow(batch, item, content) {
+      const key = `${batch.id}:${content.id}`;
+      aiContentCache.set(key, { batch, item, content });
+      const sight = ['sights', 'discover-sights'].includes(batch.category);
+      const disabled = item.status === 'working' || (item.status === 'queued' && batch.status === 'running');
+      const actionKey = esc(JSON.stringify(key));
+      return `<article class="ai-result-row">
+        ${content.image ? imagePreview(content.image, content.name) : '<div class="ai-image-empty">No image</div>'}
+        <div class="ai-result-text"><h4>${esc(content.name)}</h4><small>${esc(item.location || item.name)} · ${esc(item.status)}${sight ? ` · ${content.isFeatured ? 'Approved' : 'Needs review'}` : ''}</small>
+          ${content.description ? `<details class="ai-description" data-description-key="${esc(key)}"><summary><span>${esc(content.description.replace(/\s+/g, ' '))}</span><strong>Full description</strong></summary><p>${esc(content.description)}</p></details>` : '<p class="ai-no-description">No description yet</p>'}
+          ${item.error ? `<p class="notice error">${esc(item.error)}</p>` : ''}</div>
+        <div class="ai-result-actions"><button onclick="editAiContent(${actionKey})" ${disabled ? 'disabled title="Pause this batch and wait for generation to finish"' : ''}>Edit</button><button class="danger" onclick="removeAiContent(${actionKey})" ${disabled ? 'disabled' : ''}>${sight ? 'Remove' : 'Clear content'}</button></div>
+      </article>`;
+    }
+    async function showAiBatch(id, page = 1) {
+      aiResultPages.set(id, page);
       try {
-        const data = await call(`/admin/api/ai/${id}`);
+        const data = await call(`/admin/api/ai/${id}/results?page=${page}&per_page=5`);
         const panel = document.querySelector(`#aiDetails-${id}`);
-        if (!panel) return;
+        if (!panel || aiResultPages.get(id) !== page) return;
+        const wasOpen = !panel.hidden || aiOpenDetails.has(id);
+        const openDetails = panel.hidden ? (aiOpenDetails.get(id) || new Set()) : new Set([...panel.querySelectorAll('details[open]')].map(x => x.dataset.groupKey || x.dataset.descriptionKey));
         panel.hidden = false;
-        panel.className = 'ai-errors';
-        panel.innerHTML = data.errors.length ? `<strong>Failed items</strong><br>${data.errors.map(x => `${esc(x.target_id)}: ${esc(x.error)}`).join('<br>')}` : `No failed items. ${data.batch.completed} of ${data.batch.total} complete.`;
+        panel.className = 'ai-results';
+        const results = data.results;
+        const discovery = data.batch.category === 'discover-sights';
+        panel.innerHTML = `<div class="ai-results-heading"><p>${discovery ? 'Review sights by city. Open a city to edit, approve, or remove its sights.' : 'Saved images and descriptions. Click an image to zoom.'}</p><button onclick="closeAiResults(${id})">Close results</button></div>
+          ${results.data.map((item, index) => {
+            const rows = item.content.map(content => aiContentRow(data.batch, item, content)).join('') || `<p class="ai-help">${esc(item.error || (discovery ? 'No sights saved yet.' : 'Catalog record removed.'))}</p>`;
+            return discovery ? `<details class="ai-result-group" data-group-key="city-${id}-${item.id}" ${openDetails.has(`city-${id}-${item.id}`) || (!wasOpen && index === 0) ? 'open' : ''}><summary>${esc(item.name)}<small>${esc(item.location || '')} · ${item.content.length} sights · ${esc(item.status)}</small></summary>${rows}</details>` : rows;
+          }).join('') || '<p class="ai-help">No items in this batch.</p>'}
+          <div class="ai-result-pagination"><button onclick="showAiBatch(${id},${page - 1})" ${page <= 1 ? 'disabled' : ''}>Previous</button><span>Page ${results.current_page} of ${results.last_page} · ${results.total} items</span><button onclick="showAiBatch(${id},${page + 1})" ${page >= results.last_page ? 'disabled' : ''}>Next</button></div>`;
+        panel.querySelectorAll('[data-description-key]').forEach(x => { x.open = openDetails.has(x.dataset.descriptionKey) });
+        aiOpenDetails.set(id, openDetails);
       } catch (error) { note(error.message, true) }
+    }
+    function closeAiResults(id) {
+      aiResultPages.delete(id);
+      aiOpenDetails.delete(id);
+      document.querySelector(`#aiDetails-${id}`).hidden = true;
+    }
+    function editAiContent(key) {
+      aiEditing = aiContentCache.get(key);
+      if (!aiEditing) return;
+      const editor = document.querySelector('#aiContentEditor');
+      const editForm = document.querySelector('#aiContentForm');
+      const { content, batch } = aiEditing;
+      editForm.reset();
+      editForm.elements.name.value = content.name;
+      editForm.elements.description.value = content.description || '';
+      editForm.elements.image.value = content.image || '';
+      editForm.elements.isFeatured.checked = !!content.isFeatured;
+      document.querySelector('#aiFeatureField').hidden = !['sights', 'discover-sights'].includes(batch.category);
+      document.querySelector('#aiEditNotice').textContent = '';
+      const preview = document.querySelector('#aiEditPreview');
+      preview.hidden = !content.image;
+      preview.src = content.image || '';
+      editor.showModal();
+      editForm.elements.name.focus();
+    }
+    async function saveAiContent(event) {
+      event.preventDefault();
+      if (aiMutating || !aiEditing) return;
+      const editForm = event.target;
+      const { batch, content } = aiEditing;
+      const saveButton = editForm.querySelector('button[type=submit]');
+      saveButton.disabled = true;
+      aiMutating = true;
+      try {
+        let image = editForm.elements.image.value.trim();
+        const file = editForm.elements.imageFile.files[0];
+        if (file) {
+          const body = new FormData();
+          body.append('image', file);
+          body.append('folder', batch.category === 'discover-sights' ? 'sights' : batch.category);
+          const response = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', 'X-Admin-Key': state.key }, body });
+          const uploaded = await response.json();
+          if (!response.ok) throw new Error(Object.values(uploaded.errors || {}).flat().join(' ') || uploaded.message || 'Image upload failed.');
+          image = uploaded.imageUrl;
+          editForm.elements.image.value = image;
+          editForm.elements.imageFile.value = '';
+        }
+        await call(`/admin/api/ai/${batch.id}/content/${encodeURIComponent(content.id)}`, { method: 'PUT', body: JSON.stringify({ name: editForm.elements.name.value.trim(), description: editForm.elements.description.value, image, isFeatured: editForm.elements.isFeatured.checked }) });
+        document.querySelector('#aiContentEditor').close();
+        await showAiBatch(batch.id, aiResultPages.get(batch.id) || 1);
+        note('Content saved.');
+      } catch (error) { document.querySelector('#aiEditNotice').textContent = error.message }
+      finally { aiMutating = false; saveButton.disabled = false }
+    }
+    async function removeAiContent(key) {
+      const entry = aiContentCache.get(key);
+      if (!entry || aiMutating) return;
+      const { batch, content } = entry;
+      const sight = ['sights', 'discover-sights'].includes(batch.category);
+      if (!confirm(sight ? `Remove “${content.name}” from the sights catalog?` : `Clear the image and description for “${content.name}”?`)) return;
+      aiMutating = true;
+      try {
+        await call(`/admin/api/ai/${batch.id}/content/${encodeURIComponent(content.id)}`, { method: 'DELETE' });
+        await showAiBatch(batch.id, aiResultPages.get(batch.id) || 1);
+        note(sight ? 'Sight removed.' : 'Image and description cleared.');
+      } catch (error) { note(error.message, true) }
+      finally { aiMutating = false }
     }
     async function aiAction(id, action) {
       try { await call(`/admin/api/ai/${id}/${action}`, { method: 'POST' }); await refreshAiBatches(); await showAiBatch(id) }
