@@ -409,7 +409,40 @@ class AdminAiAutomationTest extends TestCase
         $this->postJson('/admin/api/ai/recover-rate-limits')->assertUnauthorized();
         $this->getJson('/admin/api/ai/1/results')->assertUnauthorized();
         $this->postJson('/admin/api/ai', ['category' => 'countries'])->assertUnauthorized();
+        $this->postJson('/admin/api/ai/image', ['resource' => 'cities', 'field' => 'imageUrl', 'name' => 'Paris'])->assertUnauthorized();
         $this->postJson('/admin/api/ai/1/process')->assertUnauthorized();
+    }
+
+    public function test_editor_generates_an_image_without_changing_a_catalog_record(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-key');
+        $generator = $this->mock(AiStampGenerator::class);
+        $generator->shouldReceive('image')->once()->with('City', 'Paris, France', 'cities', '')
+            ->andReturn('/images/cities/generated.webp');
+
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai/image', [
+            'resource' => 'cities', 'field' => 'imageUrl', 'name' => 'Paris, France',
+        ])->assertStatus(201)->assertJsonPath('imageUrl', '/images/cities/generated.webp');
+        $this->assertDatabaseCount('cities', 0);
+    }
+
+    public function test_editor_image_generation_rejects_unsupported_fields(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-key');
+        $this->mock(AiStampGenerator::class)->shouldNotReceive('image');
+
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai/image', [
+            'resource' => 'collections', 'field' => 'explorerImageUrl', 'name' => 'Nature',
+        ])->assertStatus(422);
+    }
+
+    public function test_editor_image_prompts_support_collection_and_quiz_images(): void
+    {
+        $generator = app(AiStampGenerator::class);
+        $this->assertStringContainsString('travel collection theme', $generator->imagePrompt('Collection', 'Coastal France'));
+        $this->assertStringContainsString('NO title', $generator->imagePrompt('Quiz Image', 'A famous bridge in Paris'));
     }
 
     public function test_project_city_csv_uses_largest_match_and_creates_missing_catalog_cities(): void

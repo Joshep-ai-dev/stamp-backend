@@ -24,6 +24,7 @@ Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
     Route::get('/ai', [AdminAiController::class, 'index']);
     Route::post('/ai', [AdminAiController::class, 'start']);
+    Route::post('/ai/image', [AdminAiController::class, 'generateImage']);
     Route::post('/ai/recover-rate-limits', [AdminAiController::class, 'recoverRateLimits']);
     Route::delete('/ai/{id}/items/{itemId}', [AdminAiController::class, 'removeItem']);
     Route::put('/ai/{id}/content/{target}', [AdminAiController::class, 'updateContent']);

@@ -54,8 +54,8 @@ class AiStampGenerator
 
     public function imagePrompt(string $category, string $name, string $extra = ''): string
     {
-        if ($category === 'Top Sight') {
-            $titleInstruction = 'This is a top-sight stamp: include NO title, place name, city name, '
+        if (in_array($category, ['Top Sight', 'Quiz Image'], true)) {
+            $titleInstruction = 'Include NO title, place name, city name, '
                 .'country name, letters, numbers, signs, captions, or other visible text. '
                 .'Let the engraving continue through the upper part of the frame. '
                 .'Do not leave an empty title panel.';
@@ -74,6 +74,9 @@ class AiStampGenerator
             'State' => 'Depict defining real landmarks, architecture, landscape, and plants from this US state in one coherent panorama.',
             'City' => 'Show recognizable real landmarks in one geographically accurate city panorama.',
             'Top Sight' => 'Show this exact attraction as the central subject with accurate surroundings; the city and country identify its location only.',
+            'Collection' => 'Depict a coherent panorama of real places connected to this travel collection theme.',
+            'Collection Place' => 'Depict the named place accurately as the central subject with its real surroundings.',
+            'Quiz Image' => 'Depict the place or subject described here accurately. Do not reveal the answer using text or symbols.',
         };
         $direction = trim($extra) ?: 'none';
 

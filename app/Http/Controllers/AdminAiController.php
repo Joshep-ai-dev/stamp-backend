@@ -53,6 +53,33 @@ class AdminAiController extends Controller
         return response()->json(['recovered' => AiRateLimit::recoverFailedItems()]);
     }
 
+    public function generateImage(Request $request, AiStampGenerator $generator): JsonResponse
+    {
+        abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
+        $data = $request->validate([
+            'resource' => ['required', Rule::in(['countries', 'states', 'cities', 'sights', 'collections', 'collection-lists', 'daily-destinations'])],
+            'field' => ['required', 'string', 'max:32'],
+            'name' => ['required', 'string', 'min:2', 'max:300'],
+            'direction' => ['nullable', 'string', 'max:500'],
+        ]);
+        $category = match ($data['resource']) {
+            'countries' => $data['field'] === 'heroImage' ? 'Country' : null,
+            'states' => $data['field'] === 'imageUrl' ? 'State' : null,
+            'cities' => $data['field'] === 'imageUrl' ? 'City' : null,
+            'sights' => $data['field'] === 'image' ? 'Top Sight' : null,
+            'collections' => $data['field'] === 'heroImageUrl' ? 'Collection' : null,
+            'collection-lists' => $data['field'] === 'imageUrl' ? 'Collection Place' : null,
+            'daily-destinations' => preg_match('/^q(?:10|[1-9])Image$/', $data['field']) ? 'Quiz Image' : null,
+        };
+        abort_unless($category, 422, 'AI generation is unavailable for this image field.');
+        $folder = match ($data['resource']) {
+            'collections', 'collection-lists' => 'collection',
+            default => $data['resource'],
+        };
+
+        return response()->json(['imageUrl' => $generator->image($category, trim($data['name']), $folder, $data['direction'] ?? '')], 201);
+    }
+
     private function sectionCounts(): array
     {
         $batchTotals = DB::table('ai_content_batches')->selectRaw('category, SUM(total) AS total, SUM(completed) AS completed, SUM(failed) AS failed')

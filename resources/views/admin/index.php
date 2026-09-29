@@ -594,6 +594,7 @@
       <img id="aiEditPreview" class="ai-edit-preview" alt="Current image" hidden>
       <label class="field">Image path or URL<input name="image" placeholder="/images/sights/stamp.webp"><small>Clear this field to remove the image.</small></label>
       <label class="field">Replace image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+      <button type="button" onclick="generateAiEditorImage(this)">Generate image with AI</button>
       <label id="aiFeatureField" class="check"><input name="isFeatured" type="checkbox">Approved · Shown in app lists</label>
       <div class="dialogfoot"><button type="button" onclick="document.querySelector('#aiContentEditor').close()">Cancel</button><button class="primary" type="submit">Save changes</button></div>
     </form>
@@ -1054,7 +1055,7 @@
         card.className = 'question-card'; card.dataset.question = number; card.open = number === 1;
         card.innerHTML = `<summary>Question ${number}${number > 5 ? ' · Preview only' : ''}</summary><div class="question-fields"></div>`;
         first.before(card);
-        controls.forEach(control => card.querySelector('.question-fields').append(control.closest('label')));
+        controls.forEach(control => card.querySelector('.question-fields').append(control.closest('.field')));
       }
       updateKrooIqQuestionVisibility();
     }
@@ -1067,12 +1068,83 @@
       });
     }
     function closeEditor() { modal.classList.add('hidden'); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
+    function aiImageSubject(resource, field) {
+      const fieldValue = name => form.elements[name]?.value?.trim() || '';
+      const country = state.meta.countries.find(item => item.id === fieldValue('countryId'))?.name || '';
+      const city = form.elements.cityId?.value ? form.elements.cityId.selectedOptions[0]?.textContent?.trim() || '' : '';
+      if (resource === 'daily-destinations') {
+        const number = field.match(/^q(10|[1-9])Image$/)?.[1];
+        const subject = fieldValue(`q${number}Information`) || fieldValue(`q${number}Prompt`);
+        if (!subject) throw new Error('Enter the question information or prompt before generating its image.');
+        return [subject, country].filter(Boolean).join(', ').slice(0, 300);
+      }
+      const title = fieldValue(resource === 'collections' || resource === 'collection-lists' ? 'title' : 'name');
+      if (!title) throw new Error('Enter a name or title before generating an image.');
+      return [title, resource === 'collection-lists' ? fieldValue('location') || city : resource === 'sights' ? city : '', country].filter(Boolean).join(', ').slice(0, 300);
+    }
+    async function generateFormImage(button) {
+      const input = button.closest('.image-field').querySelector('input[type=file]');
+      const resource = form.dataset.resource;
+      button.disabled = true;
+      button.textContent = 'Generating…';
+      try {
+        const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource, field: input.name, name: aiImageSubject(resource, input.name) }) });
+        input.value = '';
+        normalizedFiles.delete(input);
+        input.dataset.current = result.imageUrl;
+        button.closest('.image-field').querySelector('.field-preview').innerHTML = imagePreview(result.imageUrl, 'Generated image');
+        formNotice.innerHTML = '<div class="notice">Image generated. Save this form to use it.</div>';
+      } catch (error) {
+        formNotice.innerHTML = `<div class="notice error">${esc(error.message)}</div>`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Generate image with AI';
+      }
+    }
+    async function generateAiEditorImage(button) {
+      const { batch, item } = aiEditing || {};
+      if (!batch) return;
+      const editForm = document.querySelector('#aiContentForm');
+      const resource = batch.category === 'discover-sights' ? 'sights' : batch.category;
+      const field = { countries: 'heroImage', states: 'imageUrl', cities: 'imageUrl', sights: 'image' }[resource];
+      if (!field) return;
+      button.disabled = true;
+      button.textContent = 'Generating…';
+      try {
+        const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource, field, name: [editForm.elements.name.value.trim(), item.location].filter(Boolean).join(', ').slice(0, 300) }) });
+        editForm.elements.image.value = result.imageUrl;
+        editForm.elements.imageFile.value = '';
+        document.querySelector('#aiEditPreview').src = result.imageUrl;
+        document.querySelector('#aiEditPreview').hidden = false;
+        document.querySelector('#aiEditNotice').textContent = 'Image generated. Save changes to use it.';
+      } catch (error) {
+        document.querySelector('#aiEditNotice').textContent = error.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Generate image with AI';
+      }
+    }
     async function normalizeImage(input) { const file = input.files?.[0]; if (!file) return; try { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800; const context = canvas.getContext('2d'); const transparent = input.name === 'explorerImageUrl'; if (!transparent) { context.fillStyle = '#061f18'; context.fillRect(0, 0, 1200, 800) } const scale = transparent ? Math.min(1200 / bitmap.width, 800 / bitmap.height) : Math.max(1200 / bitmap.width, 800 / bitmap.height), width = bitmap.width * scale, height = bitmap.height * scale; context.drawImage(bitmap, (1200 - width) / 2, (800 - height) / 2, width, height); bitmap.close(); const mime = transparent ? 'image/png' : 'image/jpeg'; const extension = transparent ? 'png' : 'jpg'; const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, .9)); if (!blob) throw new Error('The image could not be resized.'); const preview = input.closest('.image-field')?.querySelector('.field-preview'); if (preview) { const reader = new FileReader(); reader.onload = () => { preview.innerHTML = imagePreview(reader.result, input.closest('.image-field').querySelector('label').textContent) }; reader.readAsDataURL(blob) } normalizedFiles.set(input, new File([blob], `${crypto.randomUUID()}.${extension}`, { type: mime })); note(transparent ? 'Explorer image fitted to a transparent 1200 × 800 canvas.' : 'Image center-cropped to 1200 × 800 pixels.') } catch (error) { input.value = ''; normalizedFiles.delete(input); note(error.message || 'The image could not be resized.', true) } }
     async function uploadImage(el) { const file = normalizedFiles.get(el) || el.files?.[0]; if (!file) return el.dataset.current || ''; const folders = { countries: 'countries', cities: 'cities', sights: 'sights', collections: 'collection', 'collection-lists': 'collection', 'daily-destinations': 'daily-destinations' }, body = new FormData(); body.append('image', file); body.append('folder', folders[form.dataset.resource]); const r = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Image upload returned an invalid server response (${r.status}).`); const result = await r.json(); if (!r.ok) { const validation = Object.values(result.errors || {}).flat().join(' '); throw new Error(validation || result.message || 'Image upload failed.') } return result.imageUrl }
     form.onsubmit = async e => { e.preventDefault(); const data = {}, resource = form.dataset.resource, editId = form.dataset.editId; try { for (const f of schemas[resource]) { const el = form.elements[f[0]]; if (!el || el.disabled) continue; const value = f[2] === 'image' ? await uploadImage(el) : f[2] === 'check' ? el.checked : f[2] === 'number' ? Number(el.value || 0) : el.value.trim(); if (f[0] !== 'id' || value !== '') data[f[0]] = value } if (resource === 'daily-destinations') data.options = data.options.split('\n').map(x => x.trim()).filter(Boolean); const path = `/admin/api/${resource}${editId ? '/' + encodeURIComponent(editId) : ''}`; await call(path, { method: editId ? 'PUT' : 'POST', body: JSON.stringify(data) }); closeEditor(); if (resource === 'collections') state.meta = await call('/admin/api/meta'); if (resource === 'cities') delete state.states[data.countryId]; await load(); note(editId ? 'Updated successfully.' : 'Created successfully.') } catch (err) { note(err.message, true) } };
     async function removeRow(i) { const row = state.rows[i]; if (!confirm(`Delete “${row.name || row.title}”? This cannot be undone.`)) return; try { await call(`/admin/api/${state.tab}/${encodeURIComponent(row.id)}`, { method: 'DELETE' }); await load(); note('Deleted successfully.') } catch (e) { note(state.tab === 'cities' ? `Could not delete this city. It may still be used by visits or content. ${e.message}` : e.message, true) } }
-    async function showUsStates(button) { try { state.tab = 'us-states'; table.classList.remove('ai-workspace'); summary.style.display = ''; document.querySelector('.page-description').textContent = 'Manage images for US states.'; document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); button.classList.add('active'); title.textContent = 'US state images'; document.querySelector('#addButton').style.display = 'none'; summary.textContent = 'Upload images for United States state rows in the app.'; state.rows = await call('/admin/api/us-states'); table.innerHTML = `<table><thead><tr><th>No.</th><th>Image</th><th>State</th><th>Upload</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.imageUrl ? imagePreview(row.imageUrl, row.name) : '-'}</td><td>${esc(row.name)}</td><td><input id="state-image-${row.id}" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><button class="primary" onclick="withButtonLoading(this, &quot;Uploading...&quot;, () => saveUsStateImage('${row.id}'))">Upload</button></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`; note('') } catch (e) { note(e.message, true) } }
+    async function showUsStates(button) { try { state.tab = 'us-states'; table.classList.remove('ai-workspace'); summary.style.display = ''; document.querySelector('.page-description').textContent = 'Manage images for US states.'; document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); button.classList.add('active'); title.textContent = 'US state images'; document.querySelector('#addButton').style.display = 'none'; summary.textContent = 'Upload images for United States state rows in the app.'; state.rows = await call('/admin/api/us-states'); table.innerHTML = `<table><thead><tr><th>No.</th><th>Image</th><th>State</th><th>Upload</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.imageUrl ? imagePreview(row.imageUrl, row.name) : '-'}</td><td>${esc(row.name)}</td><td><input id="state-image-${row.id}" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><button class="primary" onclick="withButtonLoading(this, &quot;Uploading...&quot;, () => saveUsStateImage('${row.id}'))">Upload</button><button onclick="generateUsStateImage(this, ${esc(JSON.stringify(String(row.id)))}, ${esc(JSON.stringify(row.name))})">Generate with AI</button></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`; note('') } catch (e) { note(e.message, true) } }
     async function saveUsStateImage(id) { const input = document.querySelector(`#state-image-${CSS.escape(String(id))}`), file = input?.files?.[0]; if (!file) return note('Choose an image first.', true); try { const body = new FormData(); body.append('image', file); body.append('folder', 'states'); const upload = await fetch('/admin/api/images', { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key }, body }); const result = await upload.json(); if (!upload.ok) throw new Error(result.message || 'Image upload failed.'); await call(`/admin/api/us-states/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ imageUrl: result.imageUrl }) }); await showUsStates(document.querySelector('.nav button[onclick*="showUsStates"]')); note('State image updated successfully.') } catch (e) { note(e.message, true) } }
+    async function generateUsStateImage(button, id, name) {
+      button.disabled = true;
+      button.textContent = 'Generating…';
+      try {
+        const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource: 'states', field: 'imageUrl', name: `${name}, United States` }) });
+        await call(`/admin/api/us-states/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ imageUrl: result.imageUrl }) });
+        await showUsStates(document.querySelector('.nav button[onclick*="showUsStates"]'));
+        note('State image generated and saved.');
+      } catch (error) {
+        note(error.message, true);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Generate with AI';
+      }
+    }
     document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); b.classList.add('active'); state.tab = b.dataset.tab; await load() });
     if (state.key) { document.querySelector('#key').value = state.key; login() }
     function fieldHtml(f, row) {
@@ -1096,7 +1168,7 @@
       if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" ${required}><option value="">Select a country first…</option></select></label>`;
       if (type === 'kinds') return `<label class="${cls}">${label}<select name="${key}" required multiple size="${Math.min(Math.max(state.meta.collectionKinds.length, 2), 6)}">${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${value.includes(x.id) ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select><small>Choose every collection this item belongs to.</small></label>`;
       if (type === 'access') return `<label class="${cls}">${label}<select name="${key}"><option value="free" ${value !== 'pro' ? 'selected' : ''}>Everyone</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+ only</option></select></label>`;
-      if (type === 'image') return `<div class="${cls} image-field"><label for="image-${key}">${label}</label><div class="field-preview">${value ? imagePreview(value, label) : '<small>No image selected</small>'}</div><input id="image-${key}" name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>${key === 'explorerImageUrl' ? 'Fitted to a transparent 1200 × 800 canvas.' : 'Center-cropped to 1200 × 800 pixels.'} Choose a file to preview before saving.</small></div>`;
+      if (type === 'image') return `<div class="${cls} image-field"><label for="image-${key}">${label}</label><div class="field-preview">${value ? imagePreview(value, label) : '<small>No image selected</small>'}</div><input id="image-${key}" name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>${key === 'explorerImageUrl' ? 'Fitted to a transparent 1200 × 800 canvas.' : 'Center-cropped to 1200 × 800 pixels.'} Choose a file to preview before saving.</small>${key === 'explorerImageUrl' ? '' : '<button type="button" onclick="generateFormImage(this)">Generate image with AI</button>'}</div>`;
       if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${required}>${esc(value || '')}</textarea></label>`;
       const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : '';
       const answerRange = questionMatch?.[2] === 'Correct' ? `min="1" max="${Math.max(1, (row?.questions?.[Number(questionMatch[1]) - 1]?.answers?.length || 4))}"` : '';
