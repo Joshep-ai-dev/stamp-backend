@@ -92,7 +92,7 @@ class GenerateAiContent implements ShouldBeUnique, ShouldQueue
             return;
         }
         ['model' => $model, 'category' => $category, 'name' => $name, 'imageField' => $imageField] = $context;
-        if (blank($model->description)) {
+        if ($category !== 'Country' && blank($model->description)) {
             $model->description = $generator->description($category, $name);
             $model->save();
         }
@@ -109,7 +109,7 @@ class GenerateAiContent implements ShouldBeUnique, ShouldQueue
         $model = $context['model'];
         $imageField = $context['imageField'];
         $model->refresh();
-        if (isset($result['description']) && blank($model->description)) {
+        if (! $model instanceof Country && isset($result['description']) && blank($model->description)) {
             $model->description = $result['description'];
         }
         if (isset($result['image']) && blank($model->{$imageField})) {
@@ -119,8 +119,8 @@ class GenerateAiContent implements ShouldBeUnique, ShouldQueue
         if (isset($result['error'])) {
             throw $result['error'];
         }
-        if (blank($model->description) || blank($model->{$imageField})) {
-            throw new \RuntimeException('Description or image generation did not finish.');
+        if ((! $model instanceof Country && blank($model->description)) || blank($model->{$imageField})) {
+            throw new \RuntimeException('Required content generation did not finish.');
         }
         if ($complete) {
             $this->completeItem();

@@ -104,7 +104,7 @@ class AiBatchRunner
     {
         return [
             'category' => $context['category'], 'name' => $context['name'], 'folder' => $context['folder'],
-            'description' => blank($context['model']->description),
+            'description' => $context['category'] !== 'Country' && blank($context['model']->description),
             'image' => blank($context['model']->{$context['imageField']}),
         ];
     }

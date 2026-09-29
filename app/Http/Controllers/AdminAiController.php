@@ -289,7 +289,7 @@ class AdminAiController extends Controller
         $category = $data['category'];
         abort_if(DB::table('ai_content_batches')->where('category', $category)->where('status', 'running')->exists(), 409, 'A batch for this content type is already running.');
         $query = match ($category) {
-            'countries' => Country::query()->where(fn ($q) => $q->whereNull('hero_image')->orWhere('hero_image', '')->orWhereNull('description')->orWhere('description', '')),
+            'countries' => Country::query()->where(fn ($q) => $q->whereNull('hero_image')->orWhere('hero_image', '')),
             'states' => CountryState::query()->where('country_code', 'US')->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
             'cities' => City::query()->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
             'sights' => Sight::query()->where('is_featured', true)->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
@@ -348,7 +348,7 @@ class AdminAiController extends Controller
                         $record->save();
                         $needsContent = true;
                     }
-                    $needsContent = $needsContent || blank($record->description);
+                    $needsContent = $needsContent || (! $record instanceof Country && blank($record->description));
                 }
                 if ($needsContent) {
                     $missing[] = $item->id;

@@ -597,14 +597,15 @@ class AdminAiAutomationTest extends TestCase
         config()->set('queue.default', 'sync');
         config()->set('ai.concurrency', 1);
         Queue::fake();
-        Http::fake(['api.openai.com/v1/responses' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => 'Generated travel description.']]]]])]);
-        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU', 'hero_image' => '/images/countries/fr.webp']);
-        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA', 'hero_image' => '/images/countries/us.webp']);
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response($this->fakeImage())]);
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
+        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA']);
         $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->assertOk()->json('batch.id');
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', true)->assertJsonPath('batch.completed', 1)->assertJsonPath('batch.status', 'running');
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 2)->assertJsonPath('batch.status', 'complete');
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('processed', false)->assertJsonPath('batch.completed', 2);
-        $this->assertDatabaseHas('countries', ['code' => 'FR', 'description' => 'Generated travel description.', 'hero_image' => '/images/countries/fr.webp']);
+        $this->assertNotEmpty(Country::find('FR')->hero_image);
+        $this->assertNull(Country::find('FR')->description);
         Http::assertSentCount(2);
         Queue::assertNothingPushed();
     }
@@ -681,7 +682,7 @@ class AdminAiAutomationTest extends TestCase
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', $concurrency)->assertJsonPath('batch.status', 'running');
         foreach (array_slice($codes, 0, $concurrency) as $code) {
             $country = Country::find($code);
-            $this->assertSame('Generated description.', $country->description);
+            $this->assertNull($country->description);
             $this->assertNotEmpty($country->hero_image);
             $this->assertFileExists(public_path(ltrim($country->hero_image, '/')));
             $this->get($country->hero_image)->assertOk();
@@ -692,7 +693,7 @@ class AdminAiAutomationTest extends TestCase
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations')
             && $request['output_format'] === 'webp' && str_contains($request['prompt'], 'deep forest-green ink'));
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', $concurrency + 1)->assertJsonPath('batch.status', 'complete');
-        Http::assertSentCount(($concurrency + 1) * 2);
+        Http::assertSentCount($concurrency + 1);
     }
 
     public function test_failed_image_does_not_discard_description_or_block_other_parallel_items(): void
@@ -710,7 +711,7 @@ class AdminAiAutomationTest extends TestCase
         $batch = $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson('/admin/api/ai', ['category' => 'countries'])->json('batch.id');
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', 2)->assertJsonPath('batch.failed', 1)
             ->assertJsonPath('errors.0.error', 'The image model returned no readable image.');
-        $this->assertDatabaseHas('countries', ['code' => 'AA', 'description' => 'Saved description.']);
+        $this->assertNull(Country::find('AA')->description);
         $this->assertNotEmpty(Country::find('BB')->hero_image);
         $this->assertNotEmpty(Country::find('CC')->hero_image);
     }
