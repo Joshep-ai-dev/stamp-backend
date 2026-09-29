@@ -6,9 +6,25 @@ use App\Exceptions\AiRateLimitedException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class AiRateLimit
 {
+    public static function isBillingFailure(Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        foreach (['no credits remaining', 'credit_balance_exhausted', 'add credits', 'current quota',
+            'organization_spend_limit_exceeded', 'project_spend_limit_exceeded',
+            'organization_usage_limit_exceeded', 'insufficient_quota'] as $marker) {
+            if (str_contains($message, $marker)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function key(): string
     {
         return 'ai-rate-limit:'.hash('sha256', (string) config('services.openai.api_key'));
@@ -37,8 +53,12 @@ class AiRateLimit
         $code = strtolower((string) $response->json('error.code'));
         $message = strtolower((string) $response->json('error.message'));
 
-        return ! in_array($code, ['insufficient_quota', 'billing_hard_limit_reached', 'billing_not_active', 'usage_limit_reached'], true)
-            && ! str_contains($message, 'current quota') && ! str_contains($message, 'billing') && ! str_contains($message, 'insufficient credit');
+        return ! in_array($code, ['insufficient_quota', 'credit_balance_exhausted', 'organization_spend_limit_exceeded',
+            'project_spend_limit_exceeded', 'organization_usage_limit_exceeded', 'billing_hard_limit_reached',
+            'billing_not_active', 'usage_limit_reached'], true)
+            && ! str_contains($message, 'current quota') && ! str_contains($message, 'billing')
+            && ! str_contains($message, 'insufficient credit') && ! str_contains($message, 'no credits remaining')
+            && ! str_contains($message, 'add credits');
     }
 
     public static function pause(Response $response): AiRateLimitedException

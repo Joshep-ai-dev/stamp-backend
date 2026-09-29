@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Exceptions\AiRateLimitedException;
 use App\Models\City;
 use App\Models\Sight;
+use App\Services\AiRateLimit;
 use App\Services\AiStampGenerator;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -95,6 +96,10 @@ class DiscoverAiSights implements ShouldBeUnique, ShouldQueue
             ]);
             DB::table('ai_content_batches')->where('id', $item->batch_id)->increment('failed');
         });
+        if (AiRateLimit::isBillingFailure($exception)) {
+            DB::table('ai_content_batches')->where('id', $item->batch_id)->where('status', 'running')
+                ->update(['status' => 'paused', 'updated_at' => now()]);
+        }
         $this->finishBatch($item->batch_id);
     }
 

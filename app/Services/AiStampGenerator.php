@@ -188,7 +188,7 @@ PROMPT;
         return [
             'model' => $model, 'prompt' => $this->imagePrompt($category, $name, $extra),
             'size' => str_starts_with($model, 'gpt-image-2') ? '1200x800' : '1536x1024',
-            'quality' => 'high', 'output_format' => 'webp', 'output_compression' => 60,
+            'quality' => config('ai.image_quality', 'low'), 'output_format' => 'webp', 'output_compression' => 60,
         ];
     }
 
@@ -274,14 +274,23 @@ PROMPT;
         if (! $bytes || ! $extension) {
             throw new RuntimeException('The image model returned no readable image.');
         }
-        if (function_exists('imagecreatefromstring') && function_exists('imagewebp') && ($extension !== 'webp' || strlen($bytes) >= 299000)) {
+        if ($extension !== 'webp' || strlen($bytes) >= 299000 || ($details[0] ?? 0) !== 1200 || ($details[1] ?? 0) !== 800) {
+            if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
+                throw new RuntimeException('GD image processing is required to resize generated images.');
+            }
             $source = @imagecreatefromstring($bytes);
             if (! $source) {
                 throw new RuntimeException('The image model returned an unreadable image.');
             }
             try {
-                $bytes = $this->smallWebp($source);
-                $extension = 'webp';
+                try {
+                    $bytes = $this->smallWebp($source);
+                    $extension = 'webp';
+                } catch (RuntimeException $exception) {
+                    if ($extension !== 'webp' || strlen($bytes) >= 299000) {
+                        throw $exception;
+                    }
+                }
             } finally {
                 imagedestroy($source);
             }
@@ -300,27 +309,24 @@ PROMPT;
 
     private function smallWebp(\GdImage $source): string
     {
-        $originalWidth = imagesx($source);
-        $originalHeight = imagesy($source);
-        foreach ([1200, 1100, 1000, 900, 800] as $width) {
-            $width = min($width, $originalWidth);
-            $height = (int) round($originalHeight * $width / $originalWidth);
-            $resized = imagescale($source, $width, $height, IMG_BICUBIC);
-            if (! $resized) {
-                continue;
+        $resized = imagecreatetruecolor(1200, 800);
+        if (! $resized) {
+            throw new RuntimeException('Could not resize the generated image to 1200 × 800.');
+        }
+        try {
+            if (! imagecopyresampled($resized, $source, 0, 0, 0, 0, 1200, 800, imagesx($source), imagesy($source))) {
+                throw new RuntimeException('Could not resize the generated image to 1200 × 800.');
             }
-            try {
-                foreach ([85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30] as $quality) {
-                    ob_start();
-                    imagewebp($resized, null, $quality);
-                    $bytes = ob_get_clean();
-                    if (is_string($bytes) && strlen($bytes) < 299000) {
-                        return $bytes;
-                    }
+            foreach ([85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10] as $quality) {
+                ob_start();
+                imagewebp($resized, null, $quality);
+                $bytes = ob_get_clean();
+                if (is_string($bytes) && strlen($bytes) < 299000) {
+                    return $bytes;
                 }
-            } finally {
-                imagedestroy($resized);
             }
+        } finally {
+            imagedestroy($resized);
         }
         throw new RuntimeException('Could not encode the generated image under 299 KB.');
     }

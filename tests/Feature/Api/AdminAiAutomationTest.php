@@ -44,6 +44,26 @@ class AdminAiAutomationTest extends TestCase
         return ['data' => [['b64_json' => 'UklGRg4CAABXRUJQVlA4WAoAAAAgAAAACwAABwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggIAAAAFABAJ0BKgwACAACgEIlAE6AKAAA/vPevodcXNkWkAAA']]];
     }
 
+    public function test_generated_image_is_saved_at_1200_by_800_under_300_kb(): void
+    {
+        if (! function_exists('imagecreatetruecolor') || ! function_exists('imagewebp')) {
+            $this->markTestSkipped('GD WebP support is required.');
+        }
+
+        $image = imagecreatetruecolor(1536, 1024);
+        imagefill($image, 0, 0, imagecolorallocate($image, 30, 72, 46));
+        ob_start();
+        imagewebp($image);
+        $bytes = ob_get_clean();
+        imagedestroy($image);
+
+        $url = app(AiStampGenerator::class)->storeImage(['data' => [['b64_json' => base64_encode($bytes)]], 'countries');
+        $file = public_path(ltrim($url, '/'));
+
+        $this->assertSame([1200, 800], array_slice(getimagesize($file), 0, 2));
+        $this->assertLessThan(300000, filesize($file));
+    }
+
     public function test_text_requests_reduce_reasoning_and_limit_tokens_without_changing_description_prompt(): void
     {
         config()->set('services.openai.api_key', 'test-key');
@@ -142,8 +162,24 @@ class AdminAiAutomationTest extends TestCase
         config()->set('services.openai.api_key', 'test-key');
         Http::fake(['api.openai.com/v1/images/generations' => Http::response(['error' => ['message' => 'You exceeded your current quota.', 'code' => 'insufficient_quota']], 429)]);
         $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()
-            ->assertJsonPath('batch.failed', 1)->assertJsonPath('retryAfterSeconds', 0);
+            ->assertJsonPath('batch.failed', 1)->assertJsonPath('batch.status', 'paused')->assertJsonPath('retryAfterSeconds', 0);
         $this->postJson('/admin/api/ai/recover-rate-limits')->assertOk()->assertJsonPath('recovered', 0);
+        Http::assertSentCount(1);
+    }
+
+    public function test_exhausted_credits_pause_the_batch_without_retrying(): void
+    {
+        [$sight, $batch] = $this->sightBatch('running');
+        config()->set('services.openai.api_key', 'test-key');
+        Http::fake(['api.openai.com/v1/images/generations' => Http::response([
+            'error' => ['message' => 'You have no credits remaining. Add credits to continue using the API.',
+                'code' => 'credit_balance_exhausted'],
+        ], 429)]);
+
+        $this->withHeader('X-Admin-Key', 'test-admin-key')->postJson("/admin/api/ai/{$batch}/process")->assertOk()
+            ->assertJsonPath('batch.status', 'paused')->assertJsonPath('batch.failed', 1)
+            ->assertJsonPath('retryAfterSeconds', 0);
+        $this->postJson("/admin/api/ai/{$batch}/process")->assertJsonPath('processed', false);
         Http::assertSentCount(1);
     }
 
@@ -691,7 +727,9 @@ class AdminAiAutomationTest extends TestCase
         $this->getJson("/admin/api/ai/{$batch}/results")->assertJsonPath('results.data.0.targetId', 'AA')
             ->assertJsonPath('results.data.1.targetId', 'BB')->assertJsonPath('results.data.2.targetId', 'CC');
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations')
-            && $request['output_format'] === 'webp' && str_contains($request['prompt'], 'deep forest-green ink'));
+            && $request['model'] === 'gpt-image-1-mini' && $request['size'] === '1536x1024'
+            && $request['output_format'] === 'webp' && $request['quality'] === 'low'
+            && str_contains($request['prompt'], 'deep forest-green ink'));
         $this->postJson("/admin/api/ai/{$batch}/process")->assertOk()->assertJsonPath('batch.completed', $concurrency + 1)->assertJsonPath('batch.status', 'complete');
         Http::assertSentCount($concurrency + 1);
     }
