@@ -3,9 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\AiRateLimitedException;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -224,13 +222,21 @@ PROMPT;
                 }
                 break;
             }
-            $responses = Http::pool(function (Pool $pool) use ($pending, $key): void {
+            try {
+                $responses = Http::pool(function (Pool $pool) use ($pending, $key): void {
+                    foreach ($pending as $id => $request) {
+                        $body = $request['path'] === '/responses' ? $this->textOptions($request['body']) : $request['body'];
+                        $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)
+                            ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($body, ['stream' => false]));
+                    }
+                }, null);
+            } catch (Throwable $exception) {
+                Log::warning('OpenAI request pool did not finish.', ['error' => $exception->getMessage()]);
                 foreach ($pending as $id => $request) {
-                    $body = $request['path'] === '/responses' ? $this->textOptions($request['body']) : $request['body'];
-                    $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(180)->retry(3, 2000, fn ($exception) => $exception instanceof ConnectionException || ($exception instanceof RequestException && $exception->response->serverError()), throw: false)
-                        ->post(rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/').$request['path'], array_merge($body, ['stream' => false]));
+                    $results[$id] = new RuntimeException('OpenAI request did not finish. Retry this batch item.', 0, $exception);
                 }
-            }, self::concurrency());
+                break;
+            }
             $retry = [];
             foreach ($responses as $id => $response) {
                 try {
