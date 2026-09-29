@@ -293,7 +293,12 @@ class AdminAiController extends Controller
             'states' => CountryState::query()->where('country_code', 'US')->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
             'cities' => City::query()->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
             'sights' => Sight::query()->where('is_featured', true)->where(fn ($q) => $q->whereNull('image_url')->orWhere('image_url', '')->orWhereNull('description')->orWhere('description', '')),
-            'discover-sights' => City::query(),
+            'discover-sights' => City::query()->whereNotExists(function ($query): void {
+                $query->selectRaw('1')->from('ai_content_items as items')
+                    ->join('ai_content_batches as batches', 'batches.id', '=', 'items.batch_id')
+                    ->where('batches.category', 'discover-sights')
+                    ->whereRaw('items.target_id = CAST(cities.id AS VARCHAR)');
+            }),
         };
         if (in_array($category, ['cities', 'discover-sights'], true)) {
             $rankedIds = $this->cityIdsFromCsv(config('ai.city_csv'));

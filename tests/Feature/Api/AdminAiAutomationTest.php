@@ -447,6 +447,38 @@ class AdminAiAutomationTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_new_top_sights_batch_starts_after_cities_in_previous_batches(): void
+    {
+        config()->set('services.stampo.admin_key', 'test-admin-key');
+        config()->set('services.openai.api_key', 'test-openai-key');
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
+        $csv = "rank,city,country\n";
+        for ($rank = 1; $rank <= 1000; $rank++) {
+            $csv .= "{$rank},Ranked Place {$rank},France\n";
+        }
+        $path = tempnam(sys_get_temp_dir(), 'oxford-test-');
+        file_put_contents($path, $csv);
+        config()->set('ai.city_csv', $path);
+
+        try {
+            $first = $this->withHeader('X-Admin-Key', 'test-admin-key')
+                ->postJson('/admin/api/ai', ['category' => 'discover-sights', 'limit' => 2])
+                ->assertOk()->assertJsonPath('batch.total', 2)->json('batch.id');
+            $firstTargets = DB::table('ai_content_items')->where('batch_id', $first)->orderBy('id')->pluck('target_id')->all();
+            DB::table('ai_content_batches')->where('id', $first)->update(['status' => 'complete']);
+
+            $second = $this->postJson('/admin/api/ai', ['category' => 'discover-sights', 'limit' => 2])
+                ->assertOk()->assertJsonPath('batch.total', 2)->json('batch.id');
+            $secondTargets = DB::table('ai_content_items')->where('batch_id', $second)->orderBy('id')->pluck('target_id')->all();
+
+            $this->assertSame([], array_values(array_intersect($firstTargets, $secondTargets)));
+            $this->assertSame(['Ranked Place 3', 'Ranked Place 4'], City::whereIn('id', $secondTargets)
+                ->orderBy('id')->pluck('name')->all());
+        } finally {
+            unlink($path);
+        }
+    }
+
     public function test_missing_project_csv_returns_actionable_error(): void
     {
         config()->set('services.stampo.admin_key', 'test-admin-key');

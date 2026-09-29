@@ -762,7 +762,7 @@
       const needsCsv = ['cities', 'discover-sights'].includes(category);
       document.querySelector('#aiCsv').hidden = !needsCsv;
       document.querySelector('#aiCategoryHelp').textContent = category === 'discover-sights'
-        ? 'Find five top sights for cities without sights, and fill missing images and descriptions for existing sights, including approved ones. Review new sights before showing them in app lists.'
+        ? 'Select the next cities not used in a Top sights batch. Find five sights where needed and fill missing images and descriptions. Retry earlier cities from their existing batch.'
         : 'Existing images and descriptions are kept. This run fills missing fields only.';
       form.querySelector('button[type=submit]').textContent = category === 'discover-sights' ? 'Generate top sights' : 'Start batch';
     }
