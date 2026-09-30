@@ -323,7 +323,7 @@
     .ai-draft-tools.lesson-action { margin-right:auto; flex-wrap:wrap }
     .ai-draft-tools.field-action { margin-top:-8px; margin-bottom:8px; flex-wrap:wrap; align-self:start }
     .ai-draft-tools button { flex:0 0 auto }
-    @media(max-width:600px) { .dialogfoot { flex-wrap:wrap } .ai-draft-tools.lesson-action { flex-basis:100% } .ai-draft-tools.field-action { grid-column:1/-1 !important } }
+    @@media(max-width:600px) { .dialogfoot { flex-wrap:wrap } .ai-draft-tools.lesson-action { flex-basis:100% } .ai-draft-tools.field-action { grid-column:1/-1 !important } }
     .question-card { grid-column:1/-1; padding:0 14px 14px }
     .question-card summary { padding:14px 0; color:var(--ink); font-weight:700; cursor:pointer }
     .question-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px }
@@ -346,7 +346,7 @@
       display: none !important
     }
 
-    @media(max-width:760px) {
+    @@media(max-width:760px) {
       .shell {
         display: block
       }
@@ -482,8 +482,8 @@
     .ai-progress { height: 7px; overflow: hidden; border-radius: 100px; background: #264637 }
     .ai-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #47ba88, #a8e5a0) }
     .ai-errors { margin-top: 12px; padding: 12px; border-radius: 9px; background: #442a26; color: #ffd8c7; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere }
-    @media(max-width:1100px) { .ai-grid { grid-template-columns: 1fr } }
-    @media(max-width:760px) {
+    @@media(max-width:1100px) { .ai-grid { grid-template-columns: 1fr } }
+    @@media(max-width:760px) {
       .top { align-items: flex-start; flex-wrap: wrap }
       .city-search-row input { min-width: 0; flex-basis: 100% }
       .dialog { padding: 16px }
@@ -547,7 +547,7 @@
     .ai-content-editor .check input { width: auto; }
     .ai-content-editor [hidden] { display: none; }
     .ai-edit-preview { max-width: 180px; max-height: 120px; object-fit: contain; margin-bottom: 10px; }
-    @media(max-width:700px) {
+    @@media(max-width:700px) {
       .ai-result-row { grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
       .ai-result-row .image-trigger, .ai-result-row .ai-image-empty { width: 90px; height: 60px; }
       .ai-image-error { display: block; padding: 8px; color: var(--danger); font-size: 12px; }

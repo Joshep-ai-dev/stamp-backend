@@ -42,14 +42,14 @@
   .contact { margin-top: 12px; padding: 22px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
   .contact a { color: var(--mint); }
   footer { border-top: 1px solid var(--line); padding: 28px; color: rgba(246,241,228,.45); font-family: 'Space Mono', monospace; font-size: 10px; text-align: center; }
-  @media (max-width: 600px) { main { padding-top: 52px; } .brand img { width: 110px; } h2 { font-size: 24px; } }
+  @@media (max-width: 600px) { main { padding-top: 52px; } .brand img { width: 110px; } h2 { font-size: 24px; } }
 </style>
 </head>
 <body>
 <nav>
   <div class="nav-inner">
-    <a class="brand" href="<?= route('website.home') ?>" aria-label="Kroo home"><img src="<?= asset('assets/kroo-logo.png') ?>" alt="Kroo"></a>
-    <a class="back" href="<?= route('website.home') ?>">&larr; Back to Kroo</a>
+    <a class="brand" href="{{ route('website.home') }}" aria-label="Kroo home"><img src="{{ asset('assets/kroo-logo.png') }}" alt="Kroo"></a>
+    <a class="back" href="{{ route('website.home') }}">&larr; Back to Kroo</a>
   </div>
 </nav>
 
