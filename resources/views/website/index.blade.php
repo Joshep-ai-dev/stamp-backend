@@ -7,9 +7,6 @@
   <meta name="theme-color" content="#06271e">
   <meta name="description" content="Collect the world with Kroo. Track your travels, explore new places, and build your passport of memories.">
   <title>Kroo — Collect the World</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --green: #06271e;
@@ -32,7 +29,7 @@
       margin: 0;
       background: var(--green);
       color: var(--cream);
-      font: 16px/1.55 'Roboto', Arial, sans-serif
+      font: 16px/1.55 Lora, 'Times New Roman', serif
     }
 
     h1,
@@ -45,7 +42,7 @@
     h1,
     h2,
     h3 {
-      font-family: 'Roboto', Arial, sans-serif;
+      font-family: Lora, 'Times New Roman', serif;
       line-height: 1.13
     }
 
@@ -71,7 +68,7 @@
       gap: 10px;
       min-height: 44px;
       padding: 10px 26px;
-      border: 1px solid #e4ad89;
+      border: 1px solid #d47b3f;
       border-radius: 999px;
       background: var(--copper);
       color: #fff;
@@ -83,7 +80,7 @@
 
     .button:hover {
       transform: translateY(-2px);
-      background: #e9ac84
+      background: #d68a58
     }
 
     .button svg {
@@ -104,7 +101,7 @@
 
     .eyebrow {
       color: var(--copper);
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 700;
       letter-spacing: .21em;
       text-transform: uppercase
@@ -131,7 +128,7 @@
     .logo {
       display: inline-flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       flex: none
     }
 
@@ -146,13 +143,13 @@
       display: flex;
       flex-direction: column;
       color: var(--copper);
-      font: 700 31px/.85 'Roboto', Arial, sans-serif
+      font: 700 31px/.85 Lora, 'Times New Roman', serif
     }
 
     .logo-text small {
       margin-top: 7px;
       color: var(--cream);
-      font: 10px/1 'Roboto', Arial, sans-serif;
+      font: 10px/1 Lora, 'Times New Roman', serif;
       letter-spacing: .03em
     }
 
@@ -176,8 +173,36 @@
     .nav-links .button {
       min-height: 36px;
       padding: 6px 18px;
-      font-size: 12px
+      font-size: 16px
     }
+
+    .menu-toggle {
+      display: none;
+      width: 44px;
+      height: 44px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 5px;
+      border: 1px solid #e4ad8977;
+      border-radius: 8px;
+      background: #06271e99;
+      color: var(--cream);
+      cursor: pointer
+    }
+
+    .menu-toggle span {
+      width: 20px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      transition: transform .2s, opacity .2s
+    }
+
+    .menu-toggle[aria-expanded="true"] span:first-child { transform: translateY(7px) rotate(45deg) }
+    .menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0 }
+    .menu-toggle[aria-expanded="true"] span:last-child { transform: translateY(-7px) rotate(-45deg) }
+    .menu-toggle:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px }
 
     .hero {
       position: relative;
@@ -205,7 +230,6 @@
       max-width: 580px;
       margin: 0 0 20px;
       font-size: clamp(58px, 7.1vw, 105px);
-      letter-spacing: -.055em
     }
 
     .hero h1 span {
@@ -215,7 +239,7 @@
     .hero p {
       max-width: 470px;
       margin-bottom: 28px;
-      font: 18px/1.5 'Roboto', Arial, sans-serif
+      font: 18px/1.5 Lora, 'Times New Roman', serif
     }
 
     .hero-actions {
@@ -270,38 +294,16 @@
     }
 
     .store-badge {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      height: 42px;
-      min-width: 133px;
-      padding: 3px 10px;
-      background: #050505;
-      border: 1px solid #eee;
-      border-radius: 6px;
-      color: #fff;
+      display: inline-block;
+      border-radius: 7px;
       box-shadow: 0 2px 8px #0007
     }
 
-    .store-badge svg {
-      width: 25px;
-      height: 29px;
-      flex: none
-    }
-
-    .store-badge span {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.02
-    }
-
-    .store-badge small {
-      font: 9px/1.1 'Roboto', Arial, sans-serif
-    }
-
-    .store-badge strong {
-      font: 600 17px/1.1 'Roboto', Arial, sans-serif;
-      white-space: nowrap
+    .store-badge img {
+      display: block;
+      width: auto;
+      height: 42px;
+      border-radius: 7px
     }
 
     .store-badges a:hover {
@@ -348,12 +350,14 @@
 
     .stat strong {
       display: block;
-      font: 26px/1.1 'Roboto', Arial, sans-serif
+      font: 26px/1.1 Lora, 'Times New Roman', serif;
+      font-weight:600
     }
 
     .stat small {
       color: var(--muted);
-      font: 12px 'Roboto', Arial, sans-serif
+      font: 16px Lora, 'Times New Roman', serif;
+      font-weight:500
     }
 
     .features {
@@ -526,14 +530,14 @@
 
     .split-copy li strong {
       display: block;
-      font-family: 'Roboto', Arial, sans-serif;
+      font-family: Lora, 'Times New Roman', serif;
       font-size: 16px
     }
 
     .split-copy li small {
       display: block;
       color: var(--muted);
-      font-size: 12px
+      font-size: 14px
     }
 
     .kroo-plus {
@@ -557,7 +561,7 @@
     }
 
     .passport .split-copy p {
-      font: 18px/1.55 'Roboto', Arial, sans-serif
+      font: 18px/1.55 Lora, 'Times New Roman', serif
     }
 
     .download {
@@ -585,7 +589,7 @@
 
     .download p {
       margin: 0 0 18px;
-      font: 17px 'Roboto', Arial, sans-serif
+      font: 17px Lora, 'Times New Roman', serif
     }
 
     .download .store-badges {
@@ -621,16 +625,16 @@
     }
 
     .footer h3 {
-      margin: 0 0 12px;
+      margin: 0 0 14px;
       color: var(--copper);
-      font: 16px 'Roboto', Arial, sans-serif
+      font: 16px Lora, 'Times New Roman', serif
     }
 
     .footer-col {
       display: flex;
       flex-direction: column;
       gap: 7px;
-      font-size: 12px;
+      font-size: 14px;
       color: var(--muted)
     }
 
@@ -639,7 +643,7 @@
     }
 
     .footer-note {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--muted)
     }
 
@@ -682,7 +686,7 @@
       }
 
       .features-copy {
-        padding-right: 12px
+        padding-right: 14px
       }
 
       .stamps img {
@@ -715,13 +719,25 @@
         font-size: 26px
       }
 
-      .nav-links a:not(.button) {
-        display: none
+      .menu-toggle { display: flex }
+
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 72px;
+        left: 0;
+        right: 0;
+        padding: 14px 18px 20px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        background: #06271ef5;
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 14px 24px #0007
       }
 
-      .nav-links .button {
-        padding: 7px 12px
-      }
+      .nav-links.is-open { display: flex }
+      .nav-links a:not(.button) { display: block; padding: 14px 10px }
 
       .hero {
         min-height: 640px;
@@ -935,21 +951,12 @@
       <rect x="2" y="5" width="20" height="14" rx="4" />
       <path d="m10 9 5 3-5 3z" />
     </symbol>
-    <symbol id="icon-apple" viewBox="0 0 32 32">
-      <path fill="currentColor" stroke="none"
-        d="M22.4 15.7c0-3 2.5-4.5 2.7-4.6-1.4-2-3.4-2.3-4.1-2.3-1.7-.2-3.3 1-4.2 1s-2.2-1-3.7-1c-2 0-3.8 1.2-4.8 3-2 3.5-.5 8.7 1.4 11.5 1 1.4 2.1 3 3.6 3s2-.9 3.7-.9 2.2.9 3.7.8c1.5 0 2.5-1.4 3.5-2.8 1.2-1.7 1.7-3.3 1.7-3.4-.1 0-3.5-1.4-3.5-4.3ZM19.8 7c.8-1 1.4-2.3 1.2-3.6-1.2.1-2.6.8-3.4 1.8-.8.9-1.5 2.2-1.3 3.4 1.3.1 2.7-.7 3.5-1.6Z" />
-    </symbol>
-    <symbol id="icon-play" viewBox="0 0 32 32">
-      <path fill="#40c4ff" stroke="none" d="M5 3v26l13-13Z" />
-      <path fill="#35d77b" stroke="none" d="M5 3 20 13l-2 3Z" />
-      <path fill="#ffcc3f" stroke="none" d="m18 16 8 5-21 8Z" />
-      <path fill="#fb5d62" stroke="none" d="m18 16 8-5-6 2Z" />
-    </symbol>
   </svg>
   <header class="site-header">
     <nav class="nav wrap" aria-label="Main navigation">
       <a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.asset', ['filename' => 'kroo-logo.png']) }}" alt=""></a>
-      <div class="nav-links"><a href="#top" aria-current="page">Home</a><a href="#features">Features</a><a href="#explore">Explore</a><a href="#kroo-plus">Kroo+</a><a href="#footer">About</a></div>
+      <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="mobile-menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <div class="nav-links" id="mobile-menu"><a href="#top" aria-current="page">Home</a><a href="#features">Features</a><a href="#explore">Explore</a><a href="#kroo-plus">Kroo+</a><a href="#footer">About</a></div>
     </nav>
   </header>
   <main id="top">
@@ -958,12 +965,7 @@
         <h1 id="hero-title">Collect<br><span>the world.</span></h1>
         <p>Track your travels, discover new places, and collect a lifetime of memories.</p>
         <div class="hero-actions">
-          <div class="store-badges"><a class="store-badge" href="#download" aria-label="App Store download information"><svg aria-hidden="true">
-                <use href="#icon-apple" />
-              </svg><span><small>Download on the</small><strong>App Store</strong></span></a><a class="store-badge" href="#download" aria-label="Google Play download information"><svg
-                aria-hidden="true">
-                <use href="#icon-play" />
-              </svg><span><small>GET IT ON</small><strong>Google Play</strong></span></a></div>
+          <div class="store-badges"><a class="store-badge" href="#download" aria-label="App Store download information"><img src="{{ route('website.page-image', ['filename' => 'apple.png']) }}" alt="Download on the App Store"></a><a class="store-badge" href="#download" aria-label="Google Play download information"><img src="{{ route('website.page-image', ['filename' => 'google.png']) }}" alt="Get it on Google Play"></a></div>
         </div>
       </div>
     </section>
@@ -1091,12 +1093,7 @@
       <div class="wrap">
         <h2 id="download-title">Your Next Adventure Awaits</h2>
         <p>Download Kroo and start collecting the world today.</p>
-        <div class="store-badges"><a class="store-badge" href="#download" aria-label="App Store download information"><svg aria-hidden="true">
-              <use href="#icon-apple" />
-            </svg><span><small>Download on the</small><strong>App Store</strong></span></a><a class="store-badge" href="#download" aria-label="Google Play download information"><svg
-              aria-hidden="true">
-              <use href="#icon-play" />
-            </svg><span><small>GET IT ON</small><strong>Google Play</strong></span></a></div>
+        <div class="store-badges"><a class="store-badge" href="#download" aria-label="App Store download information"><img src="{{ route('website.page-image', ['filename' => 'apple.png']) }}" alt="Download on the App Store"></a><a class="store-badge" href="#download" aria-label="Google Play download information"><img src="{{ route('website.page-image', ['filename' => 'google.png']) }}" alt="Get it on Google Play"></a></div>
       </div>
     </section>
   </main>
@@ -1123,6 +1120,29 @@
       </div>
     </div>
   </footer>
+  <script>
+    const menuButton = document.querySelector('.menu-toggle');
+    const menu = document.querySelector('#mobile-menu');
+    function setMenuOpen(open) {
+      menu.classList.toggle('is-open', open);
+      menuButton.setAttribute('aria-expanded', String(open));
+      menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+    menuButton.addEventListener('click', () => setMenuOpen(menuButton.getAttribute('aria-expanded') !== 'true'));
+    menu.querySelectorAll('a').forEach(link => link.addEventListener('click', () => setMenuOpen(false)));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && menuButton.getAttribute('aria-expanded') === 'true') {
+        setMenuOpen(false);
+        menuButton.focus();
+      }
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.nav') && menuButton.getAttribute('aria-expanded') === 'true') setMenuOpen(false);
+    });
+    window.matchMedia('(min-width: 681px)').addEventListener('change', event => {
+      if (event.matches) setMenuOpen(false);
+    });
+  </script>
 </body>
 
 </html>
