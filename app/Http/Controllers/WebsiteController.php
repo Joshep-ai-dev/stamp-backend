@@ -26,4 +26,14 @@ class WebsiteController extends Controller
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
+
+    public function pageImage(string $filename): BinaryFileResponse
+    {
+        $file = public_path('images/page/'.$filename);
+        abort_unless(is_file($file), 404);
+
+        return response()->file($file, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
 }
