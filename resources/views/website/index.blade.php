@@ -744,7 +744,7 @@
       .nav-links a:not(.button) { display: block; padding: 14px 10px }
 
       .hero {
-        min-height: 640px;
+        min-height: 660px;
         background-position: 58% center
       }
 

@@ -321,7 +321,7 @@
     .ai-draft-tools { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px }
     .ai-draft-tools[hidden] { display:none }
     .ai-draft-tools.lesson-action { margin-right:auto; flex-wrap:wrap }
-    .ai-draft-tools.field-action { margin-top:-8px; margin-bottom:8px; flex-wrap:wrap; align-self:start }
+    .ai-draft-tools.field-action { margin-top:2px; flex-wrap:wrap; align-self:start }
     .ai-draft-tools button { flex:0 0 auto }
     @@media(max-width:600px) { .dialogfoot { flex-wrap:wrap } .ai-draft-tools.lesson-action { flex-basis:100% } .ai-draft-tools.field-action { grid-column:1/-1 !important } }
     .question-card { grid-column:1/-1; padding:0 14px 14px }
@@ -1076,7 +1076,6 @@
       draftTools.hidden = !['countries', 'cities', 'sights', 'collections', 'collection-lists', 'daily-destinations'].includes(state.tab);
       draftTools.classList.toggle('lesson-action', isLesson);
       draftTools.classList.toggle('field-action', !isLesson);
-      draftTools.style.gridColumn = state.tab === 'cities' ? '2' : state.tab === 'countries' ? '1' : '1 / -1';
       draftTools.querySelector('button').textContent = isLesson ? 'Generate lesson and quiz with AI' : 'Generate description with AI';
       document.querySelector('#aiDraftHint').textContent = isLesson ? 'Review questions and add images before saving.' : 'Review and edit the draft before saving.';
       if (isLesson) {
@@ -1084,7 +1083,13 @@
         updateLessonCountrySelection();
       } else {
         const target = form.elements.description || form.elements.content || form.elements.detail;
-        target?.closest('.field')?.after(draftTools);
+        const targetField = target?.closest('.field');
+        if (targetField) {
+          const group = document.createElement('div');
+          group.className = `field ${targetField.classList.contains('wide') ? 'wide' : ''}`;
+          targetField.before(group);
+          group.append(targetField, draftTools);
+        }
       }
       modal.classList.remove('hidden');
       await renderStates();
