@@ -113,9 +113,9 @@
       position: sticky;
       inset: 0 0 auto;
       z-index: 5;
-      background: rgba(3, 30, 23, .7);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: rgba(3, 30, 23, .9);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       border-bottom: 1px solid #ffffff18
     }
 
