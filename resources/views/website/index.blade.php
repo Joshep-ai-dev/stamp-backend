@@ -301,7 +301,9 @@
 
     .store-badge img {
       display: block;
-      width: min(200px, 42vw);
+      width: 150px;
+      border-radius:10px;
+      border: 2px solid white;
       height: auto
     }
 
