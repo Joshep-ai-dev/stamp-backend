@@ -9,6 +9,7 @@ use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\AirportLookup;
+use App\Services\CityAliases;
 use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,7 @@ class ContentController extends Controller
     public function country(Request $request, string $code): JsonResponse
     {
         $country = Country::findOrFail(strtoupper($code));
-        $sights = Sight::with(['country', 'city'])->where('country_code', $country->code)->where('is_featured', true)->orderBy('name')->take(20)->get();
+        $sights = Sight::with(['country', 'city'])->where('country_code', $country->code)->orderBy('name')->get();
         $collections = CollectionKind::with('lists.city.country')
             ->where('is_published', true)
             ->whereHas('lists.city', fn ($query) => $query->where('country_code', $country->code))
@@ -36,11 +37,13 @@ class ContentController extends Controller
         $visits = $user?->visits()->where('country_code', $country->code)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
         $visitedCityIds = $visits->pluck('city_id')->map(fn ($id) => (string) $id);
-        $cities = City::where('country_code', $country->code)
-            ->orderBy('name')->limit(10)->get()
+        $sightCityIds = $sights->pluck('city_id')->unique();
+        $cities = CityAliases::unique(City::where('country_code', $country->code)
+            ->whereIn('id', $sightCityIds)->get()
             ->merge(City::where('country_code', $country->code)
                 ->whereIn('geoname_id', $visitedCityIds)->get())
-            ->unique('geoname_id')->values();
+            ->merge(City::where('country_code', $country->code)->orderBy('name')->limit(40)->get()))
+            ->take(max(20, $sightCityIds->count() + $visitedCityIds->count()))->values();
 
         return response()->json([
             'isEnriching' => false,
@@ -63,9 +66,13 @@ class ContentController extends Controller
 
     public function countryCities(string $code): JsonResponse
     {
-        $country = Country::with('cities')->findOrFail(strtoupper($code));
+        $country = Country::findOrFail(strtoupper($code));
+        $sightCityIds = Sight::where('country_code', $country->code)->pluck('city_id');
+        $cities = CityAliases::unique(City::whereIn('id', $sightCityIds)->get()
+            ->merge(City::where('country_code', $country->code)->orderBy('name')->limit(20)->get()))
+            ->take(max(10, $sightCityIds->unique()->count()));
 
-        return response()->json($country->cities->sortBy('name')->values()->take(10)->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]));
+        return response()->json($cities->values()->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]));
     }
 
     public function countryStates(string $code): JsonResponse
@@ -81,8 +88,8 @@ class ContentController extends Controller
     {
         $country = Country::findOrFail(strtoupper($code));
 
-        return response()->json(City::where('country_code', $country->code)->where('subcountry', $state)
-            ->orderBy('name')->get()->unique('normalized_name')->values()
+        return response()->json(CityAliases::unique(City::where('country_code', $country->code)->where('subcountry', $state)
+            ->orderBy('name')->get())
             ->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'state' => $city->subcountry, 'name' => $city->name, 'image' => ImageUrl::public($city->image_url)]));
     }
 
@@ -118,7 +125,7 @@ class ContentController extends Controller
             'imageUrl' => ImageUrl::public($stateRecord?->image_url),
             'description' => $stateRecord?->description,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
-            'cities' => $cities->unique('normalized_name')->values()->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
+            'cities' => CityAliases::unique($cities)->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
             'sights' => $sights->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
             'stats' => [
@@ -183,7 +190,7 @@ class ContentController extends Controller
             'countryCode' => $city->country_code,
             'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
             'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url), 'description' => $city->description,
-            'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
+            'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
         ]);
     }
@@ -192,7 +199,7 @@ class ContentController extends Controller
     {
         $city = $this->findCatalogCity($id);
 
-        $sights = Sight::with(['country', 'city'])->where('city_id', $city->id)->orderBy('name')->get();
+        $sights = Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get();
 
         return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
     }
@@ -259,6 +266,7 @@ class ContentController extends Controller
      */
     private function findCatalogCity(string $id, array $with = []): City
     {
+        $id = CityAliases::canonicalId($id);
         $query = City::query()->when($with, fn ($query) => $query->with($with))
             ->where('geoname_id', $id);
 
@@ -272,7 +280,6 @@ class ContentController extends Controller
     private function requiresKrooPlus(Sight $item): bool
     {
         return Sight::where('country_code', $item->country_code)
-            ->where('is_featured', true)
             ->where(fn ($query) => $query->where('name', '<', $item->name)
                 ->orWhere(fn ($same) => $same->where('name', $item->name)->where('id', '<', $item->id)))
             ->count() >= 3;
@@ -280,7 +287,7 @@ class ContentController extends Controller
 
     public function sightItem(Sight $item): array
     {
-        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city?->geoname_id, 'city' => $item->city?->name, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city ? CityAliases::canonicalId($item->city->geoname_id) : null, 'city' => $item->city?->name, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
     }
 
     public function collectionItem(CollectionKind $item, bool $admin = false): array

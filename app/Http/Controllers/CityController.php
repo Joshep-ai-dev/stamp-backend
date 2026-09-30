@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\CityResource;
 use App\Models\City;
+use App\Services\CityAliases;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
@@ -41,7 +42,7 @@ class CityController extends Controller
                 });
             })
             ->orderByRaw('CASE WHEN normalized_name = ? THEN 0 WHEN normalized_name LIKE ? THEN 1 ELSE 2 END', [$query, $query.'%'])->orderByDesc('population')->orderBy('name')->limit($limit * 2)->get()
-            ->unique(fn (City $city) => implode('|', [$city->country_code, $city->normalized_name, $city->normalized_subcountry]))
+            ->pipe(fn ($matches) => CityAliases::unique($matches))
             ->take($limit)->values();
 
         return CityResource::collection($cities);
@@ -49,6 +50,6 @@ class CityController extends Controller
 
     public function show(string $geonameId): CityResource
     {
-        return new CityResource(City::with('country')->where('geoname_id', $geonameId)->firstOrFail());
+        return new CityResource(City::with('country')->where('geoname_id', CityAliases::canonicalId($geonameId))->firstOrFail());
     }
 }

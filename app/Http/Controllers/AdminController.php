@@ -10,6 +10,7 @@ use App\Models\CountryState;
 use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\ImageStorage;
+use App\Services\CityAliases;
 use App\Services\ImageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -69,8 +70,7 @@ class AdminController extends Controller
             ->when($data['state'] ?? null, fn ($query, $state) => $query->where('subcountry', $state))
             ->orderBy('name')
             ->get(['geoname_id', 'country_code', 'name', 'normalized_name', 'subcountry'])
-            ->unique('normalized_name')
-            ->values()
+            ->pipe(fn ($items) => CityAliases::unique($items))
             ->map(fn (City $city) => [
                 'id' => $city->geoname_id,
                 'countryId' => $city->country_code,
