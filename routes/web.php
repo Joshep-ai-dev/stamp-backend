@@ -16,7 +16,7 @@ Route::get('/assets/{filename}', [WebsiteController::class, 'asset'])
     ->where('filename', '[A-Za-z0-9_-]+\.(?:png|svg)')
     ->name('website.asset');
 Route::get('/images/page/{filename}', [WebsiteController::class, 'pageImage'])
-    ->where('filename', '(?:[1-5]\.jpg|phone\.png|stamp[1-3]\.png|apple\.png|google\.png)')
+    ->where('filename', '(?:[1-5]\.jpg|phone\.png|stamp[1-3]\.png|apple\.png|google\.png|kroo_logo_text\.png|icon\.png)')
     ->name('website.page-image');
 Route::get('/images/{folder}/{filename}', [LegacyImageController::class, 'public'])
     ->where('folder', 'sights|users|collection|daily-destinations|countries|states|cities')

@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06271e">
   <meta name="description" content="Collect the world with Kroo. Track your travels, explore new places, and build your passport of memories.">
+  <link rel="icon" type="image/png" href="{{ route('website.page-image', ['filename' => 'icon.png']) }}">
+  <link rel="apple-touch-icon" href="{{ route('website.page-image', ['filename' => 'icon.png']) }}">
   <title>Kroo — Collect the World</title>
   <style>
     :root {
@@ -294,16 +296,13 @@
     }
 
     .store-badge {
-      display: inline-block;
-      border-radius: 7px;
-      box-shadow: 0 2px 8px #0007
+      display: inline-block
     }
 
     .store-badge img {
       display: block;
-      width: auto;
-      height: 42px;
-      border-radius: 7px
+      width: min(200px, 42vw);
+      height: auto
     }
 
     .store-badges a:hover {
@@ -427,7 +426,7 @@
       max-width: 430px;
       margin: 0;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 14px;
       line-height: 1.5
     }
 
@@ -954,7 +953,7 @@
   </svg>
   <header class="site-header">
     <nav class="nav wrap" aria-label="Main navigation">
-      <a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.asset', ['filename' => 'kroo-logo.png']) }}" alt=""></a>
+      <a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.page-image', ['filename' => 'kroo_logo_text.png']) }}" alt=""></a>
       <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="mobile-menu" aria-expanded="false"><span></span><span></span><span></span></button>
       <div class="nav-links" id="mobile-menu"><a href="#top" aria-current="page">Home</a><a href="#features">Features</a><a href="#explore">Explore</a><a href="#kroo-plus">Kroo+</a><a href="#footer">About</a></div>
     </nav>
@@ -1098,7 +1097,7 @@
     </section>
   </main>
   <footer id="footer" class="footer">
-    <div class="wrap footer-grid"><a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.asset', ['filename' => 'kroo-logo.png']) }}" alt=""></a>
+    <div class="wrap footer-grid"><a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.page-image', ['filename' => 'kroo_logo_text.png']) }}" alt=""></a>
       <div class="footer-col">
         <h3>Explore</h3><a href="#explore">Countries</a><a href="#explore">Cities</a><a href="#explore">Sights</a><a href="#features">Challenges</a>
       </div>
