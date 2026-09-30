@@ -80,6 +80,29 @@ class AdminAiController extends Controller
         return response()->json(['imageUrl' => $generator->image($category, trim($data['name']), $folder, $data['direction'] ?? '')], 201);
     }
 
+    public function generateText(Request $request, AiStampGenerator $generator): JsonResponse
+    {
+        abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
+        $data = $request->validate([
+            'resource' => ['required', Rule::in(['countries', 'cities', 'sights', 'collections', 'collection-lists', 'daily-destinations'])],
+            'name' => ['required', 'string', 'min:2', 'max:300'],
+            'countryId' => ['required_if:resource,daily-destinations', 'nullable', 'exists:countries,code'],
+            'isPreview' => ['sometimes', 'boolean'],
+        ]);
+        if ($data['resource'] === 'daily-destinations') {
+            $country = Country::findOrFail($data['countryId']);
+
+            return response()->json(['questions' => $generator->lesson($country->name, ($data['isPreview'] ?? false) ? 10 : 5)]);
+        }
+
+        $category = match ($data['resource']) {
+            'countries' => 'Country', 'cities' => 'City', 'sights' => 'Top Sight',
+            'collections' => 'Collection', 'collection-lists' => 'Collection Place',
+        };
+
+        return response()->json(['description' => $generator->description($category, trim($data['name']))]);
+    }
+
     private function sectionCounts(): array
     {
         $batchTotals = DB::table('ai_content_batches')->selectRaw('category, SUM(total) AS total, SUM(completed) AS completed, SUM(failed) AS failed')

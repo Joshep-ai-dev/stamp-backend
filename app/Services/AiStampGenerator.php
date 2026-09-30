@@ -15,6 +15,38 @@ use UnexpectedValueException;
 
 class AiStampGenerator
 {
+    public function lesson(string $country, int $count): array
+    {
+        $response = $this->request('/responses', [
+            'model' => config('services.openai.text_model'),
+            'input' => "Create exactly {$count} distinct, factual travel and culture quiz questions about {$country} for a general audience. Return only a JSON array. Each item must have information (2 concise sentences that teach the fact before the question), prompt (one clear question), answers (exactly 4 short, distinct choices), correctAnswer (zero-based integer index), explanation (one sentence explaining the answer). Ensure each answer is supported by its information. Avoid disputed facts, trivia requiring current data, and invented details. No markdown.",
+        ]);
+        $text = collect($response['output'] ?? [])->flatMap(fn ($item) => $item['content'] ?? [])
+            ->where('type', 'output_text')->pluck('text')->implode("\n");
+        $questions = json_decode(trim($text), true);
+        if (! is_array($questions) || count($questions) !== $count) {
+            throw new RuntimeException('The AI did not return the requested number of questions. Try again.');
+        }
+        foreach ($questions as $question) {
+            if (! is_array($question) || count($question['answers'] ?? []) !== 4
+                || ! is_int($question['correctAnswer'] ?? null) || $question['correctAnswer'] < 0 || $question['correctAnswer'] > 3
+                || count(array_unique($question['answers'])) !== 4) {
+                throw new RuntimeException('The AI returned an invalid quiz. Try again.');
+            }
+            foreach (['information', 'prompt', 'explanation'] as $field) {
+                if (! is_string($question[$field] ?? null) || trim($question[$field]) === '') {
+                    throw new RuntimeException('The AI returned an incomplete quiz. Try again.');
+                }
+            }
+            foreach ($question['answers'] as $answer) {
+                if (! is_string($answer) || trim($answer) === '') {
+                    throw new RuntimeException('The AI returned an invalid answer. Try again.');
+                }
+            }
+        }
+
+        return $questions;
+    }
     public static function concurrency(): int
     {
         return AiRateLimit::concurrency(max(1, min(12, (int) config('ai.concurrency', 8))));

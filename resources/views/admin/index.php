@@ -318,6 +318,12 @@
     .lesson-pill { display:inline-flex; padding:4px 8px; border-radius:999px; background:#173f33; color:var(--mint); font-weight:700; white-space:nowrap }
     .lesson-pill.preview { background:#493528; color:#ffd5b8 }
     .lesson-type-note { grid-column:1/-1; padding:12px 14px; border-left:3px solid var(--accent); border-radius:8px; background:#102f26; color:var(--muted) }
+    .ai-draft-tools { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px }
+    .ai-draft-tools[hidden] { display:none }
+    .ai-draft-tools.lesson-action { margin-right:auto; flex-wrap:wrap }
+    .ai-draft-tools.field-action { margin-top:-8px; margin-bottom:8px; flex-wrap:wrap; align-self:start }
+    .ai-draft-tools button { flex:0 0 auto }
+    @media(max-width:600px) { .dialogfoot { flex-wrap:wrap } .ai-draft-tools.lesson-action { flex-basis:100% } .ai-draft-tools.field-action { grid-column:1/-1 !important } }
     .question-card { grid-column:1/-1; padding:0 14px 14px }
     .question-card summary { padding:14px 0; color:var(--ink); font-weight:700; cursor:pointer }
     .question-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px }
@@ -581,7 +587,7 @@
       <h1 id="formTitle">Add</h1>
       <div id="formNotice" role="alert" aria-live="assertive"></div>
       <div id="fields" class="grid" style="margin-top:18px"></div>
-      <div class="dialogfoot"><button type="button" onclick="closeEditor()">Close</button><button class="primary"
+      <div class="dialogfoot"><div id="aiDraftTools" class="ai-draft-tools" hidden><button type="button" onclick="generateEditorText(this)">Generate with AI</button><span id="aiDraftHint">Review and edit the draft before saving.</span></div><button type="button" onclick="closeEditor()">Close</button><button class="primary"
           type="submit">Save</button></div>
     </form>
   </div>
@@ -591,6 +597,7 @@
       <p id="aiEditNotice" class="notice error" role="alert"></p>
       <label class="field">Name<input name="name" required maxlength="150"></label>
       <label class="field">Description<textarea name="description" maxlength="20000"></textarea></label>
+      <button id="aiContentDescriptionButton" type="button" onclick="generateAiContentDescription(this)">Generate description with AI</button>
       <img id="aiEditPreview" class="ai-edit-preview" alt="Current image" hidden>
       <label class="field">Image path or URL<input name="image" placeholder="/images/sights/stamp.webp"><small>Clear this field to remove the image.</small></label>
       <label class="field">Replace image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
@@ -943,6 +950,7 @@
       editForm.elements.name.value = content.name;
       editForm.elements.description.value = content.description || '';
       editForm.elements.description.closest('.field').hidden = batch.category === 'countries';
+      document.querySelector('#aiContentDescriptionButton').hidden = batch.category === 'countries';
       editForm.elements.image.value = content.image || '';
       editForm.elements.isFeatured.checked = !!content.isFeatured;
       document.querySelector('#aiFeatureField').hidden = !['sights', 'discover-sights'].includes(batch.category);
@@ -952,6 +960,22 @@
       preview.src = content.image || '';
       editor.showModal();
       editForm.elements.name.focus();
+    }
+    async function generateAiContentDescription(button) {
+      if (!aiEditing) return;
+      const editForm = document.querySelector('#aiContentForm');
+      const category = aiEditing.batch.category;
+      const resource = ['sights', 'discover-sights'].includes(category) ? 'sights' : 'cities';
+      const name = editForm.elements.name.value.trim();
+      if (!name) { document.querySelector('#aiEditNotice').textContent = 'Enter a name first.'; return; }
+      await withButtonLoading(button, 'Generating…', async () => {
+        try {
+          const result = await call('/admin/api/ai/text', { method: 'POST', body: JSON.stringify({ resource, name }) });
+          editForm.elements.description.value = result.description;
+          editForm.elements.description.focus();
+          document.querySelector('#aiEditNotice').textContent = 'Draft ready. Review it before saving.';
+        } catch (error) { document.querySelector('#aiEditNotice').textContent = error.message; }
+      });
     }
     async function saveAiContent(event) {
       event.preventDefault();
@@ -1031,14 +1055,80 @@
     async function submitCitySearch() { state.filters.cities = document.querySelector('#citySearch')?.value.trim() || ''; state.paging.currentPage = 1; await load() }
     async function clearCitySearch() { state.filters.cities = ''; state.paging.currentPage = 1; await load() }
     async function changeCityPage(offset) { state.paging.currentPage += offset; await load() }
-    async function countryChanged() { const region = form.elements.state; if (region) { region.value = ''; region.dataset.value = '' } await renderStates() }
+    async function countryChanged() { const region = form.elements.state; if (region) { region.value = ''; region.dataset.value = '' } updateLessonCountrySelection(); await renderStates() }
     async function addState() { const countryId = form.elements.countryId?.value; if (!countryId) return note('Select a country before adding a state.', true); const name = prompt('State / region name:')?.trim(); if (!name) return; try { const created = await call('/admin/api/states', { method: 'POST', body: JSON.stringify({ countryId, name }) }); delete state.states[countryId]; form.elements.state.dataset.value = created.name; await renderStates(); note(`State “${created.name}” is ready to use.`) } catch (e) { note(e.message, true) } }
     function cell(r, c) { if (c === 'image' || c === 'imageUrl' || c === 'heroImage') { const u = r.heroImage || r.image || r.imageUrl; return `<td>${u ? imagePreview(u, r.name || r.title || "Image") : '—'}</td>` } if (c === 'access') return `<td><span class="badge">${r.access === 'pro' || r.isPremium ? 'Kroo+ locked' : 'Unlocked'}</span></td>`; return `<td>${esc(r[c] || '—')}</td>` }
     function note(message, bad = false) { notice.innerHTML = message ? `<div class="notice ${bad ? 'error' : ''}">${esc(message)}</div>` : '' }
     function fieldHtml(f, row) { const [key, label, type, wide] = f; let value = row?.[key]; if (key === 'image') value = row?.image || row?.imageUrl; if (key === 'content') value = row?.content || row?.description; if (key === 'options' && Array.isArray(value)) value = value.join('\n'); const cls = `field ${wide ? 'wide' : ''}`; if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`; if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" required onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; if (type === 'state') { const add = form.dataset.resource === 'cities' ? '<button type="button" onclick="withButtonLoading(this, &quot;Adding...&quot;, () => addState())">+ Add state</button>' : ''; return `<label class="${cls}">${label}<div class="field-row"><select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select>${add}</div></label>` } if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" required><option value="">Select a state first…</option></select></label>`; if (type === 'kind') return `<label class="${cls}">${label}<select name="${key}" required><option value="">Select…</option>${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>`; if (type === 'access') return `<label class="${cls}">${label}<select name="${key}" required><option value="free" ${value !== 'pro' ? 'selected' : ''}>Everyone</option><option value="pro" ${value === 'pro' ? 'selected' : ''}>Kroo+ only</option></select></label>`; if (type === 'image') return `<label class="${cls}">${label}${value ? `<img src="${esc(value)}" alt="" style="width:120px;height:80px;object-fit:cover;margin:6px 0;border-radius:8px">` : ''}<input name="${key}" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-current="${esc(value || '')}" onchange="normalizeImage(this)"><small>Images are automatically resized to 1200 × 800 pixels.</small></label>`; if (type === 'textarea') return `<label class="${cls}">${label}<textarea name="${key}" ${f[3] ? 'required' : ''}>${esc(value || '')}</textarea></label>`; const step = type === 'number' && ['latitude', 'longitude'].includes(key) ? 'step="any"' : ''; return `<label class="${cls}">${label}<input name="${key}" type="${type}" ${step} value="${esc(value ?? '')}" ${f[3] ? 'required' : ''} ${key === 'id' && row ? 'disabled' : ''}></label>` }
     async function renderStates() { const country = form.elements.countryId?.value; const select = form.elements.state; if (!select) return renderCities(); const selected = select.dataset.value; const list = document.querySelector('#city-state-options'); if (select.tagName !== 'SELECT') { if (!country) { if (list) list.innerHTML = ''; return } try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); if (list) list.innerHTML = state.states[country].map(x => `<option value="${esc(x)}"></option>`).join('') } catch (e) { note(e.message, true) } return } if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return renderCities() } select.disabled = true; select.innerHTML = '<option value="">Loading states…</option>'; try { state.states[country] ||= await call(`/admin/api/states?country=${encodeURIComponent(country)}`); select.innerHTML = '<option value="">All / no state</option>' + state.states[country].map(x => `<option value="${esc(x)}" ${x === selected ? 'selected' : ''}>${esc(x)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load states</option>'; note(e.message, true) } finally { select.disabled = false } await renderCities() }
     async function renderCities() { const country = form.elements.countryId?.value; const region = form.elements.state?.value || ''; const select = form.elements.cityId; if (!select) return; const selected = select.dataset.value; if (!country) { select.innerHTML = '<option value="">Select a country first…</option>'; return } const key = `${country}:${region}`; select.disabled = true; select.innerHTML = '<option value="">Loading cities…</option>'; try { state.cities[key] ||= await call(`/admin/api/cities?country=${encodeURIComponent(country)}&state=${encodeURIComponent(region)}`); select.innerHTML = '<option value="">Select…</option>' + state.cities[key].map(x => `<option value="${esc(x.id)}" ${String(x.id) === String(selected) ? 'selected' : ''}>${esc(x.name)}</option>`).join(''); select.dataset.value = ''; } catch (e) { select.innerHTML = '<option value="">Could not load cities</option>'; note(e.message, true) } finally { select.disabled = false } }
-    async function openEditor(i) { state.edit = Number.isInteger(i) ? state.rows[i] : null; formNotice.innerHTML = ''; form.dataset.editId = state.edit?.id || ''; form.dataset.resource = state.tab; const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' '); formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`; fields.innerHTML = schemas[state.tab].map(f => fieldHtml(f, state.edit)).join(''); if (state.tab === 'daily-destinations') prepareKrooIqEditor(); modal.classList.remove('hidden'); await renderStates() }
+    async function openEditor(i) {
+      state.edit = Number.isInteger(i) ? state.rows[i] : null;
+      formNotice.innerHTML = '';
+      form.dataset.editId = state.edit?.id || '';
+      form.dataset.resource = state.tab;
+      const resourceName = state.tab === 'daily-destinations' ? 'Kroo IQ lesson' : state.tab.replace('-', ' ');
+      formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`;
+      const draftTools = document.querySelector('#aiDraftTools');
+      form.querySelector('.dialogfoot').prepend(draftTools);
+      fields.innerHTML = schemas[state.tab].map(field => fieldHtml(field, state.edit)).join('');
+      const isLesson = state.tab === 'daily-destinations';
+      draftTools.hidden = !['countries', 'cities', 'sights', 'collections', 'collection-lists', 'daily-destinations'].includes(state.tab);
+      draftTools.classList.toggle('lesson-action', isLesson);
+      draftTools.classList.toggle('field-action', !isLesson);
+      draftTools.style.gridColumn = state.tab === 'cities' ? '2' : state.tab === 'countries' ? '1' : '1 / -1';
+      draftTools.querySelector('button').textContent = isLesson ? 'Generate lesson and quiz with AI' : 'Generate description with AI';
+      document.querySelector('#aiDraftHint').textContent = isLesson ? 'Review questions and add images before saving.' : 'Review and edit the draft before saving.';
+      if (isLesson) {
+        prepareKrooIqEditor();
+        updateLessonCountrySelection();
+      } else {
+        const target = form.elements.description || form.elements.content || form.elements.detail;
+        target?.closest('.field')?.after(draftTools);
+      }
+      modal.classList.remove('hidden');
+      await renderStates();
+    }
+    function updateLessonCountrySelection() {
+      if (form.dataset.resource !== 'daily-destinations') return;
+      const countryId = form.elements.countryId?.value || '';
+      const country = state.meta.countries.find(item => item.id === countryId)?.name;
+      document.querySelector('#aiDraftTools button').disabled = !country;
+      document.querySelector('#aiDraftHint').textContent = country ? `Generate questions about ${country}. Review before saving.` : 'Select a country first.';
+    }
+    async function generateEditorText(button) {
+      const resource = form.dataset.resource;
+      const countryId = form.elements.countryId?.value || '';
+      const country = state.meta.countries.find(item => item.id === countryId)?.name || '';
+      const title = form.elements.title?.value.trim() || form.elements.name?.value.trim() || '';
+      const name = [title, resource === 'daily-destinations' ? '' : country].filter(Boolean).join(', ');
+      if (resource === 'daily-destinations' && !countryId) { formNotice.innerHTML = '<div class="notice error">Select a country first.</div>'; return; }
+      if (resource !== 'daily-destinations' && !name) { formNotice.innerHTML = '<div class="notice error">Enter a name or title first.</div>'; return; }
+      if (resource === 'daily-destinations' && Array.from({ length: 10 }, (_, index) => form.elements[`q${index + 1}Prompt`]?.value).some(Boolean) && !confirm('Replace the current lesson questions with a new AI draft?')) return;
+      await withButtonLoading(button, 'Generating…', async () => {
+        try {
+          formNotice.innerHTML = '<div class="notice">Generating a draft. This may take a moment.</div>';
+          const result = await call('/admin/api/ai/text', { method: 'POST', body: JSON.stringify({ resource, name: name || country, countryId, isPreview: resource === 'daily-destinations' && form.elements.isPreview.checked }) });
+          if (resource === 'daily-destinations') {
+            result.questions.forEach((question, index) => {
+              const number = index + 1;
+              form.elements[`q${number}Information`].value = question.information;
+              form.elements[`q${number}Prompt`].value = question.prompt;
+              form.elements[`q${number}Answers`].value = question.answers.join('\n');
+              form.elements[`q${number}Correct`].value = question.correctAnswer + 1;
+              form.elements[`q${number}Explanation`].value = question.explanation;
+            });
+            fields.querySelector('.question-card')?.setAttribute('open', '');
+            formNotice.innerHTML = '<div class="notice">Draft ready. Review each question and add its information image before saving.</div>';
+          } else {
+            const target = form.elements.description || form.elements.content || form.elements.detail;
+            target.value = result.description;
+            target.focus();
+            formNotice.innerHTML = '<div class="notice">Description draft ready. Review it before saving.</div>';
+          }
+        } catch (error) { formNotice.innerHTML = `<div class="notice error">${esc(error.message)}</div>`; }
+      });
+    }
     function prepareKrooIqEditor() {
       const preview = form.elements.isPreview;
       if (state.edit) {
@@ -1067,7 +1157,7 @@
         card.querySelectorAll('textarea, input[type=number]').forEach(control => { control.required = visible && !control.name.endsWith('Image'); });
       });
     }
-    function closeEditor() { modal.classList.add('hidden'); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
+    function closeEditor() { modal.classList.add('hidden'); form.querySelector('.dialogfoot').prepend(document.querySelector('#aiDraftTools')); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
     function aiImageSubject(resource, field) {
       const fieldValue = name => form.elements[name]?.value?.trim() || '';
       const country = state.meta.countries.find(item => item.id === fieldValue('countryId'))?.name || '';
@@ -1179,7 +1269,7 @@
       if (form.dataset.saving === 'true') return;
       form.dataset.saving = 'true';
       const saveButton = form.querySelector('button[type="submit"]');
-      const cancelButton = form.querySelector('.dialogfoot button[type="button"]');
+      const cancelButton = form.querySelector('.dialogfoot button[onclick="closeEditor()"]');
       cancelButton.disabled = true;
       await withButtonLoading(saveButton, 'Saving…', async () => {
       const data = {}, resource = form.dataset.resource, editId = form.dataset.editId;
