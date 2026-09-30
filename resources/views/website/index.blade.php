@@ -110,7 +110,7 @@
     }
 
     .site-header {
-      position: absolute;
+      position: sticky;
       inset: 0 0 auto;
       z-index: 5;
       background: rgba(3, 30, 23, .7);
@@ -645,8 +645,10 @@
     }
 
     .footer-note {
-      font-size: 12px;
-      color: var(--muted)
+      font-size: 14px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
     }
 
     .social-icons {
@@ -657,8 +659,8 @@
     }
 
     .social-icons svg {
-      width: 19px;
-      height: 19px;
+      width: 24px;
+      height: 24px;
       fill: none;
       stroke: currentColor;
       stroke-width: 1.8;
