@@ -456,7 +456,7 @@
     .split-copy p {
       max-width: 405px;
       color: var(--muted);
-      font-size: 14px
+      font-size: 18px
     }
 
     .stamps {
@@ -634,9 +634,10 @@
     .footer-col {
       display: flex;
       flex-direction: column;
+      height:100%;
       gap: 7px;
       font-size: 14px;
-      color: var(--muted)
+      color: var(--muted);
     }
 
     .footer-col a:hover {
@@ -1099,7 +1100,7 @@
     </section>
   </main>
   <footer id="footer" class="footer">
-    <div class="wrap footer-grid"><a class="logo" href="#top" aria-label="Kroo home"><img src="{{ route('website.page-image', ['filename' => 'kroo_logo_text.png']) }}" alt=""></a>
+    <div class="wrap footer-grid"><a class="logo" href="#top" style="height:100%;" aria-label="Kroo home"><img style="width:200px;" src="{{ route('website.page-image', ['filename' => 'kroo_logo_text.png']) }}" alt=""></a>
       <div class="footer-col">
         <h3>Explore</h3><a href="#explore">Countries</a><a href="#explore">Cities</a><a href="#explore">Sights</a><a href="#features">Challenges</a>
       </div>
