@@ -77,4 +77,20 @@ class CatalogApiTest extends TestCase
         CatalogVersion::create(['dataset' => 'world-cities.csv', 'version' => '2026-08-04', 'checksum' => str_repeat('a', 64), 'row_count' => 34065, 'imported_at' => '2026-08-04 03:00:00+00']);
         $this->getJson('/api/v1/catalog/version')->assertOk()->assertJsonPath('cityCount', 34065)->assertJsonPath('version', '2026-08-04');
     }
+
+    public function test_us_state_returns_unfeatured_sights_only_from_that_state(): void
+    {
+        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA']);
+        $california = City::create(['geoname_id' => 'sf', 'name' => 'San Francisco', 'normalized_name' => 'san francisco', 'country_code' => 'US', 'subcountry' => 'California', 'normalized_subcountry' => 'california']);
+        $nevada = City::create(['geoname_id' => 'lv', 'name' => 'Las Vegas', 'normalized_name' => 'las vegas', 'country_code' => 'US', 'subcountry' => 'Nevada', 'normalized_subcountry' => 'nevada']);
+        $bridge = Sight::create(['country_code' => 'US', 'city_id' => $california->id, 'name' => 'Golden Gate Bridge', 'slug' => 'golden-gate-bridge', 'is_featured' => false]);
+        $alcatraz = Sight::create(['country_code' => 'US', 'city_id' => $california->id, 'name' => 'Alcatraz', 'slug' => 'alcatraz', 'is_featured' => true]);
+        Sight::create(['country_code' => 'US', 'city_id' => $nevada->id, 'name' => 'Las Vegas Strip', 'slug' => 'las-vegas-strip', 'is_featured' => true]);
+
+        $this->getJson('/api/v1/catalog/countries/US')->assertOk()->assertJsonCount(3, 'sights');
+        $this->getJson('/api/v1/catalog/countries/US/states/California')->assertOk()
+            ->assertJsonCount(2, 'sights')
+            ->assertJsonPath('sights.0.id', $alcatraz->id)
+            ->assertJsonPath('sights.1.id', $bridge->id);
+    }
 }

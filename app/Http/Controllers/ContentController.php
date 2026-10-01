@@ -108,7 +108,7 @@ class ContentController extends Controller
         $cities = City::where('country_code', $country->code)->where('subcountry', $stateName)->orderBy('name')->get();
         $cityIds = $cities->pluck('id');
         $sights = Sight::with(['country', 'city'])->whereIn('city_id', $cityIds)
-            ->where('is_featured', true)->orderBy('name')->get();
+            ->where('country_code', $country->code)->orderBy('name')->get();
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', 'US')->where('subcountry', $stateName)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
