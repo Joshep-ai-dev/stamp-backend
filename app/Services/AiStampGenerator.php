@@ -86,7 +86,7 @@ class AiStampGenerator
 
     public function imagePrompt(string $category, string $name, string $extra = ''): string
     {
-        if (in_array($category, ['Top Sight', 'Quiz Image'], true)) {
+        if (in_array($category, ['Top Sight', 'Collection Place', 'Quiz Image'], true)) {
             $titleInstruction = 'Include NO title, place name, city name, '
                 .'country name, letters, numbers, signs, captions, or other visible text. '
                 .'Let the engraving continue through the upper part of the frame. '
