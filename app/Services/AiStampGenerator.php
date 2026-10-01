@@ -141,7 +141,7 @@ and 24-25 down each vertical edge, with softly rounded corners.
 aged-paper grain, and accurate local geography. Let the scene reach near the
 inner border. Landscape 3:2 composition. No collage, invented landmarks,
 modern bright colors, logo, or watermark.
-DO NOT show visible genitals or explicit nudity.
+DO NOT show visible genitals or explicit nudity or sexual part.
 Additional direction: {$direction}.
 PROMPT;
     }

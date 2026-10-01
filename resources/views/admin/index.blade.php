@@ -111,6 +111,20 @@
       flex-wrap: wrap
     }
 
+    .sight-pagination label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      white-space: nowrap;
+    }
+
+    .summarybar .sight-pagination select {
+      width: auto;
+      min-width: 0;
+      max-width: 240px;
+    }
+
     .city-search-row input {
       flex: 1;
       min-width: 220px
@@ -323,6 +337,9 @@
     .ai-draft-tools.lesson-action { margin-right:auto; flex-wrap:wrap }
     .ai-draft-tools.field-action { margin-top:2px; flex-wrap:wrap; align-self:start }
     .ai-draft-tools button { flex:0 0 auto }
+    .ai-draft-tools .include-images { display:inline-flex; align-items:center; gap:6px; white-space:nowrap }
+    .ai-draft-tools .include-images[hidden] { display:none }
+    .ai-draft-tools .include-images input { width:auto }
     @@media(max-width:600px) { .dialogfoot { flex-wrap:wrap } .ai-draft-tools.lesson-action { flex-basis:100% } .ai-draft-tools.field-action { grid-column:1/-1 !important } }
     .question-card { grid-column:1/-1; padding:0 14px 14px }
     .question-card summary { padding:14px 0; color:var(--ink); font-weight:700; cursor:pointer }
@@ -587,7 +604,7 @@
       <h1 id="formTitle">Add</h1>
       <div id="formNotice" role="alert" aria-live="assertive"></div>
       <div id="fields" class="grid" style="margin-top:18px"></div>
-      <div class="dialogfoot"><div id="aiDraftTools" class="ai-draft-tools" hidden><button type="button" onclick="generateEditorText(this)">Generate with AI</button><span id="aiDraftHint">Review and edit the draft before saving.</span></div><button type="button" onclick="closeEditor()">Close</button><button class="primary"
+      <div class="dialogfoot"><div id="aiDraftTools" class="ai-draft-tools" hidden><label class="include-images" hidden><input type="checkbox" id="includeLessonImages">Image include</label><button type="button" onclick="generateEditorText(this)">Generate with AI</button><span id="aiDraftHint">Review and edit the draft before saving.</span></div><button type="button" onclick="closeEditor()">Close</button><button class="primary"
           type="submit">Save</button></div>
     </form>
   </div>
@@ -665,7 +682,7 @@
     imageViewer.addEventListener('close', () => { viewerImage.removeAttribute('src'); viewerTrigger?.focus(); });
   </script>
   <script>
-    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, edit: null };
+    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, sightPaging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, edit: null };
     const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), formNotice = document.querySelector('#formNotice'), fields = document.querySelector('#fields');
     const normalizedFiles = new WeakMap();
     async function withButtonLoading(button, label, action) {
@@ -703,7 +720,32 @@
     async function call(path, options = {}) { let r; try { r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }) } catch (error) { throw new Error(`Could not reach the server for ${path}. Check the connection and try again.`) } if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
     async function login() { state.key = document.querySelector('#key').value.trim(); try { state.meta = await call('/admin/api/meta'); sessionStorage.stampoAdminKey = state.key; document.querySelector('#login').classList.add('hidden'); document.querySelector('#app').classList.remove('hidden'); await load() } catch (e) { document.querySelector('#loginError').textContent = e.message } }
     function logout() { sessionStorage.removeItem('stampoAdminKey'); location.reload() }
-    async function load() { try { if (state.tab === 'ai') { await loadAi(); return } table.classList.remove('ai-workspace'); summary.style.display = ''; document.querySelector('.page-description').textContent = 'Manage your travel content. Select an image to preview and zoom.'; const cityParams = state.tab === 'cities' ? `?page=${state.paging.currentPage}&per_page=${state.paging.perPage}&query=${encodeURIComponent(state.filters.cities || '')}` : ''; const result = await call(`/admin/api/${state.tab}${cityParams}`); if (state.tab === 'cities') { state.rows = result.data; state.paging = result.meta } else state.rows = result; render(); note('') } catch (e) { note(e.message, true) } }
+    let loadVersion = 0;
+    async function load() {
+      const version = ++loadVersion;
+      const tab = state.tab;
+      try {
+        if (tab === 'ai') { await loadAi(); return }
+        table.classList.remove('ai-workspace');
+        summary.style.display = '';
+        document.querySelector('.page-description').textContent = 'Manage your travel content. Select an image to preview and zoom.';
+        const paging = tab === 'sights' ? state.sightPaging : state.paging;
+        const params = new URLSearchParams();
+        if (['cities', 'sights'].includes(tab)) {
+          params.set('page', paging.currentPage);
+          params.set('per_page', paging.perPage);
+          params.set(tab === 'sights' ? 'country' : 'query', state.filters[tab] || '');
+        }
+        const result = await call('/admin/api/' + tab + (params.size ? '?' + params : ''));
+        if (version !== loadVersion || tab !== state.tab) return;
+        if (['cities', 'sights'].includes(tab)) {
+          state.rows = result.data;
+          state[tab === 'sights' ? 'sightPaging' : 'paging'] = result.meta;
+        } else state.rows = result;
+        render();
+        note('');
+      } catch (e) { if (version === loadVersion) note(e.message, true) }
+    }
     const aiKinds = [
       { id: 'countries', icon: '?', label: 'Countries', detail: 'National stamp images' },
       { id: 'states', icon: '?', label: 'US states', detail: 'All existing US state records' },
@@ -1040,7 +1082,7 @@
     }
     setInterval(() => { if (state.tab === 'ai' && document.visibilityState === 'visible') { void refreshAiBatches(); void runAiBatches() } }, 15000);
     function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
-    function render() { const names = { 'countries': 'Country hero images', 'cities': 'Cities', 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Kroo IQ lessons and questions' }; title.textContent = names[state.tab]; document.querySelector('#addButton').style.display = ['countries', 'cities'].includes(state.tab) ? 'none' : ''; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'sights' ? !filter || row.countryCode === filter : state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; const cityTools = state.tab === 'cities' ? `<div class="city-tools"><div class="city-search-row"><input id="citySearch" type="search" value="${esc(filter)}" placeholder="Search city, state, or country" aria-label="Search cities" onkeydown="if(event.key === 'Enter'){event.preventDefault();submitCitySearch()}"><button class="primary" onclick="withButtonLoading(this, &quot;Searching...&quot;, () => submitCitySearch())">Search</button>${filter ? `<button onclick="withButtonLoading(this, &quot;Clearing...&quot;, () => clearCitySearch())">Clear</button>` : ''}<button class="primary" onclick="openEditor()">+ Add new</button></div><div class="city-pagination"><span>${state.paging.total} records</span><button ${state.paging.currentPage <= 1 ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(-1))">Previous</button><span>Page ${state.paging.currentPage} of ${state.paging.lastPage}</span><button ${state.paging.currentPage >= state.paging.lastPage ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(1))">Next</button></div></div>` : ''; const krooIqHelp = state.tab === 'daily-destinations' ? '<small>Each record is one Kroo IQ question. The app uses up to five published records for the selected quiz date.</small>' : ''; summary.innerHTML = `<div class="summarybar">${cityTools || `<span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records ${krooIqHelp}</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}`}</div>`; const cols = state.tab === 'countries' ? ['heroImage', 'code', 'name'] : state.tab === 'cities' ? ['imageUrl', 'name', 'country', 'state', 'population', 'latitude', 'longitude'] : state.tab === 'sights' ? ['image', 'name', 'country', 'state', 'city'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'city', 'question', 'publishDate']; const numberOffset = state.tab === 'cities' ? (state.paging.currentPage - 1) * state.paging.perPage : 0; table.innerHTML = `<table><thead><tr><th>No.</th>${cols.map(x => `<th>${esc(({heroImage:'Image',imageUrl:'Image',collectionKind:'Collection',publishDate:'Available from'})[x] || x.replace(/([A-Z])/g, ' $1'))}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }, displayIndex) => `<tr><td>${numberOffset + displayIndex + 1}</td>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button>${state.tab === 'countries' ? '' : `<button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${i}))">Delete</button>`}</div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>` }
+    function render() { const names = { 'countries': 'Country hero images', 'cities': 'Cities', 'sights': 'Top sights', 'collections': 'Collection kinds', 'collection-lists': 'Collection list', 'daily-destinations': 'Kroo IQ lessons and questions' }; title.textContent = names[state.tab]; document.querySelector('#addButton').style.display = ['countries', 'cities'].includes(state.tab) ? 'none' : ''; const filter = state.filters[state.tab] || ''; const rows = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => state.tab === 'collection-lists' ? !filter || row.collectionKindId === filter : true); const options = state.tab === 'sights' ? state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('') : state.tab === 'collection-lists' ? state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${x.id === filter ? 'selected' : ''}>${esc(x.title)}</option>`).join('') : ''; const label = state.tab === 'sights' ? 'country' : 'collection kind'; const cityTools = state.tab === 'cities' ? `<div class="city-tools"><div class="city-search-row"><input id="citySearch" type="search" value="${esc(filter)}" placeholder="Search city, state, or country" aria-label="Search cities" onkeydown="if(event.key === 'Enter'){event.preventDefault();submitCitySearch()}"><button class="primary" onclick="withButtonLoading(this, &quot;Searching...&quot;, () => submitCitySearch())">Search</button>${filter ? `<button onclick="withButtonLoading(this, &quot;Clearing...&quot;, () => clearCitySearch())">Clear</button>` : ''}<button class="primary" onclick="openEditor()">+ Add new</button></div><div class="city-pagination"><span>${state.paging.total} records</span><button ${state.paging.currentPage <= 1 ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(-1))">Previous</button><span>Page ${state.paging.currentPage} of ${state.paging.lastPage}</span><button ${state.paging.currentPage >= state.paging.lastPage ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeCityPage(1))">Next</button></div></div>` : ''; const krooIqHelp = state.tab === 'daily-destinations' ? '<small>Each record is one Kroo IQ question. The app uses up to five published records for the selected quiz date.</small>' : ''; summary.innerHTML = `<div class="summarybar">${(state.tab === 'sights' ? sightPaginationTools(options) : cityTools) || `<span>${rows.length}${filter ? ` of ${state.rows.length}` : ''} records ${krooIqHelp}</span>${options ? `<select aria-label="Filter by ${label}" onchange="setTableFilter(this.value)"><option value="">All ${label === 'country' ? 'countries' : 'collection kinds'}</option>${options}</select>` : ''}`}</div>`; const cols = state.tab === 'countries' ? ['heroImage', 'code', 'name'] : state.tab === 'cities' ? ['imageUrl', 'name', 'country', 'state', 'population', 'latitude', 'longitude'] : state.tab === 'sights' ? ['image', 'name', 'country', 'state', 'city'] : state.tab === 'collections' ? ['imageUrl', 'title', 'detail'] : state.tab === 'collection-lists' ? ['imageUrl', 'title', 'collectionKind', 'location', 'detail', 'access'] : ['imageUrl', 'name', 'country', 'city', 'question', 'publishDate']; const numberOffset = state.tab === 'sights' ? (state.sightPaging.currentPage - 1) * state.sightPaging.perPage : state.tab === 'cities' ? (state.paging.currentPage - 1) * state.paging.perPage : 0; table.innerHTML = `<table><thead><tr><th>No.</th>${cols.map(x => `<th>${esc(({heroImage:'Image',imageUrl:'Image',collectionKind:'Collection',publishDate:'Available from'})[x] || x.replace(/([A-Z])/g, ' $1'))}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(({ row: r, index: i }, displayIndex) => `<tr><td>${numberOffset + displayIndex + 1}</td>${cols.map(c => cell(r, c)).join('')}<td><div class="actions"><button onclick="openEditor(${i})">Edit</button>${state.tab === 'countries' ? '' : `<button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${i}))">Delete</button>`}</div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>` }
     const renderDefaultResource = render;
     render = function () {
       renderDefaultResource();
@@ -1051,7 +1093,35 @@
       const cols = ['lessonNumber', 'country', 'publishDate'];
       table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Country</th><th>Available from</th><th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cols.slice(1).map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`;
     };
-    function setTableFilter(value) { state.filters[state.tab] = value; render() }
+    function sightPaginationTools(options) {
+      const { currentPage, lastPage, perPage, total } = state.sightPaging;
+      const first = total ? (currentPage - 1) * perPage + 1 : 0;
+      const last = Math.min(currentPage * perPage, total);
+      return `<div class="city-tools"><div class="city-pagination sight-pagination">
+        <label>Country <select aria-label="Filter by country" onchange="setTableFilter(this.value)"><option value="">All countries</option>${options}</select></label>
+        <label>Show <select aria-label="Sights per page" onchange="setSightPageSize(this.value)">${[50, 100, 200].map(size => `<option value="${size}" ${size === perPage ? 'selected' : ''}>${size}</option>`).join('')}</select> per page</label>
+        <span>${first}–${last} of ${total} sights</span>
+        <button ${currentPage <= 1 ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeSightPage(-1))">Previous</button>
+        <span>Page ${currentPage} of ${lastPage}</span>
+        <button ${currentPage >= lastPage ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeSightPage(1))">Next</button>
+      </div></div>`;
+    }
+    async function setTableFilter(value) {
+      state.filters[state.tab] = value;
+      if (state.tab === 'sights') { state.sightPaging.currentPage = 1; await load() }
+      else render();
+    }
+    async function setSightPageSize(value) {
+      const size = Number(value);
+      if (![50, 100, 200].includes(size)) return;
+      state.sightPaging.perPage = size;
+      state.sightPaging.currentPage = 1;
+      await load();
+    }
+    async function changeSightPage(offset) {
+      state.sightPaging.currentPage = Math.max(1, Math.min(state.sightPaging.lastPage, state.sightPaging.currentPage + offset));
+      await load();
+    }
     async function submitCitySearch() { state.filters.cities = document.querySelector('#citySearch')?.value.trim() || ''; state.paging.currentPage = 1; await load() }
     async function clearCitySearch() { state.filters.cities = ''; state.paging.currentPage = 1; await load() }
     async function changeCityPage(offset) { state.paging.currentPage += offset; await load() }
@@ -1077,6 +1147,8 @@
       draftTools.classList.toggle('lesson-action', isLesson);
       draftTools.classList.toggle('field-action', !isLesson);
       draftTools.querySelector('button').textContent = isLesson ? 'Generate lesson and quiz with AI' : 'Generate description with AI';
+      draftTools.querySelector('.include-images').hidden = !isLesson;
+      document.querySelector('#includeLessonImages').checked = false;
       document.querySelector('#aiDraftHint').textContent = isLesson ? 'Review questions and add images before saving.' : 'Review and edit the draft before saving.';
       if (isLesson) {
         prepareKrooIqEditor();
@@ -1102,7 +1174,9 @@
       document.querySelector('#aiDraftHint').textContent = country ? `Generate questions about ${country}. Review before saving.` : 'Select a country first.';
     }
     async function generateEditorText(button) {
+      if (form.dataset.generating === 'true') return;
       const resource = form.dataset.resource;
+      const includeImages = resource === 'daily-destinations' && document.querySelector('#includeLessonImages').checked;
       const countryId = form.elements.countryId?.value || '';
       const country = state.meta.countries.find(item => item.id === countryId)?.name || '';
       const title = form.elements.title?.value.trim() || form.elements.name?.value.trim() || '';
@@ -1111,6 +1185,9 @@
       if (resource !== 'daily-destinations' && !name) { formNotice.innerHTML = '<div class="notice error">Enter a name or title first.</div>'; return; }
       if (resource === 'daily-destinations' && Array.from({ length: 10 }, (_, index) => form.elements[`q${index + 1}Prompt`]?.value).some(Boolean) && !confirm('Replace the current lesson questions with a new AI draft?')) return;
       await withButtonLoading(button, 'Generating…', async () => {
+        const controls = Array.from(form.querySelectorAll('input, select, textarea, button')).map(control => [control, control.disabled]);
+        form.dataset.generating = 'true';
+        controls.forEach(([control]) => { control.disabled = true; });
         try {
           formNotice.innerHTML = '<div class="notice">Generating a draft. This may take a moment.</div>';
           const result = await call('/admin/api/ai/text', { method: 'POST', body: JSON.stringify({ resource, name: name || country, countryId, isPreview: resource === 'daily-destinations' && form.elements.isPreview.checked }) });
@@ -1124,7 +1201,26 @@
               form.elements[`q${number}Explanation`].value = question.explanation;
             });
             fields.querySelector('.question-card')?.setAttribute('open', '');
-            formNotice.innerHTML = '<div class="notice">Draft ready. Review each question and add its information image before saving.</div>';
+            if (includeImages) {
+              const failed = [];
+              for (let index = 0; index < result.questions.length; index++) {
+                const number = index + 1;
+                const input = form.elements[`q${number}Image`];
+                // The previous image belongs to the old question, not this new draft.
+                input.value = '';
+                normalizedFiles.delete(input);
+                input.dataset.current = '';
+                input.closest('.image-field').querySelector('.field-preview').innerHTML = '<small>No image selected</small>';
+                formNotice.innerHTML = `<div class="notice">Generating image ${number} of ${result.questions.length}…</div>`;
+                try { await generateImageForInput(input, resource); }
+                catch (error) { failed.push({ number, message: error.message }); }
+              }
+              formNotice.innerHTML = failed.length
+                ? `<div class="notice error">Lesson draft ready. Images for questions ${failed.map(item => item.number).join(', ')} could not be generated. ${esc(failed[0].message)} Retry those images individually before saving.</div>`
+                : '<div class="notice">Lesson and images ready. Review each question before saving.</div>';
+            } else {
+              formNotice.innerHTML = '<div class="notice">Draft ready. Review each question and add its information image before saving.</div>';
+            }
           } else {
             const target = form.elements.description || form.elements.content || form.elements.detail;
             target.value = result.description;
@@ -1132,6 +1228,10 @@
             formNotice.innerHTML = '<div class="notice">Description draft ready. Review it before saving.</div>';
           }
         } catch (error) { formNotice.innerHTML = `<div class="notice error">${esc(error.message)}</div>`; }
+        finally {
+          delete form.dataset.generating;
+          controls.forEach(([control, disabled]) => { control.disabled = disabled; });
+        }
       });
     }
     function prepareKrooIqEditor() {
@@ -1162,7 +1262,7 @@
         card.querySelectorAll('textarea, input[type=number]').forEach(control => { control.required = visible && !control.name.endsWith('Image'); });
       });
     }
-    function closeEditor() { modal.classList.add('hidden'); form.querySelector('.dialogfoot').prepend(document.querySelector('#aiDraftTools')); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
+    function closeEditor() { if (form.dataset.generating === 'true') return; modal.classList.add('hidden'); form.querySelector('.dialogfoot').prepend(document.querySelector('#aiDraftTools')); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
     function aiImageSubject(resource, field) {
       const fieldValue = name => form.elements[name]?.value?.trim() || '';
       const country = state.meta.countries.find(item => item.id === fieldValue('countryId'))?.name || '';
@@ -1177,17 +1277,20 @@
       if (!title) throw new Error('Enter a name or title before generating an image.');
       return [title, resource === 'collection-lists' ? fieldValue('location') || city : resource === 'sights' ? city : '', country].filter(Boolean).join(', ').slice(0, 300);
     }
+    async function generateImageForInput(input, resource) {
+      const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource, field: input.name, name: aiImageSubject(resource, input.name) }) });
+      input.value = '';
+      normalizedFiles.delete(input);
+      input.dataset.current = result.imageUrl;
+      input.closest('.image-field').querySelector('.field-preview').innerHTML = imagePreview(result.imageUrl, 'Generated image');
+    }
     async function generateFormImage(button) {
       const input = button.closest('.image-field').querySelector('input[type=file]');
       const resource = form.dataset.resource;
       button.disabled = true;
       button.textContent = 'Generating…';
       try {
-        const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource, field: input.name, name: aiImageSubject(resource, input.name) }) });
-        input.value = '';
-        normalizedFiles.delete(input);
-        input.dataset.current = result.imageUrl;
-        button.closest('.image-field').querySelector('.field-preview').innerHTML = imagePreview(result.imageUrl, 'Generated image');
+        await generateImageForInput(input, resource);
         formNotice.innerHTML = '<div class="notice">Image generated. Save this form to use it.</div>';
       } catch (error) {
         formNotice.innerHTML = `<div class="notice error">${esc(error.message)}</div>`;
@@ -1271,7 +1374,7 @@
     }
     form.onsubmit = async e => {
       e.preventDefault();
-      if (form.dataset.saving === 'true') return;
+      if (form.dataset.saving === 'true' || form.dataset.generating === 'true') return;
       form.dataset.saving = 'true';
       const saveButton = form.querySelector('button[type="submit"]');
       const cancelButton = form.querySelector('.dialogfoot button[onclick="closeEditor()"]');

@@ -139,8 +139,32 @@ class AdminController extends Controller
         return response()->json(['imageUrl' => $images->store($data['image'], $data['folder'])], 201);
     }
 
-    public function index(string $type): JsonResponse
+    public function index(Request $request, string $type): JsonResponse
     {
+        if ($type === 'sights' && ($request->has('page') || $request->has('per_page'))) {
+            $data = $request->validate([
+                'country' => ['nullable', 'string', 'size:2'],
+                'page' => ['sometimes', 'integer', 'min:1'],
+                'per_page' => ['sometimes', 'integer', Rule::in([50, 100, 200])],
+            ]);
+            $query = Sight::query()->with(['country', 'city'])
+                ->join('cities', 'sights.city_id', '=', 'cities.id')
+                ->select('sights.*')
+                ->when($data['country'] ?? null, fn ($query, $country) => $query->where('sights.country_code', strtoupper($country)))
+                ->orderBy('sights.country_code')->orderBy('cities.subcountry')
+                ->orderBy('cities.name')->orderBy('sights.name')->orderBy('sights.id');
+            $perPage = (int) ($data['per_page'] ?? 50);
+            $total = (clone $query)->count();
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $page = min((int) ($data['page'] ?? 1), $lastPage);
+            $sights = $query->forPage($page, $perPage)->get();
+
+            return response()->json([
+                'data' => $sights->map(fn ($sight) => $this->adminSight($sight)),
+                'meta' => ['currentPage' => $page, 'lastPage' => $lastPage, 'perPage' => $perPage, 'total' => $total],
+            ]);
+        }
+
         if ($type === 'daily-destinations') {
             $this->ensureKrooIqSchemaIsReady();
         }
