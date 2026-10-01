@@ -141,16 +141,28 @@ class AdminController extends Controller
 
     public function index(Request $request, string $type): JsonResponse
     {
-        if ($type === 'sights' && ($request->has('page') || $request->has('per_page'))) {
+        if ($type === 'sights' && ($request->has('page') || $request->has('per_page') || $request->has('query'))) {
             $data = $request->validate([
                 'country' => ['nullable', 'string', 'size:2'],
+                'query' => ['nullable', 'string', 'max:200'],
                 'page' => ['sometimes', 'integer', 'min:1'],
                 'per_page' => ['sometimes', 'integer', Rule::in([50, 100, 200])],
             ]);
+            $search = Str::lower(trim($data['query'] ?? ''));
             $query = Sight::query()->with(['country', 'city'])
                 ->join('cities', 'sights.city_id', '=', 'cities.id')
                 ->select('sights.*')
                 ->when($data['country'] ?? null, fn ($query, $country) => $query->where('sights.country_code', strtoupper($country)))
+                ->when($search !== '', function ($query) use ($search): void {
+                    $like = '%'.$search.'%';
+                    $query->where(function ($query) use ($like): void {
+                        $query->whereRaw('LOWER(sights.name) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(cities.name) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(cities.subcountry) LIKE ?', [$like])
+                            ->orWhereHas('country', fn ($country) => $country->whereRaw('LOWER(name) LIKE ?', [$like])
+                                ->orWhereRaw('LOWER(code) LIKE ?', [$like]));
+                    });
+                })
                 ->orderBy('sights.country_code')->orderBy('cities.subcountry')
                 ->orderBy('cities.name')->orderBy('sights.name')->orderBy('sights.id');
             $perPage = (int) ($data['per_page'] ?? 50);

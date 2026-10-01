@@ -736,6 +736,7 @@
           params.set('page', paging.currentPage);
           params.set('per_page', paging.perPage);
           params.set(tab === 'sights' ? 'country' : 'query', state.filters[tab] || '');
+          if (tab === 'sights') params.set('query', state.sightSearch || '');
         }
         const result = await call('/admin/api/' + tab + (params.size ? '?' + params : ''));
         if (version !== loadVersion || tab !== state.tab) return;
@@ -1098,7 +1099,11 @@
       const { currentPage, lastPage, perPage, total } = state.sightPaging;
       const first = total ? (currentPage - 1) * perPage + 1 : 0;
       const last = Math.min(currentPage * perPage, total);
-      return `<div class="city-tools"><div class="city-pagination sight-pagination">
+      return `<div class="city-tools"><div class="city-search-row">
+        <input id="sightSearch" type="search" maxlength="200" value="${esc(state.sightSearch || '')}" placeholder="Search sight, city, state, or country" aria-label="Search top sights" onkeydown="if(event.key === 'Enter'){event.preventDefault();submitSightSearch()}">
+        <button class="primary" onclick="withButtonLoading(this, &quot;Searching...&quot;, () => submitSightSearch())">Search</button>
+        ${state.sightSearch ? '<button onclick="withButtonLoading(this, &quot;Clearing...&quot;, () => clearSightSearch())">Clear</button>' : ''}
+      </div><div class="city-pagination sight-pagination">
         <label>Country <select aria-label="Filter by country" onchange="setTableFilter(this.value)"><option value="">All countries</option>${options}</select></label>
         <label>Show <select aria-label="Sights per page" onchange="setSightPageSize(this.value)">${[50, 100, 200].map(size => `<option value="${size}" ${size === perPage ? 'selected' : ''}>${size}</option>`).join('')}</select> per page</label>
         <span>${first}–${last} of ${total} sights</span>
@@ -1106,6 +1111,16 @@
         <span>Page ${currentPage} of ${lastPage}</span>
         <button ${currentPage >= lastPage ? 'disabled' : ''} onclick="withButtonLoading(this, &quot;Loading...&quot;, () => changeSightPage(1))">Next</button>
       </div></div>`;
+    }
+    async function submitSightSearch() {
+      state.sightSearch = document.querySelector('#sightSearch').value.trim();
+      state.sightPaging.currentPage = 1;
+      await load();
+    }
+    async function clearSightSearch() {
+      state.sightSearch = '';
+      state.sightPaging.currentPage = 1;
+      await load();
     }
     async function setTableFilter(value) {
       state.filters[state.tab] = value;

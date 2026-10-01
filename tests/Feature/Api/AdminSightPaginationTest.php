@@ -53,6 +53,28 @@ class AdminSightPaginationTest extends TestCase
             ->assertJsonPath('meta.lastPage', 1)->assertJsonPath('meta.total', 0);
     }
 
+    public function test_search_filters_the_full_catalog_before_pagination(): void
+    {
+        $this->getJson('/admin/api/sights?page=4&query=sIgHt%20205&country=US')
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Sight 205')
+            ->assertJsonPath('meta.total', 1)->assertJsonPath('meta.currentPage', 1);
+        $this->getJson('/admin/api/sights?page=1&query=Sight%20205&country=CA')
+            ->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_search_matches_city_region_and_country(): void
+    {
+        City::where('country_code', 'US')->update(['name' => 'Boston', 'subcountry' => 'Massachusetts']);
+        Country::where('code', 'US')->update(['name' => 'United States']);
+        foreach (['boston', 'massachusetts', 'united states', 'us'] as $search) {
+            $this->getJson('/admin/api/sights?page=1&query='.rawurlencode($search))
+                ->assertOk()->assertJsonCount(50, 'data')->assertJsonPath('meta.total', 205);
+        }
+        $this->getJson('/admin/api/sights?page=1&query='.str_repeat('a', 201))
+            ->assertUnprocessable()->assertJsonValidationErrors('query');
+    }
+
     public function test_invalid_pagination_is_rejected_and_legacy_list_is_preserved(): void
     {
         $this->getJson('/admin/api/sights?page=0&per_page=75')->assertUnprocessable()
