@@ -749,7 +749,7 @@
       }
 
       .hero:before {
-        background: none
+        background: linear-gradient(0deg, #031f1970 0%, #031f19bf 40%, #031f19a6 60%, #031f1933 100%)
       }
 
       .hero h1 {
