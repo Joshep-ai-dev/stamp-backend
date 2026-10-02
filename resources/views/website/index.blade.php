@@ -745,11 +745,11 @@
 
       .hero {
         min-height: 660px;
-        background-position: 58% center
+        background-position: right center
       }
 
       .hero:before {
-        background: linear-gradient(90deg, #031f19f7 0%, #031f19e4 47%, #031f1970 100%), linear-gradient(0deg, #031f19d9, transparent 55%)
+        background: none
       }
 
       .hero h1 {
@@ -988,12 +988,12 @@
         <div class="stat"><span class="stat-icon" aria-hidden="true"><svg>
               <use href="#icon-city" />
             </svg></span>
-          <div><strong>1,000+</strong><small>Top Cities</small></div>
+          <div><strong>50,000+</strong><small>Cities</small></div>
         </div>
         <div class="stat"><span class="stat-icon" aria-hidden="true"><svg>
               <use href="#icon-camera" />
             </svg></span>
-          <div><strong>5,000+</strong><small>Top Sights</small></div>
+          <div><strong>100,000+</strong><small>Top Sights</small></div>
         </div>
       </div>
     </section>
@@ -1009,7 +1009,7 @@
                 </svg></span>
               <div>
                 <h3>Track Your Travels</h3>
-                <p>Mark countries, cities, sights and airports you have visited.</p>
+                <p>Track countries, cities, sights and airports you have visited.</p>
               </div>
             </div>
             <div class="feature"><span class="feature-icon" aria-hidden="true"><svg>
@@ -1044,7 +1044,7 @@
       <div class="wrap explore-grid">
         <div>
           <h2 id="explore-title">Explore the World</h2>
-          <p>Discover countries, cities and iconic sights. Add them to your map and grow your Kroo Score.</p><a class="button" href="#download">Start Exploring <svg aria-hidden="true">
+          <p>Discover countries, cities and iconic sights. Add them to your passport and grow your Kroo Score.</p><a class="button" href="#download">Start Exploring <svg aria-hidden="true">
               <use href="#icon-arrow" />
             </svg></a>
         </div>
@@ -1063,7 +1063,7 @@
               <svg>
                 <use href="#icon-trophy" />
               </svg></span>
-            <div><strong>Dream Vacation Challenge</strong><small>Chance to win $5,000 cash</small></div>
+            <div><strong>Dream Vacation Challenge</strong><small>Win $1,000 cash toward your dream vacation</small></div>
           </li>
           <li><span class="plus-icon" aria-hidden="true"><svg>
                 <use href="#icon-globe" />
@@ -1080,15 +1080,13 @@
               </svg></span>
             <div><strong>Exclusive Challenges</strong><small>Special events and collections</small></div>
           </li>
-        </ul><a class="button" href="#download">Learn About Kroo+ <svg aria-hidden="true">
-            <use href="#icon-arrow" />
-          </svg></a>
+        </ul>
       </div>
     </section>
     <section id="passport" class="image-split passport" aria-labelledby="passport-title">
       <div class="split-copy">
         <h2 id="passport-title">The Kroo Passport</h2>
-        <p>A beautifully designed passport to accompany your digital journey.</p><a class="button" href="#download">Get Your Passport <svg aria-hidden="true">
+        <p>A beautifully designed digital passport to collect stamps from your journeys.</p><a class="button" href="#download">Get Your Passport <svg aria-hidden="true">
             <use href="#icon-arrow" />
           </svg></a>
       </div>
@@ -1107,7 +1105,7 @@
         <h3>Explore</h3><a href="#explore">Countries</a><a href="#explore">Cities</a><a href="#explore">Sights</a><a href="#features">Challenges</a>
       </div>
       <div class="footer-col">
-        <h3>About</h3><a href="#features">Our Story</a><a href="#passport">Passport</a><a href="#download">Contact</a>
+        <h3>About</h3><a href="#features">Our Story</a><a href="#passport">Passport</a><a href="mailto:support@krootravel.com">Contact Us</a>
       </div>
       <div class="footer-col">
         <h3>Legal</h3><a href="{{ route('website.privacy') }}">Privacy Policy</a>
