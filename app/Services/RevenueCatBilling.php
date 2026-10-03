@@ -134,12 +134,13 @@ class RevenueCatBilling
         array $subscription,
         bool $active,
     ): ?CarbonImmutable {
-        if (! $active || strtolower((string) ($subscription['period_type'] ?? '')) !== 'normal') {
-            return null;
-        }
-
+        // Keep the first paid start through cancellation, expiry, and resubscription.
         if ($existing?->paid_membership_started_at !== null) {
             return CarbonImmutable::instance($existing->paid_membership_started_at);
+        }
+
+        if (! $active || strtolower((string) ($subscription['period_type'] ?? '')) !== 'normal') {
+            return null;
         }
 
         $startedAt = $existing !== null

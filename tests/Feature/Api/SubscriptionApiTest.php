@@ -6,6 +6,7 @@ use App\Models\RevenueCatEntitlement;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -117,7 +118,7 @@ class SubscriptionApiTest extends TestCase
             ->assertJsonPath('challengeProgress.referralCount', 1);
     }
 
-    public function test_trial_and_short_paid_memberships_do_not_count_as_referrals(): void
+    public function test_trial_and_short_paid_memberships_count_as_kroo_signup_referrals(): void
     {
         $referrer = User::factory()->create();
         $this->givePaidMembership($referrer, now()->subDay());
@@ -135,7 +136,7 @@ class SubscriptionApiTest extends TestCase
         Sanctum::actingAs($referrer);
         $this->getJson('/api/v1/me/home')
             ->assertOk()
-            ->assertJsonPath('challengeProgress.referralCount', 0);
+            ->assertJsonPath('challengeProgress.referralCount', 2);
     }
 
     public function test_active_annual_membership_counts_as_a_referral_immediately(): void
@@ -234,6 +235,26 @@ class SubscriptionApiTest extends TestCase
             ->assertJsonPath('challengeProgress.referralCount', 1);
     }
 
+    public function test_cancellation_and_resubscription_preserve_the_first_paid_start(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $user = User::factory()->create();
+        $start = now()->subMonths(6);
+        $this->givePaidMembership($user, $start);
+        config(['services.revenuecat.secret_api_key' => 'rc-secret']);
+        Http::fake(['api.revenuecat.com/*' => Http::response([
+            'subscriber' => ['entitlements' => [], 'subscriptions' => []],
+        ])]);
+        Sanctum::actingAs($user);
+        $this->postJson('/api/v1/me/subscription/revenuecat/sync')->assertOk()->assertJsonPath('isKrooPlus', false);
+        $this->assertTrue($user->revenueCatEntitlement()->first()->paid_membership_started_at->equalTo($start));
+
+        Http::swap(new Factory);
+        $this->fakeActiveSubscriber(now());
+        $this->postJson('/api/v1/me/subscription/revenuecat/sync')->assertOk()->assertJsonPath('isKrooPlus', true);
+        $this->assertTrue($user->revenueCatEntitlement()->first()->paid_membership_started_at->equalTo($start));
+    }
+
     private function givePaidMembership(
         User $user,
         CarbonInterface $startedAt,
@@ -260,8 +281,7 @@ class SubscriptionApiTest extends TestCase
         ?CarbonInterface $expiresDate = null,
         ?string $basePlanId = null,
         bool $compositeProductId = true,
-    ): void
-    {
+    ): void {
         $originalPurchaseDate ??= now()->subMonth();
         $expiresDate ??= now()->addMonth();
         config([
@@ -282,12 +302,12 @@ class SubscriptionApiTest extends TestCase
                         ($basePlanId !== null && $compositeProductId
                             ? "kroo_plus_monthly:{$basePlanId}"
                             : 'kroo_plus_monthly') => [
-                            'store' => 'play_store',
-                            'period_type' => $periodType,
-                            'original_purchase_date' => $originalPurchaseDate->toIso8601String(),
-                            'purchase_date' => now()->toIso8601String(),
-                            'expires_date' => $expiresDate->toIso8601String(),
-                        ],
+                                'store' => 'play_store',
+                                'period_type' => $periodType,
+                                'original_purchase_date' => $originalPurchaseDate->toIso8601String(),
+                                'purchase_date' => now()->toIso8601String(),
+                                'expires_date' => $expiresDate->toIso8601String(),
+                            ],
                     ],
                 ],
             ]),

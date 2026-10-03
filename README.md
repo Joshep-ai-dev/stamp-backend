@@ -99,3 +99,14 @@ php artisan route:list --path=api/v1
 ```
 
 API validation errors use Laravel's standard 422 shape. Unexpected production exceptions return a generic message plus a request ID, also exposed in the `X-Request-Id` header.
+
+## Dream Vacation Challenge progress
+
+The home endpoint returns challengeProgress with targets of Kroo Score 5.0,
+Kroo IQ 85, and five new Kroo signups using the member's referral code.
+Referred users do not need a paid subscription. Challenge progress is scoped to
+the twelve calendar months beginning at the member's first paid Kroo+ start.
+IQ uses completed attempt score increments; passport score remains lifetime-based.
+The API includes startedAt, deadlineAt, expired, membershipActive, and qualified
+for the app to display. Cancellation and resubscription preserve the first
+recorded paid start date. No database migration is required for these API changes.
