@@ -683,7 +683,7 @@
     imageViewer.addEventListener('close', () => { viewerImage.removeAttribute('src'); viewerTrigger?.focus(); });
   </script>
   <script>
-    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, sightPaging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, edit: null };
+    const state = { key: sessionStorage.stampoAdminKey || '', tab: 'countries', rows: [], meta: { countries: [], collectionKinds: [] }, states: {}, cities: {}, filters: { sights: '', 'collection-lists': '', cities: '' }, paging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, sightPaging: { currentPage: 1, lastPage: 1, perPage: 50, total: 0 }, lessonPaging: { currentPage: 1, perPage: 10 }, edit: null };
     const title = document.querySelector('#title'), summary = document.querySelector('#summary'), table = document.querySelector('#table'), notice = document.querySelector('#notice'), modal = document.querySelector('#modal'), form = document.querySelector('#form'), formTitle = document.querySelector('#formTitle'), formNotice = document.querySelector('#formNotice'), fields = document.querySelector('#fields');
     const normalizedFiles = new WeakMap();
     async function withButtonLoading(button, label, action) {
@@ -1092,9 +1092,16 @@
       const previewCount = state.rows.filter(row => Number(row.lessonNumber) === 0).length;
       const publishedCount = state.rows.filter(row => row.isPublished !== false).length;
       summary.innerHTML = `<div class="lesson-summary"><div class="lesson-stat">Total lessons<strong>${state.rows.length}</strong></div><div class="lesson-stat">Published<strong>${publishedCount}</strong></div><div class="lesson-stat">Public preview<strong>${previewCount ? 'Ready' : 'Missing'}</strong></div><div class="lesson-help">Lesson 0 is the one-time public preview with 10 questions. Kroo+ lessons start at Lesson 1, contain 5 questions, and progress in order.</div></div>`;
-      const cols = ['lessonNumber', 'country'];
-      table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Country</th><th>Actions</th></tr></thead><tbody>${state.rows.map((row, index) => `<tr><td>${index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cols.slice(1).map(column => cell(row, column)).join('')}<td><div class="actions"><button onclick="openEditor(${index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${index}))">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`;
+      const { perPage } = state.lessonPaging;
+      const lastPage = Math.max(1, Math.ceil(state.rows.length / perPage));
+      state.lessonPaging.currentPage = Math.min(state.lessonPaging.currentPage, lastPage);
+      const currentPage = state.lessonPaging.currentPage;
+      const start = (currentPage - 1) * perPage;
+      summary.insertAdjacentHTML('beforeend', `<div class="city-pagination"><label>Show <select aria-label="Kroo IQ lessons per page" onchange="setLessonPageSize(this.value)">${[10, 20, 50].map(size => `<option value="${size}" ${size === perPage ? 'selected' : ''}>${size}</option>`).join('')}</select> per page</label><span>${state.rows.length ? start + 1 : 0}–${Math.min(start + perPage, state.rows.length)} of ${state.rows.length} lessons</span><button ${currentPage <= 1 ? 'disabled' : ''} onclick="changeLessonPage(-1)">Previous</button><span>Page ${currentPage} of ${lastPage}</span><button ${currentPage >= lastPage ? 'disabled' : ''} onclick="changeLessonPage(1)">Next</button></div>`);
+      table.innerHTML = `<table><thead><tr><th>No.</th><th>Lesson</th><th>Country</th><th>Actions</th></tr></thead><tbody>${state.rows.slice(start, start + perPage).map((row, index) => `<tr><td>${start + index + 1}</td><td><span class="lesson-pill ${Number(row.lessonNumber) === 0 ? 'preview' : ''}">${Number(row.lessonNumber) === 0 ? 'Lesson 0 · Preview' : `Lesson ${esc(row.lessonNumber)}`}</span></td>${cell(row, 'country')}<td><div class="actions"><button onclick="openEditor(${start + index})">Edit</button><button class="danger" onclick="withButtonLoading(this, &quot;Deleting...&quot;, () => removeRow(${start + index}))">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="12" class="empty-state">No records found. Try another filter or add content to get started.</td></tr>'}</tbody></table>`;
     };
+    function setLessonPageSize(value) { state.lessonPaging.perPage = Number(value); state.lessonPaging.currentPage = 1; render() }
+    function changeLessonPage(delta) { state.lessonPaging.currentPage += delta; render() }
     function sightPaginationTools(options) {
       const { currentPage, lastPage, perPage, total } = state.sightPaging;
       const first = total ? (currentPage - 1) * perPage + 1 : 0;
@@ -1384,7 +1391,7 @@
       if (key === 'options' && Array.isArray(value)) value = value.join('\n');
       const cls = `field ${wide ? 'wide' : ''}`, required = wide ? 'required' : '';
       if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`;
-      if (type === 'country') return `<label class="${cls}">${label}<select name="${key}" ${required} onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`;
+      if (type === 'country') { const usedCountries = form.dataset.resource === 'daily-destinations' && !row ? new Set(state.rows.map(lesson => lesson.countryId)) : null; return `<label class="${cls}">${label}<select name="${key}" ${required} onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.filter(x => !usedCountries?.has(x.id)).map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; }
       if (type === 'state') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select></label>`;
       if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" ${required}><option value="">Select a country first…</option></select></label>`;
       if (type === 'kinds') return `<label class="${cls}">${label}<select name="${key}" required multiple size="${Math.min(Math.max(state.meta.collectionKinds.length, 2), 6)}">${state.meta.collectionKinds.map(x => `<option value="${esc(x.id)}" ${value.includes(x.id) ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select><small>Choose every collection this item belongs to.</small></label>`;
