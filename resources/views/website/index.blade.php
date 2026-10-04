@@ -1044,7 +1044,7 @@
       <div class="wrap explore-grid">
         <div>
           <h2 id="explore-title">Explore the World</h2>
-          <p>Discover countries, cities and iconic sights. Add them to your passport and grow your Kroo Score.</p><a class="button" href="#download">Start Exploring <svg aria-hidden="true">
+          <p>Discover countries, cities and iconic sights. Add them with stamps to your passport and grow your Kroo Score.</p><a class="button" href="#download">Start Exploring <svg aria-hidden="true">
               <use href="#icon-arrow" />
             </svg></a>
         </div>
