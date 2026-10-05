@@ -444,7 +444,7 @@ class AdminAiAutomationTest extends TestCase
         $this->assertStringContainsString('travel collection theme', $generator->imagePrompt('Collection', 'Coastal France'));
         $this->assertStringContainsString('NO title', $generator->imagePrompt('Quiz Image', 'A famous bridge in Paris'));
         $badgePrompt = $generator->imagePrompt('Collection Badge', 'Coastal France', 'A long description of beaches and seaside villages');
-        $this->assertStringContainsString('print exactly "EXPLORE THE WORLD"', $badgePrompt);
+        $this->assertStringContainsString('print exactly "Collect the world"', $badgePrompt);
         $this->assertStringContainsString('Use this context for the illustration only: A long description of beaches and seaside villages', $badgePrompt);
     }
 
