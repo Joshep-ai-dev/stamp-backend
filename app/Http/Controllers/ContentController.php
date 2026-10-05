@@ -190,7 +190,7 @@ class ContentController extends Controller
             'countryCode' => $city->country_code,
             'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
             'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url), 'description' => $city->description,
-            'sights' => $this->visibleSights($request, Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get())->map(fn ($sight) => $this->sightItem($sight)),
+            'sights' => Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get()->map(fn ($sight) => $this->sightItem($sight)),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
         ]);
     }
@@ -201,7 +201,7 @@ class ContentController extends Controller
 
         $sights = Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get();
 
-        return response()->json($this->visibleSights($request, $sights)->map(fn ($sight) => $this->sightItem($sight)));
+        return response()->json($sights->map(fn ($sight) => $this->sightItem($sight)));
     }
 
     public function searchAirports(Request $request, AirportLookup $airports): JsonResponse
@@ -251,13 +251,6 @@ class ContentController extends Controller
         CountryState::where('country_code', 'US')->where('name', $state)->firstOrFail();
 
         return response()->json($airports->forState('US', $state));
-    }
-
-    private function visibleSights(Request $request, $sights)
-    {
-        return $request->user('sanctum')?->plan === 'pro'
-            ? $sights
-            : $sights->filter(fn ($sight) => ! $this->requiresKrooPlus($sight))->values();
     }
 
     /**

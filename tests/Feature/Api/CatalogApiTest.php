@@ -63,6 +63,20 @@ class CatalogApiTest extends TestCase
         $this->getJson('/api/v1/catalog/cities/292968')->assertOk()->assertJsonPath('sights.0.cityId', '1784176710');
     }
 
+    public function test_city_lists_sights_after_the_country_free_preview(): void
+    {
+        $other = City::create(['geoname_id' => 'other', 'name' => 'Other City', 'normalized_name' => 'other city', 'country_code' => 'MX', 'subcountry' => 'Other', 'normalized_subcountry' => 'other']);
+        foreach (['Alpha', 'Bravo', 'Charlie'] as $name) {
+            Sight::create(['country_code' => 'MX', 'city_id' => $other->id, 'name' => $name, 'slug' => strtolower($name)]);
+        }
+        $city = City::where('geoname_id', '3530597')->firstOrFail();
+        $sight = Sight::create(['country_code' => 'MX', 'city_id' => $city->id, 'name' => 'Zocalo', 'slug' => 'zocalo']);
+
+        $this->getJson('/api/v1/catalog/cities/3530597')->assertOk()->assertJsonPath('sights.0.id', $sight->id);
+        $this->getJson('/api/v1/catalog/cities/3530597/sights')->assertOk()->assertJsonPath('0.id', $sight->id);
+        $this->getJson('/api/v1/sights/'.$sight->id)->assertForbidden();
+    }
+
     public function test_same_named_cities_in_different_regions_stay_separate(): void
     {
         City::create(['geoname_id' => 'north-town', 'name' => 'Springfield', 'normalized_name' => 'springfield', 'country_code' => 'MX', 'subcountry' => 'North', 'normalized_subcountry' => 'north']);
