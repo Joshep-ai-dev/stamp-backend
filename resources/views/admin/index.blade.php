@@ -1308,7 +1308,7 @@
       return [title, resource === 'collection-lists' ? fieldValue('location') || city : resource === 'sights' ? city : '', country].filter(Boolean).join(', ').slice(0, 300);
     }
     async function generateImageForInput(input, resource) {
-      const direction = resource === 'collections' && input.name === 'explorerImageUrl' ? form.elements.detail?.value?.trim() || '' : '';
+      const direction = resource === 'collections' && input.name === 'explorerImageUrl' ? (form.elements.detail?.value?.trim() || '').slice(0, 500) : '';
       const result = await call('/admin/api/ai/image', { method: 'POST', body: JSON.stringify({ resource, field: input.name, name: aiImageSubject(resource, input.name), direction }) });
       input.value = '';
       normalizedFiles.delete(input);
