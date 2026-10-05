@@ -67,7 +67,11 @@ class AdminAiController extends Controller
             'states' => $data['field'] === 'imageUrl' ? 'State' : null,
             'cities' => $data['field'] === 'imageUrl' ? 'City' : null,
             'sights' => $data['field'] === 'image' ? 'Top Sight' : null,
-            'collections' => $data['field'] === 'heroImageUrl' ? 'Collection' : null,
+            'collections' => match ($data['field']) {
+                'explorerImageUrl' => 'Collection Badge',
+                'heroImageUrl' => 'Collection',
+                default => null,
+            },
             'collection-lists' => $data['field'] === 'imageUrl' ? 'Collection Place' : null,
             'daily-destinations' => preg_match('/^q(?:10|[1-9])Image$/', $data['field']) ? 'Quiz Image' : null,
         };

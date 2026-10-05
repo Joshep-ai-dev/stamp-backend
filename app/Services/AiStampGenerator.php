@@ -93,6 +93,23 @@ class AiStampGenerator
 
     public function imagePrompt(string $category, string $name, string $extra = ''): string
     {
+        if ($category === 'Collection Badge') {
+            $bottomText = trim($extra) ?: 'Explore the collection';
+
+            return <<<PROMPT
+Create one isolated vintage travel badge in the style of an old passport stamp or souvenir stamp.
+FORMAT: Vertical rounded-rectangle badge, approximately 2:3. Small final appearance, around 300 × 450 px. Low-detail, low-resolution print appearance. Transparent background outside the badge.
+BADGE SHAPE: The entire top section must be fully rounded into a continuous semicircular dome. No flat top or slightly rounded square corners. The sides rise vertically and smoothly join one large arch. Round the bottom corners less strongly. Use a thin double-line border following the exact silhouette.
+BACKGROUND: Warm light cream paper inside the badge only. The entire area outside the outer border must have true transparent alpha. No canvas, page, wall, mockup, scenery, or external shadow. Show one badge only.
+COLOR: One dark ink color only, preferably navy blue, forest green, dark brown, or muted red. Do not mix ink colors. Cream is the only interior background color.
+STYLE: Classic 1950s to 1970s tourism stamp, old passport stamp, vintage souvenir badge, letterpress, screen-print texture, woodcut or engraved illustration. Simple hand-drawn lines, faded uneven ink, tiny missing ink areas, rough edges, soft paper grain, imperfect registration. Old and cheaply printed. Avoid polished vector style, high-detail realism, photography, gradients, 3D, gloss, and realistic lighting.
+LAYOUT: Center the title "{$name}" near the upper rounded section in bold vintage serif type, with clear space from the border. In the middle, draw one recognizable landmark or subject representing {$name} as simple engraved line art. Keep it legible at small size, with thick enough lines and few architectural details. Supporting clouds, waves, mountains, or trees are allowed only if useful. In the bottom area, print exactly "{$bottomText}" in centered bold vintage serif text. Use only these supplied words; invent no labels.
+COMPOSITION: The illustration occupies 50 to 60 percent of badge height, the title 15 to 20 percent, and the bottom text 15 to 20 percent. Balance empty space. Keep everything inside the double border.
+TYPOGRAPHY: Slightly condensed old serif lettering with faded, rough print edges. Keep every word readable. Do not distort letters.
+QUALITY: Deliberately small and slightly low quality, mildly blurry print edges, low-detail engraving, subtle grain and imperfections, like a scanned vintage souvenir badge.
+FINAL REQUIREMENT: One vertical badge with a fully rounded dome top, rounded bottom corners, double-line border, cream interior, one dark ink color, simple engraved subject, vintage serif text, worn print texture, and a fully transparent outer background.
+PROMPT;
+        }
         if (in_array($category, ['Top Sight', 'Collection Place', 'Quiz Image'], true)) {
             $titleInstruction = 'Include NO title, place name, city name, '
                 .'country name, letters, numbers, signs, captions, or other visible text. '
@@ -155,7 +172,7 @@ PROMPT;
 
     public function image(string $category, string $name, string $folder, string $extra = ''): string
     {
-        return $this->storeImage($this->request('/images/generations', $this->imageBody($category, $name, $extra)), $folder);
+        return $this->storeImage($this->request('/images/generations', $this->imageBody($category, $name, $extra)), $folder, $category === 'Collection Badge');
     }
 
     public function generateMany(array $tasks): array
@@ -226,11 +243,18 @@ PROMPT;
     {
         $model = config('services.openai.image_model');
 
-        return [
+        $badge = $category === 'Collection Badge';
+        $body = [
             'model' => $model, 'prompt' => $this->imagePrompt($category, $name, $extra),
-            'size' => str_starts_with($model, 'gpt-image-2') ? '1200x800' : '1536x1024',
-            'quality' => config('ai.image_quality', 'low'), 'output_format' => 'webp', 'output_compression' => 60,
+            'size' => $badge ? (str_starts_with($model, 'gpt-image-2') ? '800x1200' : '1024x1536') : (str_starts_with($model, 'gpt-image-2') ? '1200x800' : '1536x1024'),
+            'quality' => config('ai.image_quality', 'low'),
+            'output_format' => $badge ? 'png' : 'webp', 'output_compression' => $badge ? 100 : 60,
         ];
+        if ($badge) {
+            $body['background'] = 'transparent';
+        }
+
+        return $body;
     }
 
     private function textOptions(array $body): array
@@ -312,7 +336,7 @@ PROMPT;
         return $results;
     }
 
-    public function storeImage(array $response, string $folder): string
+    public function storeImage(array $response, string $folder, bool $badge = false): string
     {
         $encoded = $response['data'][0]['b64_json'] ?? null;
         $bytes = $encoded ? base64_decode($encoded, true) : false;
@@ -323,7 +347,25 @@ PROMPT;
         if (! $bytes || ! $extension) {
             throw new RuntimeException('The image model returned no readable image.');
         }
-        if ($extension !== 'webp' || strlen($bytes) >= 299000 || ($details[0] ?? 0) !== 1200 || ($details[1] ?? 0) !== 800) {
+        if ($badge) {
+            if ($extension !== 'png' || ! function_exists('imagecreatefromstring') || ! function_exists('imagepng')) {
+                throw new RuntimeException('A transparent PNG and GD are required for collection badges.');
+            }
+            $source = @imagecreatefromstring($bytes);
+            $resized = imagecreatetruecolor(300, 450);
+            if (! $source || ! $resized) {
+                throw new RuntimeException('Could not resize the generated badge.');
+            }
+            imagealphablending($resized, false);
+            imagesavealpha($resized, true);
+            imagefill($resized, 0, 0, imagecolorallocatealpha($resized, 0, 0, 0, 127));
+            imagecopyresampled($resized, $source, 0, 0, 0, 0, 300, 450, imagesx($source), imagesy($source));
+            ob_start();
+            imagepng($resized, null, 8);
+            $bytes = ob_get_clean();
+            imagedestroy($resized);
+            imagedestroy($source);
+        } elseif ($extension !== 'webp' || strlen($bytes) >= 299000 || ($details[0] ?? 0) !== 1200 || ($details[1] ?? 0) !== 800) {
             if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
                 throw new RuntimeException('GD image processing is required to resize generated images.');
             }
