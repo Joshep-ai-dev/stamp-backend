@@ -322,8 +322,9 @@ class AdminController extends Controller
             $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
             $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'explorerImageUrl' => ['nullable', 'string'], 'heroImageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])]]);
-            $heroImage = $data['heroImageUrl'] ?? $model?->hero_image ?? $model?->image;
-            $values = ['access' => $data['access'] ?? $model?->access ?? 'free', 'title' => $data['title'], 'detail' => $data['detail'] ?? '', 'explorer_image' => $data['explorerImageUrl'] ?? $model?->explorer_image, 'hero_image' => $heroImage, 'image' => $heroImage, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
+            $heroImage = ImageUrl::stored($data['heroImageUrl'] ?? $model?->hero_image ?? $model?->image);
+            $explorerImage = ImageUrl::stored($data['explorerImageUrl'] ?? $model?->explorer_image);
+            $values = ['access' => $data['access'] ?? $model?->access ?? 'free', 'title' => $data['title'], 'detail' => $data['detail'] ?? '', 'explorer_image' => $explorerImage, 'hero_image' => $heroImage, 'image' => $heroImage, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
             $model ??= new CollectionKind(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'collection-lists') {
             $data = $request->validate([

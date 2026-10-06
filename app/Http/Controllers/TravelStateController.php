@@ -186,7 +186,7 @@ class TravelStateController extends Controller
         $value = $definition
             ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
             : ($progress?->progress ?? 0);
-        $heroImage = $definition?->image ?: $definition?->hero_image;
+        $heroImage = $definition?->hero_image ?: $definition?->image;
         $item = ['access' => $definition?->access ?? 'free', 'id' => $id, 'title' => $definition ? $definition->title : ($legacy['title'] ?? $id), 'detail' => $definition ? ($definition->detail ?? '') : ($legacy['detail'] ?? ''), 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($definition?->explorer_image ?: $heroImage), 'places' => $places, 'progress' => $value, 'status' => $value === 100 ? 'completed' : 'active'];
         if ($progress) {
             $item['updatedAt'] = $progress->updated_at->utc()->toISOString();

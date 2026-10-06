@@ -4,6 +4,27 @@ namespace App\Services;
 
 class ImageUrl
 {
+    public static function stored(?string $url): string
+    {
+        $url = trim((string) $url);
+        $parts = parse_url($url);
+        if (! isset($parts['host'])) {
+            return $url;
+        }
+
+        $host = strtolower($parts['host']);
+        $appHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        $requestHost = app()->bound('request') ? strtolower((string) request()->getHost()) : '';
+        if (! in_array($host, array_filter(['krootravel.com', 'www.krootravel.com', $appHost, $requestHost]), true)) {
+            return $url;
+        }
+
+        $path = $parts['path'] ?? '';
+        return str_starts_with($path, '/images/')
+            ? $path.(isset($parts['query']) ? '?'.$parts['query'] : '')
+            : $url;
+    }
+
     public static function public(?string $url): string
     {
         $url = trim((string) $url);

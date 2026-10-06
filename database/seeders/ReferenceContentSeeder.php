@@ -18,13 +18,19 @@ class ReferenceContentSeeder extends Seeder
         }
         $data = json_decode((string) file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
         foreach ($data['managedCollections'] ?? [] as $item) {
-            $kind = CollectionKind::updateOrCreate(['id' => $item['id']], [
+            $values = [
                 'title' => $item['title'], 'detail' => $item['detail'] ?? $item['description'] ?? '',
-                'image' => $item['heroImageUrl'] ?? $item['imageUrl'] ?? '',
-                'hero_image' => $item['heroImageUrl'] ?? $item['imageUrl'] ?? '',
-                'explorer_image' => $item['explorerImageUrl'] ?? '', 'is_published' => $item['isPublished'] ?? true,
+                'is_published' => $item['isPublished'] ?? true,
                 'display_order' => $item['displayOrder'] ?? 0,
-            ]);
+            ];
+            if (isset($item['heroImageUrl']) || isset($item['imageUrl'])) {
+                $values['image'] = $item['heroImageUrl'] ?? $item['imageUrl'];
+                $values['hero_image'] = $values['image'];
+            }
+            if (isset($item['explorerImageUrl'])) {
+                $values['explorer_image'] = $item['explorerImageUrl'];
+            }
+            $kind = CollectionKind::updateOrCreate(['id' => $item['id']], $values);
             foreach ($item['places'] ?? [] as $order => $place) {
                 $city = $locations->find((string) ($place['country'] ?? ''), (string) ($place['city'] ?? ''));
                 CollectionList::updateOrCreate(['id' => $place['id']], ['collectionkind_id' => $kind->id, 'image' => $place['imageUrl'] ?? '', 'title' => $place['name'] ?? $place['title'], 'city_id' => $city?->id, 'location' => collect([$city?->name ?? ($place['city'] ?? null), $city?->country?->name ?? ($place['country'] ?? null)])->filter()->join(', '), 'detail' => $place['content'] ?? $place['detail'] ?? '', 'access' => ($place['isPremium'] ?? false) ? 'pro' : 'free', 'display_order' => $order]);

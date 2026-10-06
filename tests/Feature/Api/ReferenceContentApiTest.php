@@ -44,6 +44,37 @@ class ReferenceContentApiTest extends TestCase
         $this->assertDatabaseHas('collectionkind', ['id' => $id, 'title' => 'Edited twice', 'detail' => 'Third']);
     }
 
+    public function test_collection_kind_saves_local_image_paths_without_the_site_domain(): void
+    {
+        $this->withHeaders($this->adminHeaders())->postJson('/admin/api/collections', [
+            'title' => 'Images',
+            'heroImageUrl' => 'https://krootravel.com/images/collection/hero.jpg',
+            'explorerImageUrl' => 'https://krootravel.com/images/collection/badge.png',
+        ])->assertCreated();
+
+        $kind = CollectionKind::where('title', 'Images')->firstOrFail();
+        $this->assertSame('/images/collection/hero.jpg', $kind->hero_image);
+        $this->assertSame('/images/collection/hero.jpg', $kind->image);
+        $this->assertSame('/images/collection/badge.png', $kind->explorer_image);
+    }
+
+    public function test_collection_hero_image_uses_hero_column_before_legacy_image(): void
+    {
+        CollectionKind::create([
+            'id' => 'image-priority',
+            'title' => 'Image Priority',
+            'image' => '/images/collection/old.jpg',
+            'hero_image' => '/images/collection/hero.jpg',
+            'explorer_image' => '/images/collection/badge.png',
+            'is_published' => true,
+        ]);
+
+        $this->getJson('/api/collections/image-priority')->assertOk()
+            ->assertJsonPath('heroImageUrl', url('/images/collection/hero.jpg'))
+            ->assertJsonPath('imageUrl', url('/images/collection/hero.jpg'))
+            ->assertJsonPath('explorerImageUrl', url('/images/collection/badge.png'));
+    }
+
     public function test_admin_can_manage_sights_using_catalog_country_and_city_ids(): void
     {
         Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
