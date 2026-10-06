@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\CountryState;
+use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\AiBatchRunner;
 use App\Services\AiRateLimit;
@@ -105,6 +106,31 @@ class AdminAiController extends Controller
         };
 
         return response()->json(['description' => $generator->description($category, trim($data['name']))]);
+    }
+
+    public function changeLesson(Request $request, AiStampGenerator $generator): JsonResponse
+    {
+        abort_unless(filled(config('services.openai.api_key')), 503, 'Set OPENAI_API_KEY on the server.');
+        $data = $request->validate(['lessonNumber' => ['required', 'integer', 'min:1']]);
+        $lesson = DailyDestination::where('lesson_number', $data['lessonNumber'])->firstOrFail();
+        $original = $lesson->questions;
+        $count = 5;
+        abort_unless(is_array($original) && count($original) === $count, 422, 'This lesson does not have the expected number of questions.');
+
+        $questions = $generator->lesson($lesson->country, $count, $original);
+        foreach ($questions as $index => &$question) {
+            $question['imageUrl'] = $original[$index]['imageUrl'] ?? '';
+        }
+        unset($question);
+
+        $lesson->update([
+            'questions' => $questions,
+            'question' => $questions[0]['prompt'],
+            'options' => $questions[0]['answers'],
+            'correct_answer' => $questions[0]['correctAnswer'],
+        ]);
+
+        return response()->json(['lessonNumber' => $lesson->lesson_number, 'questions' => $questions]);
     }
 
     private function sectionCounts(): array

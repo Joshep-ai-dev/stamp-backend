@@ -15,21 +15,28 @@ use UnexpectedValueException;
 
 class AiStampGenerator
 {
-    public function lesson(string $country, int $count): array
+    public function lesson(string $country, int $count, ?array $sourceQuestions = null): array
     {
+        $source = $sourceQuestions === null ? '' : 'Use this existing lesson as background for the country and its covered topics. Keep useful, recognizable country facts, but replace obscure customs, rituals, and trivia with broader features of the same country. You may choose well-established facts not in the old lesson when needed. Existing lesson: '.json_encode(array_map(fn ($question) => [
+            'information' => $question['information'] ?? '',
+            'prompt' => $question['prompt'] ?? '',
+            'answers' => $question['answers'] ?? [],
+            'correctAnswer' => $question['correctAnswer'] ?? null,
+            'explanation' => $question['explanation'] ?? '',
+        ], $sourceQuestions), JSON_UNESCAPED_UNICODE).' ';
         $response = $this->request('/responses', [
     'model' => config('services.openai.text_model'),
-    'input' => "Create exactly {$count} distinct, factual travel and culture quiz questions about {$country} for a general audience. "
+    'input' => $source."Create exactly {$count} distinct, factual travel and culture quiz questions about {$country} for a general audience. "
         .'Return only a JSON array. Each item must have information, prompt, answers, correctAnswer, and explanation. '
         .'The information must contain 2 to 4 concise, natural sentences that teach the fact needed to answer the question. '
         .'The information MUST explicitly include the correct answer by name. It should give useful context such as location, size, history, culture, significance, characteristics, or comparisons. '
         .'After reading the information, users should be able to answer the question without outside knowledge. '
-        .'The prompt must ask about an important fact explained in the information. Do not copy an information sentence word for word. Rephrase the question naturally so it tests reading comprehension and understanding. '
-        .'Avoid overly obvious wording such as simply repeating the exact statement from the information. When appropriate, ask using a comparison, ranking, location, purpose, historical role, characteristic, or relationship described in the information. '
+        .'The prompt must ask a direct, natural question about a recognizable feature of the country that is explained in the information. Favor clear questions such as where a landmark is, what a place is known for, or which landscape, food, or cultural art is associated with the country. '
+        .'Do not copy an information sentence word for word, but do not make the question convoluted merely to avoid repetition. Avoid indirect clues, forced comparisons, rankings, and questions about minor details. '
         .'The answers field must contain exactly 4 short, distinct choices. Exactly one choice must be correct. '
         .'correctAnswer must be the zero-based integer index of the correct choice. '
         .'The explanation must be one concise sentence shown after answering. It should clearly state the correct answer and explain the relevant fact from the information. '
-        .'Keep questions useful for learning about the country. Prefer important geography, landmarks, cities, history, traditions, food, arts, nature, and culture over obscure trivia. '
+        .'Across the lesson, cover a balanced mix of the country’s defining geography, major landmarks or cities, landscapes, widely known food, arts, or history. Focus on facts a visitor would find meaningful. Do not ask about obscure rituals, ceremonial steps, niche festivals, minor dates, or little-known local trivia. '
         .'Avoid disputed facts, facts requiring current data, trick questions, ambiguous answers, and invented details. '
         .'Before returning, review every item and confirm that the correct answer appears explicitly in the information, the information directly supports the question, the question is not copied word for word from the information, and exactly one answer choice is correct. '
         .'No markdown.',
