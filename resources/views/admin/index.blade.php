@@ -1091,7 +1091,7 @@
       if (state.tab !== 'daily-destinations') return;
       const previewCount = state.rows.filter(row => Number(row.lessonNumber) === 0).length;
       const publishedCount = state.rows.filter(row => row.isPublished !== false).length;
-      summary.innerHTML = `<div class="lesson-summary"><div class="lesson-stat">Total lessons<strong>${state.rows.length}</strong></div><div class="lesson-stat">Published<strong>${publishedCount}</strong></div><div class="lesson-stat">Public preview<strong>${previewCount ? 'Ready' : 'Missing'}</strong></div><div class="lesson-help">Lesson 0 is the one-time public preview with 10 questions. Kroo+ lessons start at Lesson 1, contain 5 questions, and progress in order.</div><div class="lesson-help"><label for="changeLessonNumber">Lesson number</label> <input id="changeLessonNumber" type="number" min="1" step="1" value="1" style="width:90px" aria-label="Kroo IQ lesson number"> <button class="primary" onclick="changeKrooIqLesson(this)">Change</button> <small>Rewrites and saves this lesson's information and questions using its current content. Starts at Lesson 1.</small></div></div>`;
+      summary.innerHTML = `<div class="lesson-summary"><div class="lesson-stat">Total lessons<strong>${state.rows.length}</strong></div><div class="lesson-stat">Published<strong>${publishedCount}</strong></div><div class="lesson-stat">Public preview<strong>${previewCount ? 'Ready' : 'Missing'}</strong></div><div class="lesson-help">Lesson 0 is the one-time public preview with 10 questions. Kroo+ lessons start at Lesson 1, contain 5 questions, and progress in order.</div><div class="lesson-help"><label for="changeLessonStart">Start No.</label> <input id="changeLessonStart" type="number" min="1" step="1" value="1" style="width:90px" aria-label="First Kroo IQ lesson number"> <label for="changeLessonEnd">End No.</label> <input id="changeLessonEnd" type="number" min="1" step="1" value="1" style="width:90px" aria-label="Last Kroo IQ lesson number"> <button class="primary" onclick="changeKrooIqLessons(this)">Change</button> <small>Rewrites and saves information and questions for every existing lesson in the range. Lesson 0 is excluded.</small></div></div>`;
       const { perPage } = state.lessonPaging;
       const lastPage = Math.max(1, Math.ceil(state.rows.length / perPage));
       state.lessonPaging.currentPage = Math.min(state.lessonPaging.currentPage, lastPage);
@@ -1102,19 +1102,37 @@
     };
     function setLessonPageSize(value) { state.lessonPaging.perPage = Number(value); state.lessonPaging.currentPage = 1; render() }
     function changeLessonPage(delta) { state.lessonPaging.currentPage += delta; render() }
-    async function changeKrooIqLesson(button) {
-      const input = document.querySelector('#changeLessonNumber');
-      const lessonNumber = Number(input.value);
-      if (!Number.isSafeInteger(lessonNumber) || lessonNumber < 1 || !state.rows.some(row => Number(row.lessonNumber) === lessonNumber)) return note('Enter an existing lesson number starting from 1.', true);
-      if (!confirm(`Rewrite and save the information and questions for Lesson ${lessonNumber}?`)) return;
-      await withButtonLoading(button, 'Changing...', async () => {
-        try {
-          await call('/admin/api/ai/change-lesson', { method: 'POST', body: JSON.stringify({ lessonNumber }) });
-          await load();
-          document.querySelector('#changeLessonNumber').value = lessonNumber;
-          note(`Lesson ${lessonNumber} information and questions changed. Review the lesson and its images.`);
-        } catch (error) { note(error.message, true); }
-      });
+    let changingKrooIqLessons = false;
+    async function changeKrooIqLessons(button) {
+      if (changingKrooIqLessons) return;
+      const start = Number(document.querySelector('#changeLessonStart').value);
+      const end = Number(document.querySelector('#changeLessonEnd').value);
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start) return note('Enter a valid range starting at Lesson 1.', true);
+      const numbers = [...new Set(state.rows.map(row => Number(row.lessonNumber)).filter(number => Number.isSafeInteger(number) && number >= start && number <= end))].sort((a, b) => a - b);
+      if (!numbers.length) return note('No lessons exist in that range.', true);
+      if (!confirm(`Rewrite and save information and questions for ${numbers.length} lesson(s), from ${start} to ${end}?`)) return;
+      changingKrooIqLessons = true;
+      button.disabled = true;
+      const failures = [];
+      let changed = 0;
+      try {
+        for (const lessonNumber of numbers) {
+          button.textContent = `Changing ${changed + failures.length + 1}/${numbers.length}...`;
+          note(`Changing Lesson ${lessonNumber} (${changed + failures.length + 1} of ${numbers.length})...`);
+          try {
+            await call('/admin/api/ai/change-lesson', { method: 'POST', body: JSON.stringify({ lessonNumber }) });
+            changed++;
+          } catch (error) { failures.push(`Lesson ${lessonNumber}: ${error.message}`); }
+        }
+        await load();
+        document.querySelector('#changeLessonStart').value = start;
+        document.querySelector('#changeLessonEnd').value = end;
+        note(failures.length ? `${changed} lesson(s) changed. Failed: ${failures.join('; ')}` : `${changed} lesson(s) changed. Review their information, questions, and images.`, failures.length > 0);
+      } finally {
+        changingKrooIqLessons = false;
+        button.disabled = false;
+        button.textContent = 'Change';
+      }
     }
     function sightPaginationTools(options) {
       const { currentPage, lastPage, perPage, total } = state.sightPaging;
