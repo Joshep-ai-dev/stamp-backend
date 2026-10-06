@@ -18,16 +18,22 @@ class AiStampGenerator
     public function lesson(string $country, int $count): array
     {
         $response = $this->request('/responses', [
-            'model' => config('services.openai.text_model'),
-            'input' => "Create exactly {$count} distinct, factual travel and culture quiz questions about {$country} for a general audience. "
-                .'Return only a JSON array. Each item must have information (2 concise, natural sentences shown before the question), prompt (one clear question), answers (exactly 4 short, distinct choices), correctAnswer (zero-based integer index), explanation (one sentence shown after answering that explains why the correct answer is right). '
-                .'The information must include an indirect, descriptive clue to the correct answer, woven into natural background sentences. Describe the subject through its characteristics, history, location, or role without naming the subject being asked about or including the exact correct answer choice. '
-                .'Users must be able to infer the correct choice from the information and answer options. The question must test recognition or understanding of those clues, rather than simple text matching or unrelated outside knowledge. Do not provide unrelated background, repeat the question, or label a sentence as a hint or answer. '
-                .'For example, information about an unnamed wrought-iron landmark built in Paris for the 1889 World Fair can support a question asking which landmark it is, but the information must not say Eiffel Tower. '
-                .'State the exact correct answer and the direct reasoning only in the explanation shown after answering. Each question must have exactly one unambiguous, factually correct answer. '
-                .'Before returning, review each information/question pair: the information must support identifying the correct choice without naming it or copying its text. Rewrite pairs that lack a relevant clue or explicitly reveal the answer. '
-                .'Avoid disputed facts, trivia requiring current data, and invented details. No markdown.',
-        ]);
+    'model' => config('services.openai.text_model'),
+    'input' => "Create exactly {$count} distinct, factual travel and culture quiz questions about {$country} for a general audience. "
+        .'Return only a JSON array. Each item must have information, prompt, answers, correctAnswer, and explanation. '
+        .'The information must contain 2 to 4 concise, natural sentences that teach the fact needed to answer the question. '
+        .'The information MUST explicitly include the correct answer by name. It should give useful context such as location, size, history, culture, significance, characteristics, or comparisons. '
+        .'After reading the information, users should be able to answer the question without outside knowledge. '
+        .'The prompt must ask about an important fact explained in the information. Do not copy an information sentence word for word. Rephrase the question naturally so it tests reading comprehension and understanding. '
+        .'Avoid overly obvious wording such as simply repeating the exact statement from the information. When appropriate, ask using a comparison, ranking, location, purpose, historical role, characteristic, or relationship described in the information. '
+        .'The answers field must contain exactly 4 short, distinct choices. Exactly one choice must be correct. '
+        .'correctAnswer must be the zero-based integer index of the correct choice. '
+        .'The explanation must be one concise sentence shown after answering. It should clearly state the correct answer and explain the relevant fact from the information. '
+        .'Keep questions useful for learning about the country. Prefer important geography, landmarks, cities, history, traditions, food, arts, nature, and culture over obscure trivia. '
+        .'Avoid disputed facts, facts requiring current data, trick questions, ambiguous answers, and invented details. '
+        .'Before returning, review every item and confirm that the correct answer appears explicitly in the information, the information directly supports the question, the question is not copied word for word from the information, and exactly one answer choice is correct. '
+        .'No markdown.',
+]);
         $text = collect($response['output'] ?? [])->flatMap(fn ($item) => $item['content'] ?? [])
             ->where('type', 'output_text')->pluck('text')->implode("\n");
         $questions = json_decode(trim($text), true);
