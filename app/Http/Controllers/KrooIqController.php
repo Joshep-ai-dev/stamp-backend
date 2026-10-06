@@ -21,7 +21,7 @@ class KrooIqController extends Controller
             ->first();
 
         if ($attempt) {
-            return $this->attemptPayload($attempt);
+            return $this->attemptPayload($attempt, $request);
         }
 
         $unfinishedAttempt = KrooIqAttempt::where('user_id', $request->user()->id)
@@ -31,9 +31,10 @@ class KrooIqController extends Controller
             ->first();
 
         if ($unfinishedAttempt) {
+            $this->authorizeAttempt($unfinishedAttempt, $request);
             $unfinishedAttempt->forceFill(['quiz_date' => $date])->save();
 
-            return $this->attemptPayload($unfinishedAttempt);
+            return $this->attemptPayload($unfinishedAttempt, $request);
         }
 
         $isMember = app(KrooIqAccess::class)->canUse($request->user());
@@ -72,14 +73,26 @@ class KrooIqController extends Controller
             'score_after' => $scoreBefore,
         ]);
 
-        return $this->attemptPayload($attempt);
+        return $this->attemptPayload($attempt, $request);
     }
 
-    private function attemptPayload(KrooIqAttempt $attempt): JsonResponse
+    private function authorizeAttempt(KrooIqAttempt $attempt, Request $request): DailyDestination
     {
         $lessonId = explode(':', $attempt->question_ids[0] ?? '', 2)[0];
         abort_if($lessonId === '', 404, 'Today\'s Kroo IQ lesson could not be restored.');
         $lesson = DailyDestination::findOrFail($lessonId);
+        abort_unless(
+            (int) $lesson->lesson_number === 0 || app(KrooIqAccess::class)->canUse($request->user()),
+            403,
+            'Kroo+ membership is required for Lesson 1 and later.',
+        );
+
+        return $lesson;
+    }
+
+    private function attemptPayload(KrooIqAttempt $attempt, Request $request): JsonResponse
+    {
+        $lesson = $this->authorizeAttempt($attempt, $request);
 
         return response()->json($this->payload($attempt, $lesson, $this->questions($lesson)));
     }

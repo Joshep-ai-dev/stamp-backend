@@ -106,6 +106,27 @@ class KrooIqApiTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_free_member_cannot_reopen_a_paid_lesson_attempt(): void
+    {
+        $user = User::factory()->create(['plan' => 'pro']);
+        Sanctum::actingAs($user);
+        DailyDestination::create([
+            'id' => 'paid-lesson', 'name' => 'Lesson 1', 'country' => 'Japan',
+            'content' => 'Lesson', 'question' => 'Question?',
+            'options' => ['A', 'B'], 'correct_answer' => 0,
+            'lesson_number' => 1, 'is_published' => true,
+        ]);
+
+        $this->getJson('/api/v1/me/kroo-iq/today')->assertOk()->assertJsonPath('isPreview', false);
+        $user->forceFill(['plan' => 'free'])->save();
+
+        $this->getJson('/api/v1/me/kroo-iq/today')->assertForbidden();
+
+        Carbon::setTestNow(now()->addDay());
+        $this->getJson('/api/v1/me/kroo-iq/today')->assertForbidden();
+        Carbon::setTestNow();
+    }
+
     public function test_member_can_complete_daily_quiz_and_score_is_persisted(): void
     {
         $user = User::factory()->create(['plan' => 'pro']);
