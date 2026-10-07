@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Friend;
+use App\Models\MembershipGift;
 use App\Models\User;
 use App\Services\InvitationAccess;
 use App\Services\KrooId;
+use App\Services\MembershipGifts;
+use App\Services\RevenueCatBilling;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class InvitationController extends Controller
@@ -18,8 +22,16 @@ class InvitationController extends Controller
         $data = $request->validate(['code' => ['required', 'string', 'max:200']]);
         $code = trim($data['code']);
         $code = preg_replace('#^stampo://friend/#', '', $code);
+        $gift = $this->giftFor($code);
+        if ($gift) {
+            $this->requireUnusedGift($gift);
+
+            return response()->json(['accessToken' => Crypt::encryptString(json_encode([
+                'invitedBy' => $gift->buyer_id, 'giftId' => $gift->id, 'issuedAt' => now()->toIso8601String(),
+            ]))]);
+        }
         $member = $this->memberFor($code);
-        abort_unless($member, 422, 'This referral code is not valid. Ask a Kroo member for their code.');
+        abort_unless($member, 422, 'This referral or gift code is not valid. Please check your code.');
 
         return response()->json(['accessToken' => Crypt::encryptString(json_encode([
             'invitedBy' => $member->id, 'issuedAt' => now()->toIso8601String(),
@@ -32,8 +44,12 @@ class InvitationController extends Controller
             'code' => ['required', 'string', 'max:200'],
             'name' => ['required', 'string', 'min:1', 'max:80'],
         ]);
+        $gift = $this->giftFor($data['code']);
+        if ($gift) {
+            return $this->joinWithGift($gift->id, trim($data['name']));
+        }
         $member = $this->memberFor(trim($data['code']));
-        abort_unless($member, 422, 'This referral code is not valid. Ask a Kroo member for their code.');
+        abort_unless($member, 422, 'This referral or gift code is not valid. Please check your code.');
 
         return $this->createMembership($member, trim($data['name']));
     }
@@ -42,7 +58,13 @@ class InvitationController extends Controller
     {
         $data = $request->validate(['name' => ['required', 'string', 'min:1', 'max:80']]);
 
-        return $this->createMembership(InvitationAccess::invitingMember($request), trim($data['name']));
+        $member = InvitationAccess::invitingMember($request);
+        $grant = json_decode(Crypt::decryptString((string) $request->header('X-Kroo-Invitation')), true);
+        if (isset($grant['giftId'])) {
+            return $this->joinWithGift($grant['giftId'], trim($data['name']));
+        }
+
+        return $this->createMembership($member, trim($data['name']));
     }
 
     public function resume(Request $request): JsonResponse
@@ -57,7 +79,30 @@ class InvitationController extends Controller
         return response()->json($this->session($user));
     }
 
-    private function createMembership(User $member, string $name): JsonResponse
+    private function giftFor(string $code): ?MembershipGift
+    {
+        $normalized = strtoupper(preg_replace('/[\s-]+/', '', $code));
+
+        return MembershipGift::where('code_hash', hash('sha256', $normalized))->first();
+    }
+
+    private function requireUnusedGift(MembershipGift $gift): void
+    {
+        abort_unless($gift->paid_at && ! $gift->cancelled_at, 422, 'This gift code is not valid.');
+        abort_if($gift->redeemed_at, 422, 'This gift code has already been redeemed. Sign into your existing Kroo account.');
+    }
+
+    private function joinWithGift(string $giftId, string $name): JsonResponse
+    {
+        return DB::transaction(function () use ($giftId, $name): JsonResponse {
+            $gift = MembershipGift::whereKey($giftId)->lockForUpdate()->firstOrFail();
+            $this->requireUnusedGift($gift);
+
+            return $this->createMembership(User::findOrFail($gift->buyer_id), $name, $gift->encrypted_code);
+        });
+    }
+
+    private function createMembership(User $member, string $name, ?string $giftCode = null): JsonResponse
     {
         $user = User::create([
             'name' => $name,
@@ -71,9 +116,17 @@ class InvitationController extends Controller
             'friend_id' => max($member->id, $user->id),
         ]);
 
+        $subscription = null;
+        if ($giftCode !== null) {
+            app(MembershipGifts::class)->redeem($user, $giftCode);
+            $user->refresh();
+            $subscription = app(RevenueCatBilling::class)->status($user, false);
+        }
+
         return response()->json([
             ...$this->session($user),
             'accessToken' => $this->accessToken($member),
+            ...($subscription !== null ? ['subscription' => $subscription] : []),
         ], 201);
     }
 
