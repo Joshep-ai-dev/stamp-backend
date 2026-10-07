@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RevenueCatEntitlement;
 use App\Models\User;
+use App\Models\MembershipGift;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -80,7 +81,7 @@ class RevenueCatBilling
             $attributes['last_event_type'] = $eventType;
         }
         RevenueCatEntitlement::updateOrCreate(['user_id' => $user->id], $attributes);
-        $user->forceFill(['plan' => $active ? 'pro' : 'free'])->save();
+        $user->forceFill(['plan' => ($active || $this->giftExpiry($user) !== null) ? 'pro' : 'free'])->save();
 
         return $this->entitlement($user);
     }
@@ -94,7 +95,7 @@ class RevenueCatBilling
 
         $active = $record?->is_active === true
             && ($record->expires_at === null || $record->expires_at->isFuture());
-        $user->forceFill(['plan' => $active ? 'pro' : 'free'])->save();
+        $user->forceFill(['plan' => ($active || $this->giftExpiry($user) !== null) ? 'pro' : 'free'])->save();
 
         return $this->entitlement($user->fresh());
     }
@@ -104,6 +105,12 @@ class RevenueCatBilling
         $record = $user->revenueCatEntitlement()->first();
         $active = $record?->is_active === true
             && ($record->expires_at === null || $record->expires_at->isFuture());
+
+        $giftExpiry = $this->giftExpiry($user);
+        if ($giftExpiry !== null && (!$active || ($record->expires_at !== null && $giftExpiry->gt($record->expires_at)))) {
+            return ['plan' => 'pro', 'isKrooPlus' => true, 'productId' => 'kroo_plus_gift_year',
+                'basePlanId' => null, 'expiresAt' => $giftExpiry->toIso8601String()];
+        }
 
         return [
             'plan' => $active ? 'pro' : 'free',
@@ -127,6 +134,12 @@ class RevenueCatBilling
         ])->filter()->map(fn (string $date): CarbonImmutable => CarbonImmutable::parse($date));
 
         return $dates->sortByDesc(fn (CarbonImmutable $date): int => $date->getTimestamp())->first();
+    }
+
+    private function giftExpiry(User $user): ?CarbonImmutable
+    {
+        $date = MembershipGift::where('redeemed_by', $user->id)->where('expires_at', '>', now())->max('expires_at');
+        return $date ? CarbonImmutable::parse($date) : null;
     }
 
     private function paidMembershipStartedAt(

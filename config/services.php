@@ -12,6 +12,8 @@ return [
     ],
 
     'revenuecat' => [
+        'gift_product_ids' => env('REVENUECAT_GIFT_PRODUCT_IDS', ''),
+        'gift_allow_sandbox' => (bool) env('REVENUECAT_GIFT_ALLOW_SANDBOX', false),
         'secret_api_key' => env('REVENUECAT_SECRET_API_KEY', ''),
         'entitlement_id' => env('REVENUECAT_ENTITLEMENT_ID', 'kroo_plus'),
         'webhook_authorization' => env('REVENUECAT_WEBHOOK_AUTHORIZATION', ''),

@@ -35,6 +35,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me/home', [HomeController::class, 'show']);
         Route::put('/me/completions/{sightId}', [TravelStateController::class, 'completion']);
         Route::get('/me/subscription', [SubscriptionController::class, 'show']);
+        Route::post('/me/membership-gifts', [\App\Http\Controllers\MembershipGiftController::class, 'store']);
+        Route::post('/me/membership-gifts/redeem', [\App\Http\Controllers\MembershipGiftController::class, 'redeem'])->middleware('throttle:10,1');
+        Route::post('/me/membership-gifts/{gift}/verify', [\App\Http\Controllers\MembershipGiftController::class, 'verify']);
+        Route::delete('/me/membership-gifts/{gift}', [\App\Http\Controllers\MembershipGiftController::class, 'destroy']);
         Route::post('/me/subscription/revenuecat/sync', [SubscriptionController::class, 'sync']);
         Route::get('/collections', [TravelStateController::class, 'collections']);
         Route::put('/me/collections/{collectionId}', [TravelStateController::class, 'updateCollection']);
