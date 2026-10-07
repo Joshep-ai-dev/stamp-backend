@@ -104,7 +104,7 @@ class MembershipGifts
             }
             $message .= 'Your one-use gift code: '.$gift->encrypted_code."\n\n"
                 ."New to Kroo? Enter your name and this gift code on the welcome page. Your account and one year of Kroo+ will activate together.\n\n"
-                ."Already a member? Sign into Kroo, open Profile → Membership → Redeem a gift code, and enter this code.\n\n"
+                ."Already a member? Sign into Kroo, open the + page, enter this code in the gift-code field, and tap Redeem gift.\n\n"
                 ."Your year starts when you redeem the code. No payment or recurring subscription is needed.\n\n"
                 .'Keep this gift code private. It can only be redeemed once.';
             Mail::raw($message, fn ($mail) => $mail->to($gift->recipient_email)->subject('You received a year of Kroo+!'));
