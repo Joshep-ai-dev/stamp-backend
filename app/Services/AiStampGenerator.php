@@ -144,7 +144,7 @@ PROMPT;
             'City' => 'Show recognizable real landmarks in one geographically accurate city panorama.',
             'Top Sight' => 'Show this exact attraction as the central subject with accurate surroundings; the city and country identify its location only.',
             'Collection' => 'Depict a coherent panorama of real places connected to this travel collection theme.',
-            'Collection Place' => 'Don\'t use word "Collection Place". Depict the named place accurately as the central subject with its real surroundings.',
+            'Collection Place' => 'Depict the named place accurately as the central subject with its real surroundings.',
             'Quiz Image' => 'Depict the place or subject described here accurately. Do not reveal the answer using text or symbols.',
         };
         $direction = trim($extra) ?: 'none';
