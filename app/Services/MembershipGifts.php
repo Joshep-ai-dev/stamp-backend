@@ -28,6 +28,8 @@ class MembershipGifts
 
     public function create(User $buyer, array $data): MembershipGift
     {
+        abort_unless(filled($buyer->email) && filter_var($buyer->email, FILTER_VALIDATE_EMAIL), 422,
+            'Add a valid email address to your Kroo account before buying a gift.');
         $allowed = array_filter(explode(',', (string) config('services.revenuecat.gift_product_ids')));
         abort_unless(in_array($data['productId'], $allowed, true), 503, 'The prepaid gift product is not configured.');
         $transactions = $this->transactions($buyer, $data['productId']);

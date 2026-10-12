@@ -98,6 +98,50 @@ class MembershipGiftApiTest extends TestCase
         Mail::assertSentCount(1);
     }
 
+    public function test_gift_requires_buyers_email_before_contacting_payment_provider(): void
+    {
+        Http::fake();
+        Sanctum::actingAs(User::factory()->create(['email' => null]));
+        $this->postJson('/api/v1/me/membership-gifts', [
+            'recipientEmail' => 'friend@example.com', 'productId' => 'gift.year',
+        ])->assertUnprocessable()->assertJsonPath('message', 'Add a valid email address to your Kroo account before buying a gift.');
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('membership_gifts', 0);
+    }
+
+    public function test_gift_can_be_purchased_for_a_friend_without_a_kroo_account(): void
+    {
+        $this->subscriber();
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson('/api/v1/me/membership-gifts', [
+            'recipientEmail' => 'new-friend@example.com', 'productId' => 'gift.year',
+        ])->assertOk()->assertJsonPath('checkoutAllowed', true)
+            ->assertJsonPath('recipientEmail', 'new-friend@example.com');
+        $this->assertDatabaseMissing('users', ['email' => 'new-friend@example.com']);
+        $this->assertDatabaseHas('membership_gifts', ['recipient_email' => 'new-friend@example.com']);
+    }
+
+    public function test_invalid_recipient_email_is_rejected_before_payment(): void
+    {
+        Http::fake();
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson('/api/v1/me/membership-gifts', [
+            'recipientEmail' => 'not-an-email', 'productId' => 'gift.year',
+        ])->assertUnprocessable()->assertJsonValidationErrors('recipientEmail');
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('membership_gifts', 0);
+    }
+
+    public function test_registered_recipient_email_matches_without_case_sensitivity(): void
+    {
+        $this->subscriber();
+        User::factory()->create(['email' => 'Friend@Example.com']);
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson('/api/v1/me/membership-gifts', [
+            'recipientEmail' => 'friend@example.com', 'productId' => 'gift.year',
+        ])->assertOk()->assertJsonPath('checkoutAllowed', true);
+    }
+
     public function test_unverified_and_old_payments_do_not_issue_a_code(): void
     {
         $this->subscriber([$this->purchase(['purchase_date' => now()->subDay()->toIso8601String()])]);
