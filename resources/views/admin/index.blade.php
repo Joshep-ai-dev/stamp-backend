@@ -282,6 +282,21 @@
       gap: 6px
     }
 
+    .collection-item-choice, .collection-custom-heading { padding:14px; border:1px solid var(--line); border-radius:10px; background:#0a2a21 }
+    .collection-item-choice > div:first-child, .collection-custom-heading { display:flex; flex-direction:column; gap:4px }
+    .collection-item-choice strong, .collection-custom-heading strong { color:var(--ink); font-size:14px }
+    .collection-item-choice small, .collection-custom-heading small, .collection-sight-field small { color:var(--muted); font-size:12px }
+    .collection-item-modes { display:flex; gap:8px; margin-top:12px }
+    .collection-item-modes button { flex:1; border:1px solid var(--line); background:#061f18; color:var(--muted); border-radius:8px; padding:10px 12px; font-weight:700 }
+    .collection-item-modes button.active { color:var(--ink); border-color:var(--accent); background:#164334; box-shadow:inset 0 0 0 1px var(--accent) }
+    .collection-sight-field input { margin-top:2px }
+    .collection-sight-results { display:grid; gap:6px; max-height:220px; overflow:auto }
+    .collection-sight-results:empty { display:none }
+    .collection-sight-result { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:10px 12px; text-align:left; border:1px solid var(--line); border-radius:8px; background:#061f18; color:var(--ink) }
+    .collection-sight-result:hover, .collection-sight-result:focus-visible { border-color:var(--accent); background:#164334 }
+    .collection-sight-result span { color:var(--muted); font-size:12px }
+    .collection-id-field { opacity:.8 }
+
     .wide {
       grid-column: 1/-1
     }
@@ -715,7 +730,7 @@
       cities: [['name', 'Name', 'text', 1], ['id', 'City ID', 'text'], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state'], ['population', 'Population', 'number'], ['latitude', 'Latitude', 'number'], ['longitude', 'Longitude', 'number'], ['imageUrl', 'Image', 'image'], ['description', 'Description', 'textarea']],
       sights: [['name', 'Name', 'text', 1], ['countryId', 'Country', 'country', 1], ['state', 'State / region', 'state', 1], ['cityId', 'City', 'city', 1], ['image', 'Image', 'image'], ['content', 'Content', 'textarea', 1], ['isFeatured', 'Shown in lists', 'check']],
       collections: [['title', 'Title', 'text', 1], ['id', 'ID', 'text'], ['explorerImageUrl', 'Collection page image (2:3 transparent vintage badge)', 'image', 1], ['heroImageUrl', 'Collection page hero image (optional)', 'image', 1], ['detail', 'Detail / badge bottom text', 'textarea', 1], ['countryId', 'Country target (optional)', 'country-target'], ['stateIds', 'Included US states', 'us-states', 1], ['sightIds', 'Included US top sights', 'us-sights', 1], ['access', 'Available to', 'access'], ['isPublished', 'Published', 'check']],
-      'collection-lists': [['collectionKindIds', 'Collections', 'kinds', 1], ['sightId', 'Top sight (optional)', 'sight', 1], ['title', 'Title for custom item', 'text'], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country'], ['state', 'State / region', 'state'], ['cityId', 'City / location', 'city'], ['location', 'Location label (optional)', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea'], ['access', 'Access', 'access']],
+      'collection-lists': [['collectionKindIds', 'Collections', 'kinds', 1], ['sightId', 'Top sight', 'sight', 1], ['title', 'Title', 'text'], ['id', 'ID (optional)', 'text'], ['countryId', 'Country', 'country'], ['state', 'State / region', 'state'], ['cityId', 'City / location', 'city'], ['location', 'Location label (optional)', 'text'], ['imageUrl', 'Image', 'image'], ['detail', 'Detail', 'textarea'], ['access', 'Access', 'access']],
       'daily-destinations': [['isPreview', 'Public preview (Lesson 0 with 10 questions)', 'check'], ['countryId', 'Country', 'country', 1], ...krooIqQuestionFields, ['isPublished', 'Available in Kroo IQ', 'check']]
     };
     async function call(path, options = {}) { let r; try { r = await fetch(path, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${state.key}`, 'X-Admin-Key': state.key, ...options.headers } }) } catch (error) { throw new Error(`Could not reach the server for ${path}. Check the connection and try again.`) } if (r.status === 204) return null; const type = r.headers.get('content-type') || ''; if (!type.includes('application/json')) throw new Error(`Server returned HTML instead of JSON (${r.status}) for ${path}. Clear the Laravel caches and verify this route is deployed.`); const body = await r.json(); if (!r.ok) throw new Error(body.message || `Request failed (${r.status})`); return body }
@@ -1233,20 +1248,29 @@
       }
       modal.classList.remove('hidden');
       await renderStates();
-      if (form.dataset.resource === 'collection-lists') updateCollectionSightFields();
+      if (form.dataset.resource === 'collection-lists') setupCollectionItemEditor();
     }
     let sightSearchTimer;
     function renderSightOptions() {
       const list = document.querySelector('#collection-sight-options');
-      if (list) list.innerHTML = (state.meta.sightOptions || []).map(sight => `<option value="${esc(sight.label)}"></option>`).join('');
+      if (list) list.innerHTML = (state.meta.sightOptions || []).map(sight => `<button type="button" class="collection-sight-result" onclick="chooseCollectionSight('${esc(sight.id)}')"><strong>${esc(sight.name)}</strong><span>${esc(sight.location || '')}</span></button>`).join('');
     }
     function searchCollectionSights(value) {
-      const selected = state.meta.sightOptions?.find(sight => sight.label === value);
       const id = form.elements.sightId;
-      if (id) id.value = selected?.id || '';
-      updateCollectionSightFields();
+      if (id) id.value = '';
+      const results = document.querySelector('#collection-sight-options');
+      if (results) results.replaceChildren();
+      form.dataset.collectionItemMode = 'sight';
+      fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', true);
+      fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = true);
+      fields.querySelectorAll('[data-item-mode]').forEach(button => {
+        const selected = button.dataset.itemMode === 'sight';
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      if (form.elements.sightId) form.elements.sightId.disabled = true;
       clearTimeout(sightSearchTimer);
-      if (selected || value.trim().length < 2) return;
+      if (value.trim().length < 2) return;
       sightSearchTimer = setTimeout(async () => {
         try {
           state.meta.sightOptions = await call(`/admin/api/sight-options?query=${encodeURIComponent(value.trim())}`);
@@ -1257,21 +1281,80 @@
     function selectCollectionSight(input) {
       const selected = state.meta.sightOptions?.find(sight => sight.label === input.value);
       form.elements.sightId.value = selected?.id || '';
-      updateCollectionSightFields();
+      if (selected) setCollectionItemMode('sight');
+      else updateCollectionItemMode();
     }
-    function updateCollectionSightFields() {
+    function chooseCollectionSight(id) {
+      const selected = state.meta.sightOptions?.find(sight => String(sight.id) === String(id));
+      if (!selected) return;
+      form.elements.sightId.value = selected.id;
+      form.elements.sightSearch.value = selected.label;
+      setCollectionItemMode('sight');
+      const results = document.querySelector('#collection-sight-options');
+      if (results) results.replaceChildren();
+    }
+    function setupCollectionItemEditor() {
       const linked = Boolean(form.elements.sightId?.value);
+      const choice = document.createElement('section');
+      choice.className = 'field wide collection-item-choice';
+      choice.innerHTML = `<div><strong>What would you like to add?</strong><small>Choose an existing sight or create a custom place.</small></div><div class="collection-item-modes" role="group" aria-label="Collection item type"><button type="button" data-item-mode="sight" onclick="setCollectionItemMode('sight')">Top sight</button><button type="button" data-item-mode="custom" onclick="setCollectionItemMode('custom')">Custom place</button></div>`;
+      const kinds = form.elements.collectionKindIds.closest('.field');
+      kinds.after(choice);
+      const sightField = form.elements.sightSearch.closest('.field');
+      sightField.classList.add('wide', 'collection-sight-field');
+      sightField.querySelector('label').textContent = 'Find a Top sight';
+      const help = sightField.querySelector('.collection-sight-help');
+      if (help) help.textContent = 'Search by sight name, city, or country, then select a result.';
+      const customTitle = form.elements.title.closest('.field');
+      customTitle.before(Object.assign(document.createElement('div'), { className: 'field wide collection-custom-heading', innerHTML: '<strong>Custom place details</strong><small>Add a place that is not already in Top sights.</small>' }));
+      for (const key of ['title', 'countryId', 'state', 'cityId', 'location', 'imageUrl', 'detail']) {
+        form.elements[key]?.closest('.field')?.classList.add('collection-custom-field');
+      }
+      form.elements.access.closest('.field').classList.add('wide');
+      form.elements.id.closest('.field').classList.add('collection-id-field');
+      form.elements.title.required = !linked;
+      setCollectionItemMode(linked ? 'sight' : 'custom');
+    }
+    function setCollectionItemMode(mode) {
+      if (mode === 'sight' && !form.elements.sightId?.value) {
+        form.dataset.collectionItemMode = 'sight';
+        fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', true);
+        fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = true);
+        const picker = form.elements.sightSearch?.closest('.field');
+        if (picker) picker.hidden = false;
+        if (form.elements.sightSearch) { form.elements.sightSearch.disabled = false; form.elements.sightSearch.focus(); }
+        fields.querySelectorAll('[data-item-mode]').forEach(button => {
+          const selected = button.dataset.itemMode === 'sight';
+          button.classList.toggle('active', selected);
+          button.setAttribute('aria-pressed', String(selected));
+        });
+        if (form.elements.sightId) form.elements.sightId.disabled = true;
+        return;
+      }
+      form.dataset.collectionItemMode = mode;
+      updateCollectionItemMode();
+    }
+    function updateCollectionItemMode() {
+      const linked = form.dataset.collectionItemMode === 'sight' && Boolean(form.elements.sightId?.value);
+      const sightField = form.elements.sightSearch?.closest('.field');
+      if (sightField) sightField.hidden = !linked;
+      if (form.elements.sightSearch) form.elements.sightSearch.disabled = !linked;
+      fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', linked);
+      fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = linked);
+      const choice = fields.querySelector('.collection-item-choice');
+      choice?.querySelectorAll('[data-item-mode]').forEach(button => {
+        const selected = button.dataset.itemMode === (linked ? 'sight' : 'custom');
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
       for (const key of ['title', 'countryId', 'state', 'cityId', 'location', 'imageUrl', 'detail']) {
         const input = form.elements[key];
-        if (!input) continue;
-        input.disabled = linked;
-        const field = input.closest('.field');
-        if (field) field.style.display = linked ? 'none' : '';
+        if (input) input.disabled = linked;
       }
-      const titleInput = form.elements.title;
-      if (titleInput) titleInput.required = !linked;
-      const help = document.querySelector('#collection-sight-reference-help');
-      if (help) help.style.display = linked ? 'block' : 'none';
+      if (form.elements.title) form.elements.title.required = !linked;
+      if (form.elements.sightId) form.elements.sightId.disabled = !linked;
+      const access = form.elements.access?.closest('.field');
+      if (access) access.querySelector('label').textContent = linked ? 'Who can view this sight?' : 'Who can view this place?';
     }
     function updateLessonCountrySelection() {
       if (form.dataset.resource !== 'daily-destinations') return;
@@ -1471,7 +1554,7 @@
       if (type === 'check') return `<label class="check ${wide ? 'wide' : ''}"><input name="${key}" type="checkbox" ${value !== false ? 'checked' : ''}> ${label}</label>`;
       if (type === 'country-target') return '<label class="' + cls + '">' + label + '<select name="' + key + '"><option value="">All countries</option>' + state.meta.countries.map(x => '<option value="' + esc(x.id) + '" ' + (x.id === value ? 'selected' : '') + '>' + esc(x.code + ' - ' + x.name) + '</option>').join('') + '</select><small>Choose a country to show this collection only on that country page.</small></label>';
       if (type === 'us-states' || type === 'us-sights') { const options = type === 'us-states' ? state.meta.usStates : state.meta.usSights; const selected = new Set((value || []).map(String)); const labels = type === 'us-states' ? 'Select states to include directly. Matching state entries already in the collection list will only appear once.' : 'Select top sights directly. Sights already linked in the collection list will only appear once.'; return `<label class="${cls}">${label}<select name="${key}" multiple size="${type === 'us-states' ? 8 : 10}">${options.map(x => `<option value="${esc(x.id)}" ${selected.has(String(x.id)) ? 'selected' : ''}>${esc(type === 'us-states' ? x.name : `${x.name} - ${x.city}, ${x.state}`)}</option>`).join('')}</select><small>${labels} Use Ctrl or Command to select multiple items.</small></label>`; }
-      if (type === 'sight') { const selected = (state.meta.sightOptions || []).find(sight => String(sight.id) === String(value)); const sightLabel = selected?.label || (value ? [row?.title, row?.location].filter(Boolean).join(' — ') : ''); return `<div class="${cls}"><label for="collection-sight-search">${label}</label><input id="collection-sight-search" name="sightSearch" type="search" list="collection-sight-options" value="${esc(sightLabel)}" placeholder="Search Top sights by name, city, or country" oninput="searchCollectionSights(this.value)" onchange="selectCollectionSight(this)"><input type="hidden" name="sightId" value="${esc(value || '')}"><datalist id="collection-sight-options">${(state.meta.sightOptions || []).map(sight => `<option value="${esc(sight.label)}"></option>`).join('')}</datalist><small>Search and select an existing Top sight. The collection stores its ID and reads sight details from Top sights.</small><small id="collection-sight-reference-help" style="display:none">This item references the selected Top sight. Edit its name, image, location, and description under Top sights.</small></div>`; }
+      if (type === 'sight') { const selected = (state.meta.sightOptions || []).find(sight => String(sight.id) === String(value)); const sightLabel = selected?.label || (value ? [row?.title, row?.location].filter(Boolean).join(' — ') : ''); return `<div class="${cls}"><label for="collection-sight-search">${label}</label><input id="collection-sight-search" name="sightSearch" type="search" value="${esc(sightLabel)}" placeholder="Type a sight name, city, or country…" autocomplete="off" oninput="searchCollectionSights(this.value)" onchange="selectCollectionSight(this)"><input type="hidden" name="sightId" value="${esc(value || '')}"><div id="collection-sight-options" class="collection-sight-results" role="listbox" aria-label="Top sight search results"></div><small class="collection-sight-help">Search by sight name, city, or country, then choose a result.</small></div>`; }
       if (type === 'country') { const usedCountries = form.dataset.resource === 'daily-destinations' && !row ? new Set(state.rows.map(lesson => lesson.countryId)) : null; return `<label class="${cls}">${label}<select name="${key}" ${required} onchange="countryChanged()"><option value="">Select…</option>${state.meta.countries.filter(x => !usedCountries?.has(x.id)).map(x => `<option value="${esc(x.id)}" ${x.id === value ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('')}</select></label>`; }
       if (type === 'state') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" onchange="renderCities()"><option value="">Select a country first…</option></select></label>`;
       if (type === 'city') return `<label class="${cls}">${label}<select name="${key}" data-value="${esc(value || '')}" ${required}><option value="">Select a country first…</option></select></label>`;
