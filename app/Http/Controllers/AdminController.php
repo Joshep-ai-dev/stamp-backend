@@ -38,7 +38,7 @@ class AdminController extends Controller
             ->where('country_code', 'US')
             ->orderBy('name')
             ->get(['id', 'city_id', 'name'])
-            ->map(fn (Sight $sight) => ['id' => $sight->id, 'name' => $sight->name, 'city' => $sight->city?->name, 'state' => $sight->city?->subcountry]));
+            ->map(fn (Sight $sight) => ['id' => $sight->id, 'name' => $sight->name, 'city' => $sight->city?->englishName(), 'state' => $sight->city?->englishSubcountry()]));
     }
 
     public function sightOptions(Request $request): JsonResponse
@@ -55,6 +55,7 @@ class AdminController extends Controller
                 $query->where(function ($query) use ($like): void {
                     $query->whereRaw('LOWER(name) LIKE ?', [$like])
                         ->orWhereHas('city', fn ($city) => $city->whereRaw('LOWER(name) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(ascii_name) LIKE ?', [$like])
                             ->orWhereRaw('LOWER(subcountry) LIKE ?', [$like]))
                         ->orWhereHas('country', fn ($country) => $country->whereRaw('LOWER(name) LIKE ?', [$like]));
                 });
@@ -65,7 +66,7 @@ class AdminController extends Controller
         return response()->json($sights->map(function (Sight $sight): array {
             $city = $sight->city;
             $country = $sight->country ?? $city?->country;
-            $location = collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ');
+            $location = collect([$city?->englishName(), $city?->englishSubcountry(), $country?->name])->filter()->join(', ');
 
             return ['id' => (string) $sight->id, 'name' => $sight->name, 'location' => $location, 'label' => $sight->name.($location !== '' ? ' — '.$location : '')];
         }));
@@ -97,6 +98,7 @@ class AdminController extends Controller
                     $like = '%'.$search.'%';
                     $query->where(function ($query) use ($like): void {
                         $query->where('normalized_name', 'like', $like)
+                            ->orWhereRaw('LOWER(ascii_name) LIKE ?', [$like])
                             ->orWhere('normalized_subcountry', 'like', $like)
                             ->orWhere('country_code', 'like', strtoupper($like))
                             ->orWhereHas('country', fn ($country) => $country->where('normalized_name', 'like', $like));
@@ -119,13 +121,13 @@ class AdminController extends Controller
         $cities = City::where('country_code', strtoupper($country))
             ->when($data['state'] ?? null, fn ($query, $state) => $query->where('subcountry', $state))
             ->orderBy('name')
-            ->get(['geoname_id', 'country_code', 'name', 'normalized_name', 'subcountry'])
+            ->get(['geoname_id', 'country_code', 'name', 'ascii_name', 'normalized_name', 'subcountry'])
             ->pipe(fn ($items) => CityAliases::unique($items))
             ->map(fn (City $city) => [
                 'id' => $city->geoname_id,
                 'countryId' => $city->country_code,
-                'name' => $city->name,
-                'subcountry' => $city->subcountry,
+                'name' => $city->englishName(),
+                'subcountry' => $city->englishSubcountry(),
             ]);
 
         return response()->json($cities);
@@ -141,7 +143,7 @@ class AdminController extends Controller
         $legacy = City::where('country_code', strtoupper($country))
             ->whereNotNull('subcountry')->where('subcountry', '!=', '')->distinct()->pluck('subcountry');
 
-        return response()->json($saved->merge($legacy)->unique()->sort()->values());
+        return response()->json($saved->merge($legacy)->map(fn (string $name) => Str::ascii($name) ?: $name)->unique()->sort()->values());
     }
 
     public function stateList(): JsonResponse
@@ -166,7 +168,7 @@ class AdminController extends Controller
             ['name' => $name],
         );
 
-        return response()->json(['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name], $state->wasRecentlyCreated ? 201 : 200);
+        return response()->json(['id' => $state->id, 'countryId' => $state->country_code, 'name' => Str::ascii($state->name) ?: $state->name], $state->wasRecentlyCreated ? 201 : 200);
     }
 
     public function updateState(Request $request, string $id): JsonResponse
@@ -412,7 +414,7 @@ class AdminController extends Controller
             abort_if($sight && $city && $sight->city_id !== $city->id, 422, 'The selected sight is not in the selected city.');
             $sightId = $sight?->id;
             $title = $data['title'] ?? $model?->title ?? $sight?->name;
-            $location = $data['location'] ?? ($city ? collect([$city->name, $city->subcountry, $city->country->name])->filter()->join(', ') : $model?->location);
+            $location = $data['location'] ?? ($city ? collect([$city->englishName(), $city->englishSubcountry(), $city->country->name])->filter()->join(', ') : $model?->location);
             $values = $sight
                 ? ['collectionkind_id' => $kindIds[0], 'title' => null, 'image' => null, 'city_id' => null, 'sight_id' => $sightId, 'location' => null, 'detail' => null, 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0]
                 : ['collectionkind_id' => $kindIds[0], 'title' => $title, 'image' => $data['imageUrl'] ?? $model?->image ?? '', 'city_id' => $city?->id, 'sight_id' => null, 'location' => $location, 'detail' => $data['detail'] ?? '', 'access' => $data['access'] ?? $model?->access ?? 'free', 'display_order' => 0];
@@ -444,7 +446,7 @@ class AdminController extends Controller
             $data += ['imageUrl' => $model?->image_url, 'content' => $model?->content ?? ''];
             $city = (object) ['country_code' => $country->code, 'country' => $country, 'id' => null, 'name' => null];
             $data += ['name' => "Lesson {$lessonNumber} - {$country->name}", 'icon' => '🌍', 'question' => $first['prompt'], 'options' => $first['answers'], 'correctAnswer' => $first['correctAnswer']];
-            $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->name, 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
+            $values = ['name' => $data['name'], 'country_code' => $city->country_code, 'country' => $city->country->name, 'city_id' => $city->id, 'city' => $city->englishName(), 'image_url' => $data['imageUrl'] ?? $model?->image_url ?? '', 'icon' => $data['icon'] ?? '🌍', 'content' => $data['content'], 'question' => $data['question'], 'options' => $data['options'], 'correct_answer' => $data['correctAnswer'], 'publish_date' => ($data['publishDate'] ?? '') ?: null, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true, 'is_premium' => false];
             $values += ['questions' => $data['questions'], 'lesson_number' => $lessonNumber, 'display_order' => $lessonNumber];
             $values['display_order'] = $lessonNumber;
             $model ??= new DailyDestination(['id' => $data['id'] ?? (string) Str::uuid()]);
@@ -513,17 +515,17 @@ class AdminController extends Controller
 
     private function adminState(CountryState $state): array
     {
-        return ['id' => $state->id, 'countryId' => $state->country_code, 'name' => $state->name, 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description];
+        return ['id' => $state->id, 'countryId' => $state->country_code, 'name' => Str::ascii($state->name) ?: $state->name, 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description];
     }
 
     private function adminCity(City $city): array
     {
-        return ['id' => $city->geoname_id, 'countryId' => $city->country_code, 'country' => $city->country?->name, 'state' => $city->subcountry, 'name' => $city->name, 'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'imageUrl' => ImageUrl::public($city->image_url), 'description' => $city->description];
+        return ['id' => $city->geoname_id, 'countryId' => $city->country_code, 'country' => $city->country?->name, 'state' => $city->englishSubcountry(), 'name' => $city->englishName(), 'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'imageUrl' => ImageUrl::public($city->image_url), 'description' => $city->description];
     }
 
     private function adminSight(Sight $x): array
     {
-        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'state' => $x->city?->subcountry, 'city' => $x->city?->name];
+        return [...(new ContentController)->sightItem($x), 'image' => ImageUrl::public($x->image_url), 'content' => $x->description, 'country' => $x->country?->name, 'countryCode' => $x->country_code, 'state' => $x->city?->englishSubcountry(), 'city' => $x->city?->englishName()];
     }
 
     private function collectionList(CollectionList $item): array
@@ -532,10 +534,10 @@ class AdminController extends Controller
         $city = $sight?->city ?? $item->city;
         $country = $sight?->country ?? $city?->country;
         $location = $sight
-            ? collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ')
+            ? collect([$city?->englishName(), $city?->englishSubcountry(), $country?->name])->filter()->join(', ')
             : $item->location;
 
-        return ['id' => $item->id, 'collectionKindId' => $item->kinds->first()?->id ?? $item->collectionkind_id, 'collectionKindIds' => $item->kinds->pluck('id')->values(), 'collectionKind' => $item->kinds->pluck('title')->join(', '), 'imageUrl' => ImageUrl::public($sight?->image_url ?? $item->image), 'title' => $sight?->name ?? $item->title, 'cityId' => $city?->geoname_id, 'sightId' => $item->sight_id ? (string) $item->sight_id : null, 'countryId' => $sight?->country_code ?? $city?->country_code, 'state' => $city?->subcountry, 'location' => $location, 'detail' => $sight?->description ?? $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'collectionKindId' => $item->kinds->first()?->id ?? $item->collectionkind_id, 'collectionKindIds' => $item->kinds->pluck('id')->values(), 'collectionKind' => $item->kinds->pluck('title')->join(', '), 'imageUrl' => ImageUrl::public($sight?->image_url ?? $item->image), 'title' => $sight?->name ?? $item->title, 'cityId' => $city?->geoname_id, 'sightId' => $item->sight_id ? (string) $item->sight_id : null, 'countryId' => $sight?->country_code ?? $city?->country_code, 'state' => $city?->englishSubcountry(), 'location' => $location, 'detail' => $sight?->description ?? $item->detail, 'access' => $item->access, 'displayOrder' => $item->display_order];
     }
 
     private function modelImage(?Model $model): ?string

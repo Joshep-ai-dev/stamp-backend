@@ -51,11 +51,11 @@ class VisitController extends Controller
                     ->lockForUpdate()->first();
                 $values = [
                         'source_id' => $existing?->source_id ?? ($existing ? null : $sourceId),
-                        'city_name' => $city->name,
+                        'city_name' => $city->englishName(),
                         'country' => $city->country->name,
                         'country_code' => $city->country_code,
                         'continent_code' => $city->country->continent_code,
-                        'subcountry' => $city->subcountry,
+                        'subcountry' => $city->englishSubcountry(),
                         'visited_at' => $item['visitedAt'],
                         'note' => $item['note'] ?? null,
                         'places' => $item['places'] ?? [],
@@ -92,9 +92,9 @@ class VisitController extends Controller
         $city = City::with('country')->where('geoname_id', $request->string('cityId'))->firstOrFail();
 
         return [[
-            'city_id' => $city->id, 'city_name' => $city->name, 'country' => $city->country->name,
+            'city_id' => $city->id, 'city_name' => $city->englishName(), 'country' => $city->country->name,
             'country_code' => $city->country_code, 'continent_code' => $city->country->continent_code,
-            'subcountry' => $city->subcountry, 'visited_at' => $request->date('visitedAt')->format('Y-m-d'),
+            'subcountry' => $city->englishSubcountry(), 'visited_at' => $request->date('visitedAt')->format('Y-m-d'),
             'note' => $request->input('note'), 'places' => $request->input('places', []),
         ], $city];
     }

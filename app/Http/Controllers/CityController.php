@@ -32,6 +32,7 @@ class CityController extends Controller
                 $builder->where(function ($part) use ($term): void {
                     $like = '%'.$term.'%';
                     $part->where('normalized_name', 'like', $like)
+                        ->orWhereRaw('LOWER(ascii_name) LIKE ?', [$like])
                         ->orWhere('normalized_subcountry', 'like', $like)
                         ->orWhereRaw('LOWER(country_code) LIKE ?', [$like])
                         ->orWhereHas('country', fn ($country) => $country->where('normalized_name', 'like', $like));

@@ -56,10 +56,10 @@ class ContentController extends Controller
             'isEnriching' => false,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name, 'officialName' => $country->name, 'flag' => $country->flag, 'continent' => $country->continent_code, 'coverImage' => ImageUrl::public($country->hero_image), 'description' => $country->description],
             'featuredIn' => [],
-            'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]),
+            'cities' => $cities->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->englishName(), 'subcountry' => $city->englishSubcountry(), 'image' => ImageUrl::public($city->image_url)]),
             'states' => $country->code === 'US'
                 ? CountryState::where('country_code', 'US')->orderBy('name')->get()
-                    ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description])
+                    ->map(fn ($state) => ['id' => (string) $state->id, 'name' => Str::ascii($state->name) ?: $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url), 'description' => $state->description])
                 : [],
             // Always return the ordered catalog so clients can render locked
             // previews. Access to items after the first three is enforced by
@@ -67,7 +67,7 @@ class ContentController extends Controller
             'sights' => $sights->values()->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
             'stats' => ['cities' => $visits->pluck('city_id')->unique()->count(), 'totalCities' => $cities->count(), 'sights' => $completed->intersect($sights->pluck('id'))->count(), 'totalSights' => $sights->count(), 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count()],
-            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
+            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city?->englishName() ?? $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
         ]);
     }
 
@@ -79,7 +79,7 @@ class ContentController extends Controller
             ->merge(City::where('country_code', $country->code)->orderBy('name')->limit(20)->get()))
             ->take(max(10, $sightCityIds->unique()->count()));
 
-        return response()->json($cities->values()->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->name, 'subcountry' => $city->subcountry, 'image' => ImageUrl::public($city->image_url)]));
+        return response()->json($cities->values()->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'name' => $city->englishName(), 'subcountry' => $city->englishSubcountry(), 'image' => ImageUrl::public($city->image_url)]));
     }
 
     public function countryStates(string $code): JsonResponse
@@ -88,7 +88,7 @@ class ContentController extends Controller
         abort_unless($country->code === 'US', 404);
 
         return response()->json(CountryState::where('country_code', 'US')->orderBy('name')->get()
-            ->map(fn ($state) => ['id' => (string) $state->id, 'name' => $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url)]));
+            ->map(fn ($state) => ['id' => (string) $state->id, 'name' => Str::ascii($state->name) ?: $state->name, 'countryId' => 'US', 'imageUrl' => ImageUrl::public($state->image_url)]));
     }
 
     public function stateCities(string $code, string $state): JsonResponse
@@ -97,7 +97,7 @@ class ContentController extends Controller
 
         return response()->json(CityAliases::unique(City::where('country_code', $country->code)->where('subcountry', $state)
             ->orderBy('name')->get())
-            ->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'state' => $city->subcountry, 'name' => $city->name, 'image' => ImageUrl::public($city->image_url)]));
+            ->map(fn ($city) => ['id' => $city->geoname_id, 'countryId' => $country->code, 'state' => $city->englishSubcountry(), 'name' => $city->englishName(), 'image' => ImageUrl::public($city->image_url)]));
     }
 
     public function state(Request $request, string $code, string $state): JsonResponse
@@ -130,11 +130,11 @@ class ContentController extends Controller
 
         return response()->json([
             'id' => (string) ($stateRecord?->id ?? $stateName),
-            'name' => $stateName,
+            'name' => Str::ascii($stateName) ?: $stateName,
             'imageUrl' => ImageUrl::public($stateRecord?->image_url),
             'description' => $stateRecord?->description,
             'country' => ['id' => $country->code, 'code' => $country->code, 'name' => $country->name],
-            'cities' => CityAliases::unique($cities)->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->name, 'state' => $city->subcountry, 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
+            'cities' => CityAliases::unique($cities)->map(fn ($city) => ['id' => $city->geoname_id, 'name' => $city->englishName(), 'state' => $city->englishSubcountry(), 'countryId' => $country->code, 'image' => ImageUrl::public($city->image_url)]),
             'sights' => $sights->map(fn ($sight) => [...$this->sightItem($sight), 'completed' => $completed->contains($sight->id)]),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
             'stats' => [
@@ -142,7 +142,7 @@ class ContentController extends Controller
                 'sights' => $completed->intersect($sights->pluck('id'))->count(),
                 'airports' => $visits->flatMap(fn ($visit) => $visit->places ?? [])->where('type', 'airport')->pluck('id')->unique()->count(),
             ],
-            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
+            'visitedCities' => $visits->unique('city_id')->map(fn ($visit) => ['id' => (string) $visit->city_id, 'name' => $visit->city?->englishName() ?? $visit->city_name, 'image' => ImageUrl::public($visit->image_url)])->values(),
         ]);
     }
 
@@ -196,12 +196,12 @@ class ContentController extends Controller
             ->orderBy('title')->get();
 
         return response()->json([
-            'id' => $city->geoname_id, 'name' => $city->name, 'countryId' => $city->country_code,
+            'id' => $city->geoname_id, 'name' => $city->englishName(), 'countryId' => $city->country_code,
             // A city can be imported before its related country row is available.
             // Still return the city guide rather than failing with a 500 error.
             'country' => $city->country?->name ?? $city->country_code,
             'countryCode' => $city->country_code,
-            'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->subcountry,
+            'continentCode' => $city->country?->continent_code ?? '', 'subcountry' => $city->englishSubcountry(),
             'latitude' => $city->latitude, 'longitude' => $city->longitude, 'population' => $city->population, 'image' => ImageUrl::public($city->image_url), 'description' => $city->description,
             'sights' => Sight::with(['country', 'city'])->whereIn('city_id', CityAliases::relatedIds($city))->orderBy('name')->get()->map(fn ($sight) => $this->sightItem($sight)),
             'collections' => $collections->map(fn ($item) => $this->collectionItem($item)),
@@ -246,7 +246,7 @@ class ContentController extends Controller
             stateName: $city->subcountry,
         );
 
-        return response()->json($this->airportLocation($results, $city->name, $city->subcountry, $city->country_code));
+        return response()->json($this->airportLocation($results, $city->englishName(), $city->englishSubcountry(), $city->country_code));
     }
 
     private function airportLocation(array $airports, string $city, ?string $state, string $countryCode): array
@@ -293,7 +293,7 @@ class ContentController extends Controller
 
     public function sightItem(Sight $item): array
     {
-        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->subcountry, 'cityId' => $item->city ? CityAliases::canonicalId($item->city->geoname_id) : null, 'city' => $item->city?->name, 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
+        return ['id' => $item->id, 'countryId' => $item->country_code, 'state' => $item->city?->englishSubcountry(), 'cityId' => $item->city ? CityAliases::canonicalId($item->city->geoname_id) : null, 'city' => $item->city?->englishName(), 'name' => $item->name, 'slug' => $item->slug, 'description' => $item->description, 'imageUrl' => ImageUrl::public($item->image_url), 'isFeatured' => $item->is_featured, 'displayOrder' => $item->display_order];
     }
 
     public function collectionItem(CollectionKind $item, bool $admin = false): array
@@ -313,7 +313,7 @@ class ContentController extends Controller
 
             $canViewDetail = $hasAccess || ($item->access !== 'pro' && ! $isPremium);
 
-            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'name' => $sight?->name ?? $list->title, 'title' => $sight?->name ?? $list->title, 'cityId' => $city?->geoname_id, 'city' => $city?->name, 'state' => $city?->subcountry, 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'location' => $sight ? collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ') : $list->location, 'detail' => $canViewDetail ? $detail : '', 'content' => $canViewDetail ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium];
+            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'name' => $sight?->name ?? $list->title, 'title' => $sight?->name ?? $list->title, 'cityId' => $city?->geoname_id, 'city' => $city?->englishName(), 'state' => $city?->englishSubcountry(), 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'location' => $sight ? collect([$city?->englishName(), $city?->englishSubcountry(), $country?->name])->filter()->join(', ') : $list->location, 'detail' => $canViewDetail ? $detail : '', 'content' => $canViewDetail ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium];
         });
         $places = $places->concat($sourceBuilder->extras($item, $hasAccess))->values();
         $result = ['access' => $item->access ?? 'free', 'id' => $item->id, 'title' => $item->title, 'countryId' => $item->country_code, 'country' => $item->country?->name, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($item->explorer_image ?: $heroImage), 'places' => $places, 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
@@ -335,6 +335,6 @@ class ContentController extends Controller
             'imageUrl' => ImageUrl::public($question['imageUrl'] ?? null),
         ])->values();
 
-        return ['id' => $item->id, 'name' => $item->name, 'lessonNumber' => $item->lesson_number, 'isPreview' => (int) $item->lesson_number === 0, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->subcountry, 'cityId' => $city?->geoname_id, 'city' => $item->city, 'icon' => $item->icon, 'questions' => $questions, 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        return ['id' => $item->id, 'name' => $item->name, 'lessonNumber' => $item->lesson_number, 'isPreview' => (int) $item->lesson_number === 0, 'countryId' => $item->country_code, 'country' => $item->country, 'state' => $city?->englishSubcountry(), 'cityId' => $city?->geoname_id, 'city' => $city?->englishName() ?? $item->city, 'icon' => $item->icon, 'questions' => $questions, 'question' => $item->question, 'options' => $item->options, 'correctAnswer' => $item->correct_answer, 'publishDate' => $item->publish_date?->format('Y-m-d') ?? '', 'isPublished' => $item->is_published, 'isPremium' => false, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
     }
 }

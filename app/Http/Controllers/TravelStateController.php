@@ -96,9 +96,9 @@ class TravelStateController extends Controller
                     if (! $visit) {
                         $city->loadMissing('country');
                         $visit = $request->user()->visits()->create([
-                            'city_id' => $city->id, 'city_name' => $city->name,
+                            'city_id' => $city->id, 'city_name' => $city->englishName(),
                             'country' => $city->country->name, 'country_code' => $city->country_code,
-                            'continent_code' => $city->country->continent_code, 'subcountry' => $city->subcountry,
+                            'continent_code' => $city->country->continent_code, 'subcountry' => $city->englishSubcountry(),
                             'visited_at' => now()->toDateString(), 'note' => null, 'places' => [],
                         ]);
                     }
@@ -193,7 +193,7 @@ class TravelStateController extends Controller
             $completed = $completionIds->contains($completionId)
                 || ($isStateChecklistItem && $visitedStates->contains($state));
 
-            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $name, 'state' => $city?->subcountry, 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'location' => $sight ? collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ') : $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && ! $isPremium)) ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium, 'completed' => $completed];
+            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $name, 'state' => $city?->englishSubcountry(), 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'location' => $sight ? collect([$city?->englishName(), $city?->englishSubcountry(), $country?->name])->filter()->join(', ') : $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && ! $isPremium)) ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium, 'completed' => $completed];
         }) ?? collect();
         $hasAccess = request()->user()?->plan === 'pro';
         $sourcePlaces = $definition

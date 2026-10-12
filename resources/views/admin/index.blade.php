@@ -1410,8 +1410,12 @@
       if (form.elements.sightId) form.elements.sightId.disabled = !linked;
       const saveButton = form.querySelector('button[type="submit"]');
       if (saveButton) saveButton.disabled = sightMode && !linked;
-      const access = form.elements.access?.closest('.field');
-      if (access) access.querySelector('label').textContent = linked ? 'Who can view this sight?' : 'Who can view this place?';
+      const accessLabel = form.elements.access?.closest('label');
+      if (accessLabel) {
+        const select = accessLabel.querySelector('select');
+        accessLabel.firstChild.textContent = linked ? 'Who can view this sight?' : 'Who can view this place?';
+        if (select) select.setAttribute('aria-label', linked ? 'Who can view this sight?' : 'Who can view this place?');
+      }
     }
     function updateLessonCountrySelection() {
       if (form.dataset.resource !== 'daily-destinations') return;
