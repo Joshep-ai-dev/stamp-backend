@@ -3,10 +3,15 @@ Gift purchase confirmed!
 
 Hi {{ $sender }},
 Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.
-Recipient: {{ $gift->recipient_email }}
+Recipient: {{ $recipientName }}
 Gift: Kroo+ 1 Year
 Purchase date: {{ $gift->paid_at->format('M j, Y') }}
-We’ve sent your Kroo+ gift to {{ $gift->recipient_email }}.
+We’ve sent your Kroo+ gift to {{ $recipientName }}.
+
+@if (filled($gift->message))
+Your personal note:
+{{ $gift->message }}
+@endif
 
 Thanks for spreading the joy of travel with Kroo.
 @else

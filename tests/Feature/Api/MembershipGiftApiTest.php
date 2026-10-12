@@ -83,6 +83,33 @@ class MembershipGiftApiTest extends TestCase
         $this->assertSame('free', $recipient->fresh()->plan);
         $this->getJson('/api/v1/me/subscription')->assertOk()->assertJsonPath('isKrooPlus', false);
     }
+    public function test_emails_show_recipient_name_personal_note_and_inline_code(): void
+    {
+        $buyer = User::factory()->create(['name' => 'Robert']);
+        User::factory()->create(['name' => 'Sarah', 'email' => 'friend@example.com']);
+        $gift = MembershipGift::create([
+            'buyer_id' => $buyer->id, 'recipient_email' => 'friend@example.com',
+            'product_id' => 'gift.year', 'baseline_transactions' => [], 'paid_at' => now(),
+            'encrypted_code' => 'AABBCCDDEEFF112233445566', 'message' => "Safe <note>\nHappy travels!",
+        ]);
+        $buyerHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
+        $recipientHtml = (new MembershipGiftMail($gift, 'Robert'))->render();
+        $this->assertStringContainsString('Recipient:</strong> Sarah', $buyerHtml);
+        $this->assertStringNotContainsString('friend@example.com', $buyerHtml);
+        $this->assertStringContainsString('Your personal note:', $buyerHtml);
+        foreach ([$buyerHtml, $recipientHtml] as $html) {
+            $this->assertStringContainsString('Safe &lt;note&gt;<br', $html);
+            $this->assertStringContainsString('Happy travels!', $html);
+            $this->assertStringNotContainsString('Clipboard', $html);
+            $this->assertStringNotContainsString('&#128203;', $html);
+        }
+        $this->assertStringContainsString('Gift code:</strong> <span style="font-family:monospace;font-weight:normal;', $recipientHtml);
+        $gift->recipient_email = 'new-friend@example.com';
+        $fallbackHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
+        $this->assertStringContainsString('Recipient:</strong> your friend', $fallbackHtml);
+        $this->assertStringNotContainsString('new-friend@example.com', $fallbackHtml);
+    }
+
     public function test_buyer_confirmation_retries_without_resending_recipient_code(): void
     {
         Mail::fake();

@@ -21,24 +21,22 @@
 @endif
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
-<p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $gift->recipient_email : $sender }}</p>
+<p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $recipientName : $sender }}</p>
 <p style="margin:6px 0;"><strong>Gift:</strong> Kroo+ 1 Year</p>
 @if (! $isBuyer)
-<p style="margin:6px 0;"><strong>Gift code:</strong></p>
-<p style="margin:6px 0;font: bold 18px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;"><span style="user-select:all;-webkit-user-select:all;">{{ $gift->encrypted_code }}</span> <span role="img" aria-label="Clipboard" style="font-size:20px;">&#128203;</span></p>
-<p style="margin:8px 0 0;font-size:12px;color:#176248;">Select and copy this one-time code, then paste it into Kroo.</p>
+<p style="margin:6px 0;overflow-wrap:anywhere;"><strong>Gift code:</strong> <span style="font-family:monospace;font-weight:normal;user-select:all;-webkit-user-select:all;">{{ $gift->encrypted_code }}</span></p>
 @endif
 @if ($isBuyer)<p style="margin:6px 0;"><strong>Purchase date:</strong> {{ $gift->paid_at->format('M j, Y') }}</p>@endif
 </td></tr></table>
+@if (filled($gift->message))
+<p><strong>{{ $isBuyer ? 'Your personal note:' : 'A message from '.$sender.':' }}</strong></p>
+<p style="background:#f0f8f4;padding:15px;border-radius:8px;">{!! nl2br(e($gift->message)) !!}</p>
+@endif
 @if ($isBuyer)
-<p style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;">We’ve sent your Kroo+ gift to <strong>{{ $gift->recipient_email }}</strong>, so they can discover all the perks waiting for them.</p>
+<p style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;">We’ve sent your Kroo+ gift to <strong>{{ $recipientName }}</strong>, so they can discover all the perks waiting for them.</p>
 <p style="text-align:center;">Thanks for spreading the joy of travel with Kroo.</p>
 <p style="text-align:center;">Happy travels,<br><strong>The Kroo Team</strong></p>
 @else
-@if (filled($gift->message))
-<p><strong>A message from {{ $sender }}:</strong></p>
-<p style="background:#f0f8f4;padding:15px;border-radius:8px;">{!! nl2br(e($gift->message)) !!}</p>
-@endif
 <p><strong>New to Kroo?</strong> Enter your name and this gift code on the welcome page. Your account and one year of Kroo+ will activate together.</p>
 <p><strong>Already a member?</strong> Sign into Kroo, open the + page, enter this code in the gift-code field, and tap Redeem gift.</p>
 <p>Your year starts when you redeem the code. No payment or recurring subscription is needed. Keep this gift code private. It can only be redeemed once.</p>
