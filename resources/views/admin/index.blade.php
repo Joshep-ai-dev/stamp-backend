@@ -282,6 +282,7 @@
       gap: 6px
     }
     .field[hidden] { display:none !important }
+    #fields.collection-list-fields { grid-template-columns:1fr }
 
     .collection-item-choice { padding:14px; border:1px solid var(--line); border-radius:10px; background:#0a2a21 }
     .collection-item-choice > div:first-child { display:flex; flex-direction:column; gap:4px }
@@ -1225,9 +1226,10 @@
       formTitle.textContent = state.tab === 'daily-destinations' && state.edit ? `Edit Lesson ${state.edit.lessonNumber}` : `${state.edit ? 'Edit' : 'Add'} ${resourceName}`;
       const draftTools = document.querySelector('#aiDraftTools');
       form.querySelector('.dialogfoot').prepend(draftTools);
+      fields.classList.toggle('collection-list-fields', state.tab === 'collection-lists');
       fields.innerHTML = schemas[state.tab].map(field => fieldHtml(field, state.edit)).join('');
       const isLesson = state.tab === 'daily-destinations';
-      draftTools.hidden = !['countries', 'cities', 'sights', 'collections', 'collection-lists', 'daily-destinations'].includes(state.tab);
+      draftTools.hidden = !['countries', 'cities', 'sights', 'collections', 'daily-destinations'].includes(state.tab);
       draftTools.classList.toggle('lesson-action', isLesson);
       draftTools.classList.toggle('field-action', !isLesson);
       draftTools.querySelector('button').textContent = isLesson ? 'Generate lesson and quiz with AI' : 'Generate description with AI';
@@ -1237,7 +1239,7 @@
       if (isLesson) {
         prepareKrooIqEditor();
         updateLessonCountrySelection();
-      } else {
+      } else if (state.tab !== 'collection-lists') {
         const target = form.elements.description || form.elements.content || form.elements.detail;
         const targetField = target?.closest('.field');
         if (targetField) {
@@ -1249,7 +1251,9 @@
       }
       modal.classList.remove('hidden');
       await renderStates();
-      if (form.dataset.resource === 'collection-lists') setupCollectionItemEditor();
+      if (form.dataset.resource === 'collection-lists') {
+        setupCollectionItemEditor();
+      }
     }
     let sightSearchTimer;
     function renderSightOptions() {
