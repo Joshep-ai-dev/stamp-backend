@@ -9,6 +9,7 @@ html, body, table, td, p, a, h1, h2, h3 {
 }
 table { border-collapse:collapse; }
 .hero-title { font-size:32px !important; }
+.hero-title-mobile { display:none; }
 @media only screen and (max-width:480px) {
     .email-outer { padding:0 !important; }
     .email-shell { border:0 !important; border-radius:0 !important; }
@@ -21,12 +22,14 @@ table { border-collapse:collapse; }
     .hero-layout { display:table !important; width:100% !important; table-layout:fixed !important; height:152px !important; }
     .hero-layout tbody { display:table-row-group !important; }
     .hero-layout tr { display:table-row !important; }
-    .hero-copy { display:table-cell !important; box-sizing:border-box !important; width:100% !important; padding:0 4px 0 2px !important; vertical-align:middle !important; }
-    .hero-plane { display:none !important; width:0 !important; padding:0 !important; }
-    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:20px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-copy { display:table-cell !important; box-sizing:border-box !important; width:72% !important; padding:0 4px 0 2px !important; vertical-align:middle !important; }
+    .hero-plane { display:table-cell !important; width:28% !important; padding:0 0 0 4px !important; vertical-align:middle !important; }
+    .hero-plane img { display:block !important; position:static !important; width:100% !important; max-width:none !important; height:auto !important; transform:none !important; }
+    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-title-desktop { display:none !important; }
+    .hero-title-mobile { display:block !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; }
-    .hero-subtitle-recipient { white-space:nowrap !important; }
+    .hero-subtitle { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; white-space:nowrap !important; }
     .hero-copy, .hero-title, .hero-subtitle { text-align:left !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
     .content-cell p { margin:0 0 10px !important; }
@@ -62,8 +65,9 @@ table { border-collapse:collapse; }
 <tr><td class="hero-cell" style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
 <table class="hero-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;height:152px;"><tr>
 <td class="hero-copy" width="78%" valign="middle" style="width:78%;font-family:Arial,Helvetica,sans-serif;text-align:left;">
-<h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;letter-spacing:0;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)A gift that goes<br>places.@else Your next adventure<br>starts here.@endif</h1>
-<p class="hero-subtitle{{ $isBuyer ? '' : ' hero-subtitle-recipient' }}" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
+<h1 class="hero-title hero-title-desktop" style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;letter-spacing:0;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)A gift that goes<br>places.@else Your next adventure<br>starts here.@endif</h1>
+<h1 class="hero-title hero-title-mobile" style="display:none;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;letter-spacing:0;line-height:1.08;margin:0 0 8px;">@if ($isBuyer)A gift that<br>goes places.@else Your next<br>adventure<br>starts here.@endif</h1>
+<p class="hero-subtitle{{ $isBuyer ? '' : ' hero-subtitle-recipient' }}" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone Kroo+!' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
 <td class="hero-plane" width="22%" align="right" valign="middle" style="width:22%;padding-left:4px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
 </tr></table>

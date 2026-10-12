@@ -290,6 +290,10 @@
             font-size: 12px
         }
 
+        .hero-title-mobile {
+            display: none
+        }
+
         @media(max-width:480px) {
             .wrap {
                 padding: 0 !important;
@@ -328,29 +332,43 @@
             }
 
             .hero {
-                min-height: 132px !important;
-                padding: 16px 14px !important;
+                min-height: 176px !important;
+                padding: 14px !important;
                 display: block !important;
                 position: relative !important
             }
 
             .hero:after {
-                display: none !important
+                display: block !important;
+                width: 80px !important;
+                height: 80px !important;
+                right: 4px !important;
+                top: 50% !important;
+                bottom: auto !important;
+                transform: translateY(-50%)
             }
 
             .hero h2 {
-                width: 100% !important;
-                max-width: 100% !important;
+                width: 72% !important;
+                max-width: 72% !important;
                 padding: 0;
-                font-size: 20px !important;
+                font-size: 18px !important;
                 line-height: 1.08 !important;
                 margin: 0 0 8px !important;
                 position: relative;
                 z-index: 1
             }
 
+            .hero-title-desktop {
+                display: none !important
+            }
+
+            .hero-title-mobile {
+                display: block !important
+            }
+
             .hero-line {
-                white-space: nowrap !important
+                white-space: normal !important
             }
 
             .hero p {
@@ -359,16 +377,9 @@
                 font-size: 13px !important;
                 line-height: 1.35;
                 max-width: 100%;
+                white-space: nowrap !important;
                 position: relative;
                 z-index: 1
-            }
-
-            #recipient .hero p {
-                white-space: nowrap !important
-            }
-
-            .hero-line {
-                white-space: normal
             }
 
             .content {
@@ -484,8 +495,9 @@
                 <div class="preheader"><span>Your Kroo+ gift is ready to make someone�s day ??</span><span>Gift confirmation</span></div>
                 <div class="brand" role="img" aria-label="Kroo logo">kroo</div>
                 <div class="hero">
-                    <h2><span class="hero-line">A gift that goes</span><br>places.</h2>
-                    <p>You�ve gifted someone a world of possibilities with Kroo+.</p>
+                    <h2 class="hero-title-desktop"><span class="hero-line">A gift that goes</span><br>places.</h2>
+                    <h2 class="hero-title-mobile">A gift that<br>goes places.</h2>
+                    <p>You�ve gifted someone Kroo+!</p>
                 </div>
                 <div class="content">
                     <h3>Gift purchase confirmed!</h3>
@@ -523,7 +535,8 @@
                 <div class="preheader"><span>You�ve been gifted Kroo+! ??</span><span>Your gift awaits</span></div>
                 <div class="brand" role="img" aria-label="Kroo logo">kroo</div>
                 <div class="hero" style="background:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%)">
-                    <h2><span class="hero-line">Your next adventure</span><br>starts here.</h2>
+                    <h2 class="hero-title-desktop"><span class="hero-line">Your next adventure</span><br>starts here.</h2>
+                    <h2 class="hero-title-mobile">Your next<br>adventure<br>starts here.</h2>
                     <p>You�ve been gifted Kroo+!</p>
                 </div>
                 <div class="content">

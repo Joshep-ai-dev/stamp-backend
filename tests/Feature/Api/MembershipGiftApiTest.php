@@ -112,13 +112,13 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringContainsString('.hero-title { font-size:32px !important; }', $html);
             $this->assertStringContainsString('-webkit-text-size-adjust:100% !important', $html);
             $this->assertStringContainsString('.gift-label, .gift-value { display:block !important;', $html);
-            $this->assertStringContainsString('.hero-plane { display:none !important; width:0 !important; padding:0 !important; }', $html);
+            $this->assertStringContainsString('.hero-plane { display:table-cell !important; width:28% !important;', $html);
             $this->assertStringContainsString('.email-outer { padding:0 !important;', $html);
-            $this->assertStringContainsString('.hero-copy { display:table-cell !important; box-sizing:border-box !important; width:100% !important;', $html);
-            $this->assertStringContainsString('.hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:20px !important;', $html);
-            $this->assertStringContainsString('width:100% !important; max-width:none !important;', $html);
-            $this->assertStringContainsString('.hero-subtitle { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; }', $html);
-            $this->assertStringContainsString('.hero-subtitle-recipient { white-space:nowrap !important; }', $html);
+            $this->assertStringContainsString('.hero-copy { display:table-cell !important; box-sizing:border-box !important; width:72% !important;', $html);
+            $this->assertStringContainsString('.hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important;', $html);
+            $this->assertStringContainsString('.hero-title-desktop { display:none !important; }', $html);
+            $this->assertStringContainsString('.hero-title-mobile { display:block !important; }', $html);
+            $this->assertStringContainsString('width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; white-space:nowrap !important;', $html);
             $this->assertStringContainsString('padding:10px 8px 10px 2px !important;', $html);
             $this->assertStringContainsString('height:152px !important;', $html);
             $this->assertStringContainsString('.content-cell { padding:14px 10px !important; font-size:12px !important;', $html);
@@ -130,6 +130,8 @@ class MembershipGiftApiTest extends TestCase
         $this->assertStringContainsString('Gift code:</td><td class="gift-value gift-code" valign="top"', $recipientHtml);
         $this->assertStringContainsString('Your next adventure<br>starts here.', $recipientHtml);
         $this->assertStringContainsString('A gift that goes<br>places.', $buyerHtml);
+        $this->assertStringContainsString('Your next<br>adventure<br>starts here.', $recipientHtml);
+        $this->assertStringContainsString('A gift that<br>goes places.', $buyerHtml);
         $gift->recipient_email = 'new-friend@example.com';
         $fallbackHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
         $this->assertStringContainsString('new-friend@example.com</td>', $fallbackHtml);
