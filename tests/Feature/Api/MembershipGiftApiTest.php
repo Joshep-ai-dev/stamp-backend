@@ -111,6 +111,9 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringContainsString('@media only screen and (max-width:480px)', $html);
             $this->assertStringContainsString('-webkit-text-size-adjust:100% !important', $html);
             $this->assertStringContainsString('.gift-label, .gift-value { display:block !important;', $html);
+            $this->assertStringContainsString('.hero-plane { display:block !important; position:absolute !important;', $html);
+            $this->assertStringContainsString('.email-outer { padding:0 !important;', $html);
+            $this->assertStringContainsString('.hero-title { font-size:24px !important;', $html);
             $this->assertStringContainsString('font-size:32px!important;font-weight:700!important;letter-spacing:0!important;line-height:1.1!important', $html);
             $this->assertStringContainsString('class="gift-label"', $html);
             $this->assertStringContainsString('width="120" style="width:120px;', $html);

@@ -9,34 +9,38 @@ html, body, table, td, p, a, h1, h2, h3 {
 }
 table { border-collapse:collapse; }
 @media only screen and (max-width:480px) {
-    .email-outer { padding:8px 3px !important; }
-    .email-shell { border-radius:8px !important; }
-    .preheader { padding:8px 12px !important; }
-    .preheader-left, .preheader-right { font-size:10px !important; line-height:1.35 !important; }
+    .email-outer { padding:0 !important; }
+    .email-shell { border:0 !important; border-radius:0 !important; }
+    .preheader { padding:7px 10px !important; }
+    .preheader-left, .preheader-right { font-size:9px !important; line-height:1.3 !important; }
     .preheader-left { width:66% !important; }
     .preheader-right { width:34% !important; padding-left:8px !important; }
-    .brand-cell { padding:14px !important; font-size:32px !important; }
-    .hero-cell { padding:24px 16px !important; }
-    .hero-copy { width:82% !important; }
-    .hero-plane { width:18% !important; padding-left:2px !important; }
-    .hero-plane img { max-width:70px !important; }
-    .hero-title { font-size:26px !important; line-height:1.12 !important; }
+    .brand-cell { padding:11px !important; font-size:30px !important; }
+    .hero-cell { padding:18px 12px !important; }
+    .hero-layout { display:block !important; position:relative !important; }
+    .hero-layout tbody, .hero-layout tr { display:block !important; }
+    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; padding-right:52px !important; }
+    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:0 !important; width:48px !important; padding:0 !important; transform:translateY(-50%) !important; }
+    .hero-plane img { width:48px !important; max-width:48px !important; }
+    .hero-title { font-size:24px !important; line-height:1.1 !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { font-size:14px !important; line-height:1.45 !important; }
-    .content-cell { padding:20px 12px !important; font-size:15px !important; line-height:1.55 !important; }
-    .confirmation-title { font-size:21px !important; line-height:1.25 !important; }
-    .gift-icon { width:18px !important; padding:18px 0 14px 10px !important; font-size:21px !important; }
-    .gift-details { padding:15px 10px !important; }
+    .hero-subtitle { font-size:13px !important; line-height:1.4 !important; }
+    .content-cell { padding:16px 10px !important; font-size:14px !important; line-height:1.5 !important; }
+    .confirmation-title { font-size:19px !important; line-height:1.2 !important; margin-bottom:14px !important; }
+    .gift-icon { width:16px !important; padding:15px 0 12px 8px !important; font-size:19px !important; }
+    .gift-details { padding:12px 8px !important; }
+    .gift-details h3 { font-size:16px !important; margin-bottom:6px !important; }
+    .gift-table { font-size:13px !important; }
     .gift-label, .gift-value { display:block !important; width:auto !important; }
     .gift-label { padding:7px 0 0 !important; }
     .gift-value { padding:0 0 2px !important; overflow-wrap:anywhere !important; word-break:normal !important; }
     .gift-code { word-break:break-all !important; }
-    .notice { padding:13px !important; }
-    .footer-cell { padding:16px 12px !important; }
-    .footer-logo { font-size:21px !important; }
-    .footer-tagline { font-size:9px !important; }
-    .footer-social { font-size:11px !important; }
-    .fine-print { padding:14px 10px !important; font-size:10px !important; line-height:1.5 !important; }
+    .notice { padding:11px !important; }
+    .footer-cell { padding:13px 10px !important; }
+    .footer-logo { font-size:19px !important; }
+    .footer-tagline { font-size:8px !important; }
+    .footer-social { font-size:10px !important; }
+    .fine-print { padding:11px 8px !important; font-size:9px !important; line-height:1.45 !important; }
 }
 </style>
 </head>
@@ -52,7 +56,7 @@ table { border-collapse:collapse; }
 </td></tr>
 <tr><td class="brand-cell" align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;line-height:1.2;">kroo</td></tr>
 <tr><td class="hero-cell" style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<table class="hero-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td class="hero-copy" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;">
 <h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif!important;font-size:32px!important;font-weight:700!important;letter-spacing:0!important;line-height:1.1!important;margin:0 0 12px!important;">@if ($isBuyer)<span class="hero-line" style="white-space:nowrap;">A gift that goes</span><br>places.@else<span class="hero-line" style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
 <p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
@@ -71,7 +75,7 @@ table { border-collapse:collapse; }
 @endif
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td class="gift-icon" valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td class="gift-details" style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;">
+<table class="gift-table" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;">
 <tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</td><td class="gift-value" valign="top" style="padding:3px 0;overflow-wrap:anywhere;word-break:break-word;">{{ $isBuyer ? $gift->recipient_email : $sender }}</td></tr>
 <tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">Gift:</td><td class="gift-value" valign="top" style="padding:3px 0;">Kroo+ 1 Year</td></tr>
 @if (! $isBuyer)

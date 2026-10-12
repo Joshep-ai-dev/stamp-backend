@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -291,24 +291,106 @@
         }
 
         @media(max-width:480px) {
+            .wrap {
+                padding: 0 !important;
+                gap: 12px
+            }
+
+            .email {
+                border: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important
+            }
+
+            .label {
+                padding: 0 10px
+            }
+
+            .preheader {
+                padding: 7px 10px !important;
+                font-size: 9px !important;
+                line-height: 1.3
+            }
+
+            .preheader span:first-child {
+                width: 66%
+            }
+
+            .preheader span:last-child {
+                width: 34%;
+                padding-left: 8px;
+                text-align: right
+            }
+
+            .brand {
+                padding: 11px !important;
+                font-size: 30px !important
+            }
+
+            .hero {
+                min-height: 0 !important;
+                padding: 18px 12px !important
+            }
+
+            .hero:after {
+                width: 48px !important;
+                height: 48px !important;
+                right: 12px !important;
+                top: 50% !important;
+                bottom: auto !important;
+                transform: translateY(-50%)
+            }
+
+            .hero h2 {
+                max-width: none !important;
+                padding-right: 52px;
+                font-size: 24px !important;
+                line-height: 1.1 !important;
+                margin-bottom: 9px !important
+            }
+
+            .hero p {
+                padding-right: 52px;
+                font-size: 13px !important;
+                line-height: 1.4
+            }
+
             .hero-line {
                 white-space: normal
             }
 
-            .hero h2 {
-                font-size: 26px !important
-            }
-
-            .hero {
-                padding: 24px 16px !important
-            }
-
             .content {
-                padding: 20px 12px !important
+                padding: 16px 10px !important;
+                font-size: 14px !important;
+                line-height: 1.5
+            }
+
+            .content h3 {
+                font-size: 19px !important;
+                line-height: 1.2;
+                margin-bottom: 14px
+            }
+
+            .details {
+                padding: 12px 8px;
+                margin: 14px 0;
+                grid-template-columns: 24px 1fr;
+                gap: 7px
+            }
+
+            .gifticon {
+                font-size: 19px
+            }
+
+            .details h4 {
+                font-size: 16px;
+                margin-bottom: 6px
             }
 
             .details dl {
-                grid-template-columns: 1fr !important
+                grid-template-columns: 1fr !important;
+                font-size: 13px;
+                gap: 0
             }
 
             .details dt {
@@ -317,6 +399,26 @@
 
             .details dd {
                 padding-bottom: 2px
+            }
+
+            .note {
+                padding: 11px;
+                margin: 14px 0
+            }
+
+            .footer {
+                padding: 13px 10px;
+                font-size: 8px
+            }
+
+            .footer strong {
+                font-size: 19px
+            }
+
+            .fine {
+                padding: 11px 8px;
+                font-size: 9px;
+                line-height: 1.45
             }
         }
 
@@ -353,20 +455,20 @@
     </header>
     <main class="wrap">
         <section id="buyer">
-            <div class="label">Email 1 · Sent to the buyer</div>
+            <div class="label">Email 1 � Sent to the buyer</div>
             <article class="email">
-                <div class="preheader"><span>Your Kroo+ gift is ready to make someone’s day 🎁</span><span>Gift confirmation</span></div>
+                <div class="preheader"><span>Your Kroo+ gift is ready to make someone�s day ??</span><span>Gift confirmation</span></div>
                 <div class="brand" role="img" aria-label="Kroo logo">kroo</div>
                 <div class="hero">
                     <h2><span class="hero-line">A gift that goes</span><br>places.</h2>
-                    <p>You’ve gifted someone a world of possibilities with Kroo+.</p>
+                    <p>You�ve gifted someone a world of possibilities with Kroo+.</p>
                 </div>
                 <div class="content">
                     <h3>Gift purchase confirmed!</h3>
                     <p>Hi Robert,</p>
-                    <p>Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.</p>
+                    <p>Thanks for gifting Kroo+! You�ve given someone a little more freedom to explore, travel, and make unforgettable memories.</p>
                     <div class="details">
-                        <div class="gifticon">♧</div>
+                        <div class="gifticon">?</div>
                         <div>
                             <h4>Your Kroo+ gift</h4>
                             <dl>
@@ -381,30 +483,30 @@
                             </dl>
                         </div>
                     </div>
-                    <div class="note">➤ &nbsp; We’ll send your Kroo+ gift to <strong>sarah.johnson@example.com</strong>, so they can discover all the perks waiting for them.</div>
+                    <div class="note">? &nbsp; We�ll send your Kroo+ gift to <strong>sarah.johnson@example.com</strong>, so they can discover all the perks waiting for them.</div>
                     <p><strong>Your personal note:</strong></p>
                     <div class="note">Thought of you and all our future trips together - go add your first stamp!</div>
                     <p class="signoff">Thanks for spreading the joy of travel with Kroo.</p>
                     <p class="signoff">Happy travels,<br><strong>The Kroo Team</strong></p>
                 </div>
-                <div class="footer"><strong aria-label="Kroo logo">kroo</strong><span>Collect The World With Kroo.</span><span>◎ &nbsp; 𝕏 &nbsp; f</span></div>
-                <div class="fine">You’re receiving this email because you purchased a Kroo+ gift.<br>© 2026 Kroo. All rights reserved.</div>
+                <div class="footer"><strong aria-label="Kroo logo">kroo</strong><span>Collect The World With Kroo.</span><span>? &nbsp; ?? &nbsp; f</span></div>
+                <div class="fine">You�re receiving this email because you purchased a Kroo+ gift.<br>� 2026 Kroo. All rights reserved.</div>
             </article>
         </section>
         <section id="recipient">
-            <div class="label">Email 2 · Sent to the recipient</div>
+            <div class="label">Email 2 � Sent to the recipient</div>
             <article class="email">
-                <div class="preheader"><span>You’ve been gifted Kroo+! 🎉</span><span>Your gift awaits</span></div>
+                <div class="preheader"><span>You�ve been gifted Kroo+! ??</span><span>Your gift awaits</span></div>
                 <div class="brand" role="img" aria-label="Kroo logo">kroo</div>
                 <div class="hero" style="background:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%)">
                     <h2><span class="hero-line">Your next adventure</span><br>starts here.</h2>
-                    <p>You’ve been gifted Kroo+!</p>
+                    <p>You�ve been gifted Kroo+!</p>
                 </div>
                 <div class="content">
                     <p>Hi Sarah,</p>
-                    <p><strong>Robert just gifted you Kroo+! 🎁</strong><br>This means more ways to explore, travel, and experience the world — with exclusive perks, rewards, and more.</p>
+                    <p><strong>Robert just gifted you Kroo+! ??</strong><br>This means more ways to explore, travel, and experience the world � with exclusive perks, rewards, and more.</p>
                     <div class="details">
-                        <div class="gifticon">♧</div>
+                        <div class="gifticon">?</div>
                         <div>
                             <h4>Your Kroo+ gift</h4>
                             <dl>
@@ -421,11 +523,11 @@
                         on the + page.</p>
                     <p><strong>A message from Robert:</strong></p>
                     <div class="note">Thought of you and all our future trips together - go add your first stamp!</div>
-                    <p>Welcome to Kroo+.<br>We can’t wait to see where you go!</p>
+                    <p>Welcome to Kroo+.<br>We can�t wait to see where you go!</p>
                     <p>The Kroo Team</p>
                 </div>
-                <div class="footer"><strong aria-label="Kroo logo">kroo</strong><span>Collect The World With Kroo.</span><span>◎ &nbsp; 𝕏 &nbsp; f</span></div>
-                <div class="fine">You’re receiving this email because someone gifted you Kroo+.<br>© 2026 Kroo. All rights reserved.</div>
+                <div class="footer"><strong aria-label="Kroo logo">kroo</strong><span>Collect The World With Kroo.</span><span>? &nbsp; ?? &nbsp; f</span></div>
+                <div class="fine">You�re receiving this email because someone gifted you Kroo+.<br>� 2026 Kroo. All rights reserved.</div>
             </article>
         </section>
     </main>
