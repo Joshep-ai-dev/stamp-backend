@@ -14,7 +14,7 @@ class MembershipGift extends Model
     {
         return [
             'baseline_transactions' => 'array', 'encrypted_code' => 'encrypted',
-            'paid_at' => 'immutable_datetime', 'email_sent_at' => 'immutable_datetime',
+            'buyer_email_sent_at' => 'immutable_datetime', 'paid_at' => 'immutable_datetime', 'email_sent_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime', 'redeemed_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
         ];

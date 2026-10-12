@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\MembershipGiftMail;
 use App\Models\MembershipGift;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -93,22 +94,18 @@ class MembershipGifts
     {
         Cache::lock('gift-mail:'.$gift->id, 120)->get(function () use ($gift): void {
             $gift->refresh();
-            if (! $gift->paid_at || $gift->email_sent_at || ! $gift->encrypted_code) {
+            if (! $gift->paid_at || $gift->cancelled_at || ! $gift->encrypted_code) {
                 return;
             }
             $buyer = User::findOrFail($gift->buyer_id);
-            $sender = $buyer->name;
-            $message = $sender." sent you one prepaid year of Kroo+!\n\n";
-            if ($gift->message) {
-                $message .= $gift->message."\n\n";
+            if (! $gift->email_sent_at) {
+                Mail::to($gift->recipient_email)->send(new MembershipGiftMail($gift, $buyer->name));
+                $gift->forceFill(['email_sent_at' => now()])->save();
             }
-            $message .= 'Your one-use gift code: '.$gift->encrypted_code."\n\n"
-                ."New to Kroo? Enter your name and this gift code on the welcome page. Your account and one year of Kroo+ will activate together.\n\n"
-                ."Already a member? Sign into Kroo, open the + page, enter this code in the gift-code field, and tap Redeem gift.\n\n"
-                ."Your year starts when you redeem the code. No payment or recurring subscription is needed.\n\n"
-                .'Keep this gift code private. It can only be redeemed once.';
-            Mail::raw($message, fn ($mail) => $mail->to($gift->recipient_email)->subject('You received a year of Kroo+!'));
-            $gift->forceFill(['email_sent_at' => now()])->save();
+            if (! $gift->buyer_email_sent_at && filled($buyer->email)) {
+                Mail::to($buyer->email)->send(new MembershipGiftMail($gift, $buyer->name, true));
+                $gift->forceFill(['buyer_email_sent_at' => now()])->save();
+            }
         });
     }
 
@@ -143,7 +140,8 @@ class MembershipGifts
                 }
             });
         // Verified gifts are retried regardless of their age.
-        MembershipGift::whereNotNull('paid_at')->whereNull('email_sent_at')->each(function ($gift): void {
+        MembershipGift::whereNotNull('paid_at')->whereNull('cancelled_at')
+            ->where(fn ($query) => $query->whereNull('email_sent_at')->orWhereNull('buyer_email_sent_at'))->each(function ($gift): void {
             try {
                 $this->send($gift);
             } catch (\Throwable $error) {

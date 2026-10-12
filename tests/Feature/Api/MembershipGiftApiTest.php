@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Mail\MembershipGiftMail;
 use App\Models\MembershipGift;
 use App\Models\User;
 use App\Services\MembershipGifts;
@@ -40,7 +41,7 @@ class MembershipGiftApiTest extends TestCase
     public function test_verified_gift_sends_note_and_one_code_without_upgrading_buyer(): void
     {
         $this->travelTo(now()->startOfSecond());
-        Mail::shouldReceive('raw')->once()->withArgs(fn ($body, $callback) => str_contains($body, 'Happy travels!') && str_contains($body, 'one-use gift code:'));
+        Mail::fake();
         $this->subscriber();
         $buyer = User::factory()->create();
         $id = $this->draft($buyer);
@@ -48,10 +49,19 @@ class MembershipGiftApiTest extends TestCase
         $this->postJson('/api/v1/me/membership-gifts/'.$id.'/verify')->assertOk()->assertJsonPath('status', 'paid')->assertJsonPath('emailSent', true);
         $gift = MembershipGift::findOrFail($id);
         $code = $gift->encrypted_code;
+        Mail::assertSent(MembershipGiftMail::class, fn ($mail) => $mail->hasTo('friend@example.com') && ! $mail->isBuyer);
+        Mail::assertSent(MembershipGiftMail::class, fn ($mail) => $mail->hasTo($buyer->email) && $mail->isBuyer);
+        $recipientHtml = (new MembershipGiftMail($gift, '<b>Sender</b>'))->render();
+        $this->assertStringContainsString('Happy travels!', $recipientHtml);
+        $this->assertStringContainsString($code, $recipientHtml);
+        $this->assertStringContainsString('&lt;b&gt;Sender&lt;/b&gt;', $recipientHtml);
+        $this->assertStringNotContainsString($code, (new MembershipGiftMail($gift, $buyer->name, true))->render());
+        $this->assertNotNull($gift->buyer_email_sent_at);
         $this->assertSame('free', $buyer->fresh()->plan);
         $this->assertNull($gift->expires_at);
         $this->postJson('/api/v1/me/membership-gifts/'.$id.'/verify')->assertOk();
         $this->assertSame($code, $gift->fresh()->encrypted_code);
+        Mail::assertSentCount(2);
 
         $recipient = User::factory()->create();
         Sanctum::actingAs($recipient);
@@ -70,6 +80,24 @@ class MembershipGiftApiTest extends TestCase
         $this->assertSame('free', $recipient->fresh()->plan);
         $this->getJson('/api/v1/me/subscription')->assertOk()->assertJsonPath('isKrooPlus', false);
     }
+    public function test_buyer_confirmation_retries_without_resending_recipient_code(): void
+    {
+        Mail::fake();
+        $buyer = User::factory()->create();
+        $gift = MembershipGift::create([
+            'buyer_id' => $buyer->id, 'recipient_email' => 'friend@example.com',
+            'product_id' => 'gift.year', 'baseline_transactions' => [],
+            'paid_at' => now(), 'email_sent_at' => now(),
+            'encrypted_code' => 'PRIVATE-GIFT-CODE',
+        ]);
+        app(MembershipGifts::class)->deliverPending();
+        Mail::assertSent(MembershipGiftMail::class, fn ($mail) => $mail->isBuyer && $mail->hasTo($buyer->email));
+        Mail::assertSentCount(1);
+        $this->assertNotNull($gift->fresh()->buyer_email_sent_at);
+        app(MembershipGifts::class)->deliverPending();
+        Mail::assertSentCount(1);
+    }
+
     public function test_unverified_and_old_payments_do_not_issue_a_code(): void
     {
         $this->subscriber([$this->purchase(['purchase_date' => now()->subDay()->toIso8601String()])]);
@@ -90,7 +118,7 @@ class MembershipGiftApiTest extends TestCase
     }
     public function test_scheduler_recovers_payment_without_client_confirmation(): void
     {
-        Mail::shouldReceive('raw')->once();
+        Mail::fake();
         $this->subscriber();
         $id = $this->draft(User::factory()->create());
         $this->subscriber([$this->purchase()]);
