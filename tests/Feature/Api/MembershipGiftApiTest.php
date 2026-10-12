@@ -94,7 +94,8 @@ class MembershipGiftApiTest extends TestCase
         ]);
         $buyerHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
         $recipientHtml = (new MembershipGiftMail($gift, 'Robert'))->render();
-        $this->assertStringContainsString('Recipient:</strong> friend@example.com', $buyerHtml);
+        $this->assertStringContainsString('Recipient:</td><td class="gift-value" valign="top"', $buyerHtml);
+        $this->assertStringContainsString('friend@example.com</td>', $buyerHtml);
         $this->assertStringContainsString('&#10148;', $buyerHtml);
         $this->assertStringContainsString('Collect The World With Kroo.', $buyerHtml);
         $this->assertStringContainsString('aria-label="Instagram"', $buyerHtml);
@@ -107,15 +108,20 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringNotContainsString('&#9992;', $html);
             $this->assertStringContainsString('&#9831;', $html);
             $this->assertStringContainsString('background:#f7faf8', $html);
-            $this->assertStringContainsString('font-size:32px;font-weight:700;line-height:1.1', $html);
+            $this->assertStringContainsString('@media only screen and (max-width:480px)', $html);
+            $this->assertStringContainsString('-webkit-text-size-adjust:100% !important', $html);
+            $this->assertStringContainsString('.gift-label, .gift-value { display:block !important;', $html);
+            $this->assertStringContainsString('font-size:32px!important;font-weight:700!important;letter-spacing:0!important;line-height:1.1!important', $html);
+            $this->assertStringContainsString('class="gift-label"', $html);
+            $this->assertStringContainsString('width="120" style="width:120px;', $html);
             $this->assertStringNotContainsString('&#128203;', $html);
         }
-        $this->assertStringContainsString('Gift code:</strong> <span style="font-family:monospace;font-weight:normal;', $recipientHtml);
+        $this->assertStringContainsString('Gift code:</td><td class="gift-value gift-code" valign="top"', $recipientHtml);
         $this->assertStringContainsString('Your next adventure</span><br>starts here.', $recipientHtml);
         $this->assertStringContainsString('A gift that goes</span><br>places.', $buyerHtml);
         $gift->recipient_email = 'new-friend@example.com';
         $fallbackHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
-        $this->assertStringContainsString('Recipient:</strong> new-friend@example.com', $fallbackHtml);
+        $this->assertStringContainsString('new-friend@example.com</td>', $fallbackHtml);
     }
 
     public function test_buyer_confirmation_retries_without_resending_recipient_code(): void

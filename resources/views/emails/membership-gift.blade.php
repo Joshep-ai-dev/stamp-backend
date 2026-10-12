@@ -1,50 +1,93 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kroo+ gift</title></head>
-<body style="margin:0;background:#f1f4f3;color:#173a32;font:15px/1.55 Arial,Helvetica,sans-serif;">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kroo+ gift</title>
+<style>
+html, body, table, td, p, a, h1, h2, h3 {
+    -webkit-text-size-adjust:100% !important;
+    -ms-text-size-adjust:100% !important;
+}
+table { border-collapse:collapse; }
+@media only screen and (max-width:480px) {
+    .email-outer { padding:8px 3px !important; }
+    .email-shell { border-radius:8px !important; }
+    .preheader { padding:8px 12px !important; }
+    .preheader-left, .preheader-right { font-size:10px !important; line-height:1.35 !important; }
+    .preheader-left { width:66% !important; }
+    .preheader-right { width:34% !important; padding-left:8px !important; }
+    .brand-cell { padding:14px !important; font-size:32px !important; }
+    .hero-cell { padding:24px 16px !important; }
+    .hero-copy { width:82% !important; }
+    .hero-plane { width:18% !important; padding-left:2px !important; }
+    .hero-plane img { max-width:70px !important; }
+    .hero-title { font-size:26px !important; line-height:1.12 !important; }
+    .hero-line { white-space:normal !important; }
+    .hero-subtitle { font-size:14px !important; line-height:1.45 !important; }
+    .content-cell { padding:20px 12px !important; font-size:15px !important; line-height:1.55 !important; }
+    .confirmation-title { font-size:21px !important; line-height:1.25 !important; }
+    .gift-icon { width:18px !important; padding:18px 0 14px 10px !important; font-size:21px !important; }
+    .gift-details { padding:15px 10px !important; }
+    .gift-label, .gift-value { display:block !important; width:auto !important; }
+    .gift-label { padding:7px 0 0 !important; }
+    .gift-value { padding:0 0 2px !important; overflow-wrap:anywhere !important; word-break:normal !important; }
+    .gift-code { word-break:break-all !important; }
+    .notice { padding:13px !important; }
+    .footer-cell { padding:16px 12px !important; }
+    .footer-logo { font-size:21px !important; }
+    .footer-tagline { font-size:9px !important; }
+    .footer-social { font-size:11px !important; }
+    .fine-print { padding:14px 10px !important; font-size:10px !important; line-height:1.5 !important; }
+}
+</style>
+</head>
+<body style="margin:0;background:#f1f4f3;color:#173a32;font:15px/1.55 Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 <div style="display:none;max-height:0;overflow:hidden;">{{ $isBuyer ? 'Your Kroo+ gift is ready to make someone’s day.' : 'You’ve been gifted one year of Kroo+!' }}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:28px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dce5e1;border-radius:12px;overflow:hidden;">
-<tr><td style="background:#f7faf8;padding:9px 18px;color:#526b62;font-size:11px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="email-outer" align="center" style="padding:28px 12px;">
+<table class="email-shell" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dce5e1;border-radius:12px;overflow:hidden;">
+<tr><td class="preheader" style="background:#f7faf8;padding:9px 18px;color:#526b62;font-size:11px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="font-size:11px;">{{ $isBuyer ? 'Your Kroo+ gift is ready to make someone’s day' : 'You’ve been gifted Kroo+!' }} <span aria-hidden="true">{!! $isBuyer ? '&#127873;' : '&#127881;' !!}</span></td>
-<td align="right" style="font-size:11px;padding-left:12px;">{{ $isBuyer ? 'Gift confirmation' : 'Your gift awaits' }}</td>
+<td class="preheader-left" style="width:70%;font-size:11px;line-height:1.4;">{{ $isBuyer ? 'Your Kroo+ gift is ready to make someone’s day' : 'You’ve been gifted Kroo+!' }} <span aria-hidden="true">{!! $isBuyer ? '&#127873;' : '&#127881;' !!}</span></td>
+<td class="preheader-right" align="right" style="width:30%;font-size:11px;line-height:1.4;padding-left:12px;">{{ $isBuyer ? 'Gift confirmation' : 'Your gift awaits' }}</td>
 </tr></table>
 </td></tr>
-<tr><td align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;">kroo</td></tr>
-<tr><td style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
+<tr><td class="brand-cell" align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;line-height:1.2;">kroo</td></tr>
+<tr><td class="hero-cell" style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td valign="middle" style="width:70%;">
-<h1 style="font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:700;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)<span style="white-space:nowrap;">A gift that goes</span><br>places.@else<span style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
-<p style="margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
+<td class="hero-copy" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;">
+<h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif!important;font-size:32px!important;font-weight:700!important;letter-spacing:0!important;line-height:1.1!important;margin:0 0 12px!important;">@if ($isBuyer)<span class="hero-line" style="white-space:nowrap;">A gift that goes</span><br>places.@else<span class="hero-line" style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
+<p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
-<td align="right" valign="middle" style="width:30%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
+<td class="hero-plane" align="right" valign="middle" style="width:28%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
 </tr></table>
 </td></tr>
-<tr><td style="padding:26px 28px;">
+<tr><td class="content-cell" style="padding:26px 28px;">
 @if ($isBuyer)
-<h2 style="text-align:center;font-size:23px;color:#042219;margin:0 0 20px;">Gift purchase confirmed!</h2>
+<h2 class="confirmation-title" style="text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:23px;line-height:1.25;color:#042219;margin:0 0 20px;">Gift purchase confirmed!</h2>
 <p>Hi {{ $sender }},</p>
 <p>Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.</p>
 @else
 <p>Hi there,</p>
 <p><strong>{{ $sender }} just gifted you Kroo+! <span aria-hidden="true">&#127873;</span></strong><br>This means more ways to explore, travel, and experience the world. — with exclusive perks, rewards, and more.</p>
 @endif
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td style="padding:18px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td class="gift-icon" valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td class="gift-details" style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
-<p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $gift->recipient_email : $sender }}</p>
-<p style="margin:6px 0;"><strong>Gift:</strong> Kroo+ 1 Year</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;">
+<tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</td><td class="gift-value" valign="top" style="padding:3px 0;overflow-wrap:anywhere;word-break:break-word;">{{ $isBuyer ? $gift->recipient_email : $sender }}</td></tr>
+<tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">Gift:</td><td class="gift-value" valign="top" style="padding:3px 0;">Kroo+ 1 Year</td></tr>
 @if (! $isBuyer)
-<p style="margin:6px 0;overflow-wrap:anywhere;"><strong>Gift code:</strong> <span style="font-family:monospace;font-weight:normal;user-select:all;-webkit-user-select:all;">{{ $gift->encrypted_code }}</span></p>
+<tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">Gift code:</td><td class="gift-value gift-code" valign="top" style="padding:3px 0;font-family:monospace;font-weight:normal;overflow-wrap:anywhere;word-break:break-all;user-select:all;-webkit-user-select:all;">{{ $gift->encrypted_code }}</td></tr>
 @endif
-@if ($isBuyer)<p style="margin:6px 0;"><strong>Purchase date:</strong> {{ $gift->paid_at->format('M j, Y') }}</p>@endif
+@if ($isBuyer)
+<tr><td class="gift-label" valign="top" width="120" style="width:120px;padding:3px 12px 3px 0;font-weight:700;">Purchase date:</td><td class="gift-value" valign="top" style="padding:3px 0;">{{ $gift->paid_at->format('M j, Y') }}</td></tr>
+@endif
+</table>
 </td></tr></table>
 @if (filled($gift->message))
 <p><strong>{{ $isBuyer ? 'Your personal note:' : 'A message from '.$sender.':' }}</strong></p>
 <p style="background:#f0f8f4;padding:15px;border-radius:8px;">{!! nl2br(e($gift->message)) !!}</p>
 @endif
 @if ($isBuyer)
-<p style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;"><span aria-hidden="true" style="color:#087f5b;font-size:17px;">&#10148;</span>&nbsp; We’ll send your Kroo+ gift to <strong>{{ $gift->recipient_email }}</strong>, so they can discover all the perks waiting for them.</p>
+<p class="notice" style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;"><span aria-hidden="true" style="color:#087f5b;font-size:17px;">&#10148;</span>&nbsp; We’ll send your Kroo+ gift to <strong>{{ $gift->recipient_email }}</strong>, so they can discover all the perks waiting for them.</p>
 <p style="text-align:center;">Thanks for spreading the joy of travel with Kroo.</p>
 <p style="text-align:center;">Happy travels,<br><strong>The Kroo Team</strong></p>
 @else
@@ -54,13 +97,13 @@
 <p>Welcome to Kroo+.<br>We can’t wait to see where you go!</p><p>The Kroo Team</p>
 @endif
 </td></tr>
-<tr><td style="background:#042219;color:#ffffff;padding:20px 22px;">
+<tr><td class="footer-cell" style="background:#042219;color:#ffffff;padding:20px 22px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td align="left" valign="middle" style="width:25%;"><strong aria-label="Kroo" style="font-size:24px;color:#ffffff;letter-spacing:-1px;">kroo</strong></td>
-<td align="center" valign="middle" style="width:50%;font-size:11px;color:#ffffff;">Collect The World With Kroo.</td>
-<td align="right" valign="middle" style="width:25%;font-size:12px;color:#ffffff;white-space:nowrap;"><span aria-label="Instagram">&#9678;</span>&nbsp;&nbsp; <span aria-label="X">&#120143;</span>&nbsp;&nbsp; <span aria-label="Facebook">f</span></td>
+<td align="left" valign="middle" style="width:25%;"><strong class="footer-logo" aria-label="Kroo" style="font-size:24px;color:#ffffff;letter-spacing:-1px;">kroo</strong></td>
+<td class="footer-tagline" align="center" valign="middle" style="width:50%;font-size:11px;color:#ffffff;">Collect The World With Kroo.</td>
+<td class="footer-social" align="right" valign="middle" style="width:25%;font-size:12px;color:#ffffff;white-space:nowrap;"><span aria-label="Instagram">&#9678;</span>&nbsp;&nbsp; <span aria-label="X">&#120143;</span>&nbsp;&nbsp; <span aria-label="Facebook">f</span></td>
 </tr></table>
 </td></tr>
-<tr><td style="font-size:11px;color:#71847c;text-align:center;padding:16px;">You’re receiving this email because {{ $isBuyer ? 'you purchased a Kroo+ gift.' : 'someone gifted you Kroo+.' }}<br>&copy; {{ now()->year }} Kroo. All rights reserved.</td></tr>
+<tr><td class="fine-print" style="font-size:11px;line-height:1.5;color:#71847c;text-align:center;padding:16px;">You’re receiving this email because {{ $isBuyer ? 'you purchased a Kroo+ gift.' : 'someone gifted you Kroo+.' }}<br>&copy; {{ now()->year }} Kroo. All rights reserved.</td></tr>
 </table></td></tr></table>
 </body></html>
