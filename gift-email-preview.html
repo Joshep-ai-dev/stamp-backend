@@ -328,8 +328,10 @@
             }
 
             .hero {
-                min-height: 120px !important;
-                padding: 16px 84px 14px 14px !important
+                min-height: 176px !important;
+                padding: 12px !important;
+                display: block !important;
+                position: relative !important
             }
 
             .hero:after {
@@ -342,18 +344,24 @@
             }
 
             .hero h2 {
-                max-width: none !important;
+                width: 72% !important;
+                max-width: 72% !important;
                 padding: 0;
-                font-size: 18px !important;
+                font-size: 21px !important;
                 line-height: 1.08 !important;
-                margin-bottom: 8px !important
+                margin: 0 0 8px !important;
+                position: relative;
+                z-index: 1
             }
 
             .hero p {
+                width: 72%;
                 padding: 0;
-                font-size: 11px !important;
+                font-size: 13px !important;
                 line-height: 1.35;
-                max-width: 220px
+                max-width: 72%;
+                position: relative;
+                z-index: 1
             }
 
             .hero-line {

@@ -16,15 +16,16 @@ table { border-collapse:collapse; }
     .preheader-left { width:66% !important; }
     .preheader-right { width:34% !important; padding-left:8px !important; }
     .brand-cell { padding:9px !important; font-size:27px !important; }
-    .hero-cell { padding:0 !important; position:relative !important; overflow:hidden !important; }
-    .hero-layout { display:block !important; position:relative !important; min-height:120px !important; }
-    .hero-layout tbody, .hero-layout tr { display:block !important; }
-    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; min-height:120px !important; padding:16px 84px 14px 14px !important; position:relative !important; z-index:2 !important; }
-    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:4px !important; width:108px !important; padding:0 !important; transform:translateY(-50%) !important; z-index:1 !important; }
-    .hero-plane img { width:108px !important; max-width:108px !important; height:auto !important; }
-    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-cell { padding:8px 12px !important; position:relative !important; overflow:hidden !important; }
+    .hero-layout { display:table !important; width:100% !important; table-layout:fixed !important; height:152px !important; }
+    .hero-layout tbody { display:table-row-group !important; }
+    .hero-layout tr { display:table-row !important; }
+    .hero-copy { display:table-cell !important; box-sizing:border-box !important; width:72% !important; padding:0 4px 0 2px !important; vertical-align:middle !important; position:relative !important; z-index:2 !important; }
+    .hero-plane { display:table-cell !important; position:relative !important; width:28% !important; padding:0 !important; vertical-align:middle !important; }
+    .hero-plane img { position:absolute !important; top:50% !important; right:0 !important; width:108px !important; max-width:118px !important; height:auto !important; transform:translateY(-50%) !important; }
+    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:21px !important; line-height:1.08 !important; margin-bottom:8px !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { font-family:Arial,Helvetica,sans-serif !important; font-size:11px !important; line-height:1.35 !important; }
+    .hero-subtitle { font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; }
     .hero-copy, .hero-title, .hero-subtitle { text-align:left !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
     .content-cell p { margin:0 0 10px !important; }

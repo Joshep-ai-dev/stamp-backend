@@ -111,12 +111,12 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringContainsString('@media only screen and (max-width:480px)', $html);
             $this->assertStringContainsString('-webkit-text-size-adjust:100% !important', $html);
             $this->assertStringContainsString('.gift-label, .gift-value { display:block !important;', $html);
-            $this->assertStringContainsString('.hero-plane { display:block !important; position:absolute !important;', $html);
+            $this->assertStringContainsString('.hero-plane img { position:absolute !important;', $html);
             $this->assertStringContainsString('.email-outer { padding:0 !important;', $html);
-            $this->assertStringContainsString('.hero-title { font-size:18px !important;', $html);
+            $this->assertStringContainsString('.hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:21px !important;', $html);
             $this->assertStringContainsString('width:108px !important;', $html);
             $this->assertStringContainsString('padding:10px 8px 10px 2px !important;', $html);
-            $this->assertStringContainsString('min-height:120px !important;', $html);
+            $this->assertStringContainsString('height:152px !important;', $html);
             $this->assertStringContainsString('.content-cell { padding:14px 10px !important; font-size:12px !important;', $html);
             $this->assertStringContainsString('font-size:32px;font-weight:700;letter-spacing:0;line-height:1.1;', $html);
             $this->assertStringContainsString('class="gift-label"', $html);
