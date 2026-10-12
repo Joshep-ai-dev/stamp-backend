@@ -94,8 +94,10 @@ class MembershipGiftApiTest extends TestCase
         ]);
         $buyerHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
         $recipientHtml = (new MembershipGiftMail($gift, 'Robert'))->render();
-        $this->assertStringContainsString('Recipient:</strong> Sarah', $buyerHtml);
-        $this->assertStringNotContainsString('friend@example.com', $buyerHtml);
+        $this->assertStringContainsString('Recipient:</strong> friend@example.com', $buyerHtml);
+        $this->assertStringContainsString('&#10148;', $buyerHtml);
+        $this->assertStringContainsString('Collect The World With Kroo.', $buyerHtml);
+        $this->assertStringContainsString('aria-label="Instagram"', $buyerHtml);
         $this->assertStringContainsString('Your personal note:', $buyerHtml);
         foreach ([$buyerHtml, $recipientHtml] as $html) {
             $this->assertStringContainsString('Safe &lt;note&gt;<br', $html);
@@ -110,8 +112,7 @@ class MembershipGiftApiTest extends TestCase
         $this->assertStringContainsString('Gift code:</strong> <span style="font-family:monospace;font-weight:normal;', $recipientHtml);
         $gift->recipient_email = 'new-friend@example.com';
         $fallbackHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
-        $this->assertStringContainsString('Recipient:</strong> your friend', $fallbackHtml);
-        $this->assertStringNotContainsString('new-friend@example.com', $fallbackHtml);
+        $this->assertStringContainsString('Recipient:</strong> new-friend@example.com', $fallbackHtml);
     }
 
     public function test_buyer_confirmation_retries_without_resending_recipient_code(): void

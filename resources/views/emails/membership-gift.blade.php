@@ -12,7 +12,7 @@
 </tr></table>
 </td></tr>
 <tr><td align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;">kroo</td></tr>
-<tr><td style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43,#0d8274,#82b7a5);color:#ffffff;">
+<tr><td style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td valign="middle" style="width:70%;">
 <h1 style="font-size:32px;line-height:1.1;margin:0 0 12px;">{{ $isBuyer ? 'A gift that goes places.' : 'Your next adventure starts here.' }}</h1>
@@ -32,7 +32,7 @@
 @endif
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
-<p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $recipientName : $sender }}</p>
+<p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $gift->recipient_email : $sender }}</p>
 <p style="margin:6px 0;"><strong>Gift:</strong> Kroo+ 1 Year</p>
 @if (! $isBuyer)
 <p style="margin:6px 0;overflow-wrap:anywhere;"><strong>Gift code:</strong> <span style="font-family:monospace;font-weight:normal;user-select:all;-webkit-user-select:all;">{{ $gift->encrypted_code }}</span></p>
@@ -44,7 +44,7 @@
 <p style="background:#f0f8f4;padding:15px;border-radius:8px;">{!! nl2br(e($gift->message)) !!}</p>
 @endif
 @if ($isBuyer)
-<p style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;">We’ve sent your Kroo+ gift to <strong>{{ $recipientName }}</strong>, so they can discover all the perks waiting for them.</p>
+<p style="background:#f0f8f4;padding:15px;border-radius:8px;color:#176248;"><span aria-hidden="true" style="color:#087f5b;font-size:17px;">&#10148;</span>&nbsp; We’ll send your Kroo+ gift to <strong>{{ $gift->recipient_email }}</strong>, so they can discover all the perks waiting for them.</p>
 <p style="text-align:center;">Thanks for spreading the joy of travel with Kroo.</p>
 <p style="text-align:center;">Happy travels,<br><strong>The Kroo Team</strong></p>
 @else
@@ -54,7 +54,13 @@
 <p>Welcome to Kroo+.<br>We can’t wait to see where you go!</p><p>The Kroo Team</p>
 @endif
 </td></tr>
-<tr><td style="background:#042219;color:#dcece5;padding:18px 22px;text-align:center;"><strong style="font-size:24px;color:#ffffff;letter-spacing:-1px;">kroo</strong><br>Collect The World With Kroo.</td></tr>
+<tr><td style="background:#042219;color:#ffffff;padding:20px 22px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td align="left" valign="middle" style="width:25%;"><strong aria-label="Kroo" style="font-size:24px;color:#ffffff;letter-spacing:-1px;">kroo</strong></td>
+<td align="center" valign="middle" style="width:50%;font-size:11px;color:#ffffff;">Collect The World With Kroo.</td>
+<td align="right" valign="middle" style="width:25%;font-size:12px;color:#ffffff;white-space:nowrap;"><span aria-label="Instagram">&#9678;</span>&nbsp;&nbsp; <span aria-label="X">&#120143;</span>&nbsp;&nbsp; <span aria-label="Facebook">f</span></td>
+</tr></table>
+</td></tr>
 <tr><td style="font-size:11px;color:#71847c;text-align:center;padding:16px;">You’re receiving this email because {{ $isBuyer ? 'you purchased a Kroo+ gift.' : 'someone gifted you Kroo+.' }}<br>&copy; {{ now()->year }} Kroo. All rights reserved.</td></tr>
 </table></td></tr></table>
 </body></html>
