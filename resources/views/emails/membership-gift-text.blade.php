@@ -5,7 +5,6 @@ Hi {{ $sender }},
 Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.
 Recipient: {{ $gift->recipient_email }}
 Gift: Kroo+ 1 Year
-Gift reference: {{ $gift->id }}
 Purchase date: {{ $gift->paid_at->format('M j, Y') }}
 We’ve sent your Kroo+ gift to {{ $gift->recipient_email }}.
 
@@ -14,14 +13,13 @@ Thanks for spreading the joy of travel with Kroo.
 Hi there,
 {{ $sender }} just gifted you Kroo+!
 Gift: Kroo+ 1 Year
-Gift reference: {{ $gift->id }}
 @if (filled($gift->message))
 
 A message from {{ $sender }}:
 {{ $gift->message }}
 @endif
 
-Your one-use gift code: {{ $gift->encrypted_code }}
+Gift code (one-time use): {{ $gift->encrypted_code }}
 
 New to Kroo? Enter your name and this gift code on the welcome page. Your account and one year of Kroo+ will activate together.
 Already a member? Sign into Kroo, open the + page, enter this code in the gift-code field, and tap Redeem gift.

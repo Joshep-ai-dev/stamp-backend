@@ -54,6 +54,9 @@ class MembershipGiftApiTest extends TestCase
         $recipientHtml = (new MembershipGiftMail($gift, '<b>Sender</b>'))->render();
         $this->assertStringContainsString('Happy travels!', $recipientHtml);
         $this->assertStringContainsString($code, $recipientHtml);
+        $this->assertStringContainsString('Gift code:', $recipientHtml);
+        $this->assertStringNotContainsString('Gift reference:', $recipientHtml);
+        $this->assertStringNotContainsString('Activate Your Gift', $recipientHtml);
         $this->assertStringContainsString('&lt;b&gt;Sender&lt;/b&gt;', $recipientHtml);
         $this->assertStringNotContainsString($code, (new MembershipGiftMail($gift, $buyer->name, true))->render());
         $this->assertNotNull($gift->buyer_email_sent_at);
