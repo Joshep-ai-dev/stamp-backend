@@ -107,9 +107,12 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringNotContainsString('&#9992;', $html);
             $this->assertStringContainsString('&#9831;', $html);
             $this->assertStringContainsString('background:#f7faf8', $html);
+            $this->assertStringContainsString('font-size:32px;font-weight:700;line-height:1.1', $html);
             $this->assertStringNotContainsString('&#128203;', $html);
         }
         $this->assertStringContainsString('Gift code:</strong> <span style="font-family:monospace;font-weight:normal;', $recipientHtml);
+        $this->assertStringContainsString('Your next adventure</span><br>starts here.', $recipientHtml);
+        $this->assertStringContainsString('A gift that goes</span><br>places.', $buyerHtml);
         $gift->recipient_email = 'new-friend@example.com';
         $fallbackHtml = (new MembershipGiftMail($gift, 'Robert', true))->render();
         $this->assertStringContainsString('Recipient:</strong> new-friend@example.com', $fallbackHtml);

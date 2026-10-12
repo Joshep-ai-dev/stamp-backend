@@ -15,7 +15,7 @@
 <tr><td style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td valign="middle" style="width:70%;">
-<h1 style="font-size:32px;line-height:1.1;margin:0 0 12px;">{{ $isBuyer ? 'A gift that goes places.' : 'Your next adventure starts here.' }}</h1>
+<h1 style="font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:700;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)<span style="white-space:nowrap;">A gift that goes</span><br>places.@else<span style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
 <p style="margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
 <td align="right" valign="middle" style="width:30%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
@@ -28,7 +28,7 @@
 <p>Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.</p>
 @else
 <p>Hi there,</p>
-<p><strong>{{ $sender }} just gifted you Kroo+! <span aria-hidden="true">&#127873;</span></strong><br>This means more ways to explore, travel, and experience the world.</p>
+<p><strong>{{ $sender }} just gifted you Kroo+! <span aria-hidden="true">&#127873;</span></strong><br>This means more ways to explore, travel, and experience the world. — with exclusive perks, rewards, and more.</p>
 @endif
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
