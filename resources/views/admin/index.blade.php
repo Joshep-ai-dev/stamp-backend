@@ -297,6 +297,11 @@
     .collection-sight-result { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:10px 12px; text-align:left; border:1px solid var(--line); border-radius:8px; background:#061f18; color:var(--ink) }
     .collection-sight-result:hover, .collection-sight-result:focus-visible { border-color:var(--accent); background:#164334 }
     .collection-sight-result span { color:var(--muted); font-size:12px }
+    .collection-sight-selected { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--accent); border-radius:8px; background:#0a2a21 }
+    .collection-sight-selected[hidden] { display:none }
+    .collection-sight-selected strong, .collection-sight-selected span { display:block }
+    .collection-sight-selected span { margin-top:3px; color:var(--muted); font-size:12px }
+    .collection-sight-selected button { flex:0 0 auto }
     .collection-id-field { opacity:.8 }
 
     .wide {
@@ -1260,11 +1265,19 @@
       const list = document.querySelector('#collection-sight-options');
       if (list) list.innerHTML = (state.meta.sightOptions || []).map(sight => `<button type="button" class="collection-sight-result" onclick="chooseCollectionSight('${esc(sight.id)}')"><strong>${esc(sight.name)}</strong><span>${esc(sight.location || '')}</span></button>`).join('');
     }
+    function renderSelectedCollectionSight(sight) {
+      const selected = document.querySelector('#collection-sight-selected');
+      if (!selected) return;
+      selected.querySelector('[data-selected-name]').textContent = sight?.name || '';
+      selected.querySelector('[data-selected-location]').textContent = sight?.location || '';
+      selected.hidden = !sight;
+    }
     function searchCollectionSights(value) {
       const id = form.elements.sightId;
       if (id) id.value = '';
       const results = document.querySelector('#collection-sight-options');
       if (results) results.replaceChildren();
+      renderSelectedCollectionSight(null);
       form.dataset.collectionItemMode = 'sight';
       updateCollectionItemMode();
       clearTimeout(sightSearchTimer);
@@ -1279,23 +1292,42 @@
     function selectCollectionSight(input) {
       const selected = state.meta.sightOptions?.find(sight => sight.label === input.value);
       form.elements.sightId.value = selected?.id || '';
-      if (selected) setCollectionItemMode('sight');
+      if (selected) {
+        renderSelectedCollectionSight(selected);
+        setCollectionItemMode('sight');
+      }
       else updateCollectionItemMode();
     }
     function chooseCollectionSight(id) {
       const selected = state.meta.sightOptions?.find(sight => String(sight.id) === String(id));
       if (!selected) return;
       form.elements.sightId.value = selected.id;
-      form.elements.sightSearch.value = selected.label;
+      form.elements.sightSearch.value = '';
+      renderSelectedCollectionSight(selected);
       setCollectionItemMode('sight');
       const results = document.querySelector('#collection-sight-options');
       if (results) results.replaceChildren();
+    }
+    function clearCollectionSightSelection() {
+      form.elements.sightId.value = '';
+      form.elements.sightSearch.value = '';
+      renderSelectedCollectionSight(null);
+      const results = document.querySelector('#collection-sight-options');
+      if (results) results.replaceChildren();
+      updateCollectionItemMode();
+    }
+    function changeCollectionSight() {
+      form.elements.sightId.value = '';
+      renderSelectedCollectionSight(null);
+      form.elements.sightSearch.value = '';
+      form.elements.sightSearch.focus();
+      updateCollectionItemMode();
     }
     function setupCollectionItemEditor() {
       const linked = Boolean(form.elements.sightId?.value);
       const choice = document.createElement('section');
       choice.className = 'field wide collection-item-choice';
-      choice.innerHTML = `<div><strong>What would you like to add?</strong><small>Choose an existing sight or create a custom place.</small></div><div class="collection-item-modes" role="group" aria-label="Collection item type"><button type="button" data-item-mode="sight" onclick="setCollectionItemMode('sight')">Top sight</button><button type="button" data-item-mode="custom" onclick="setCollectionItemMode('custom')">Custom place</button></div>`;
+      choice.innerHTML = `<div><strong>What would you like to add?</strong><small>Choose an existing sight or create a custom place.</small></div><div class="collection-item-modes" role="group" aria-label="Collection item type"><button type="button" data-item-mode="sight" onclick="setCollectionItemMode('sight')">Top sight</button><button type="button" data-item-mode="custom" onclick="clearCollectionSightSelection(); setCollectionItemMode('custom')">Custom place</button></div>`;
       const kinds = form.elements.collectionKindIds.closest('.field');
       kinds.after(choice);
       const sightField = form.elements.sightSearch.closest('.field');
@@ -1303,6 +1335,17 @@
       sightField.querySelector('label').textContent = 'Find a Top sight';
       const help = sightField.querySelector('.collection-sight-help');
       if (help) help.textContent = 'Search by sight name, city, or country, then select a result.';
+      const selected = document.createElement('div');
+      selected.id = 'collection-sight-selected';
+      selected.className = 'collection-sight-selected';
+      selected.hidden = true;
+      selected.innerHTML = '<div><strong data-selected-name></strong><span data-selected-location></span></div><button type="button" onclick="changeCollectionSight()">Change</button>';
+      sightField.querySelector('#collection-sight-options').before(selected);
+      const sightId = form.elements.sightId.value;
+      if (sightId) {
+        const selectedSight = state.meta.sightOptions?.find(sight => String(sight.id) === String(sightId));
+        if (selectedSight) renderSelectedCollectionSight(selectedSight);
+      }
       for (const key of ['title', 'countryId', 'state', 'cityId', 'location', 'imageUrl', 'detail']) {
         form.elements[key]?.closest('.field')?.classList.add('collection-custom-field');
       }
@@ -1323,6 +1366,8 @@
       const sightField = form.elements.sightSearch?.closest('.field');
       if (sightField) sightField.hidden = !sightMode;
       if (form.elements.sightSearch) form.elements.sightSearch.disabled = !sightMode;
+      const selectedSight = document.querySelector('#collection-sight-selected');
+      if (selectedSight) selectedSight.hidden = !linked;
       fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = sightMode);
       const choice = fields.querySelector('.collection-item-choice');
       choice?.querySelectorAll('[data-item-mode]').forEach(button => {
