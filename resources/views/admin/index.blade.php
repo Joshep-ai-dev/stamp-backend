@@ -1314,7 +1314,7 @@
       renderSelectedCollectionSight(null);
       const results = document.querySelector('#collection-sight-options');
       if (results) results.replaceChildren();
-      updateCollectionItemMode();
+      clearTimeout(sightSearchTimer);
     }
     function changeCollectionSight() {
       form.elements.sightId.value = '';
@@ -1323,11 +1323,17 @@
       form.elements.sightSearch.focus();
       updateCollectionItemMode();
     }
+    function chooseCollectionItemMode(mode) {
+      clearCollectionSightSelection();
+      form.dataset.collectionItemMode = mode;
+      updateCollectionItemMode();
+      if (mode === 'sight') form.elements.sightSearch?.focus();
+    }
     function setupCollectionItemEditor() {
       const linked = Boolean(form.elements.sightId?.value);
       const choice = document.createElement('section');
       choice.className = 'field wide collection-item-choice';
-      choice.innerHTML = `<div><strong>What would you like to add?</strong><small>Choose an existing sight or create a custom place.</small></div><div class="collection-item-modes" role="group" aria-label="Collection item type"><button type="button" data-item-mode="sight" onclick="setCollectionItemMode('sight')">Top sight</button><button type="button" data-item-mode="custom" onclick="clearCollectionSightSelection(); setCollectionItemMode('custom')">Custom place</button></div>`;
+      choice.innerHTML = `<div><strong>What would you like to add?</strong><small>Choose an existing sight or create a custom place.</small></div><div class="collection-item-modes" role="group" aria-label="Collection item type"><button type="button" data-item-mode="sight" onclick="chooseCollectionItemMode('sight')">Top sight</button><button type="button" data-item-mode="custom" onclick="chooseCollectionItemMode('custom')">Custom place</button></div>`;
       const kinds = form.elements.collectionKindIds.closest('.field');
       kinds.after(choice);
       const sightField = form.elements.sightSearch.closest('.field');
@@ -1353,7 +1359,8 @@
       form.elements.id.closest('.field').classList.add('collection-id-field');
       form.elements.id.closest('.field').hidden = true;
       form.elements.title.required = !linked;
-      setCollectionItemMode(linked ? 'sight' : 'custom');
+      form.dataset.collectionItemMode = linked ? 'sight' : 'custom';
+      updateCollectionItemMode();
     }
     function setCollectionItemMode(mode) {
       form.dataset.collectionItemMode = mode;
