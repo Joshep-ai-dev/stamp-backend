@@ -281,11 +281,12 @@
       flex-direction: column;
       gap: 6px
     }
+    .field[hidden] { display:none !important }
 
-    .collection-item-choice, .collection-custom-heading { padding:14px; border:1px solid var(--line); border-radius:10px; background:#0a2a21 }
-    .collection-item-choice > div:first-child, .collection-custom-heading { display:flex; flex-direction:column; gap:4px }
-    .collection-item-choice strong, .collection-custom-heading strong { color:var(--ink); font-size:14px }
-    .collection-item-choice small, .collection-custom-heading small, .collection-sight-field small { color:var(--muted); font-size:12px }
+    .collection-item-choice { padding:14px; border:1px solid var(--line); border-radius:10px; background:#0a2a21 }
+    .collection-item-choice > div:first-child { display:flex; flex-direction:column; gap:4px }
+    .collection-item-choice strong { color:var(--ink); font-size:14px }
+    .collection-item-choice small, .collection-sight-field small { color:var(--muted); font-size:12px }
     .collection-item-modes { display:flex; gap:8px; margin-top:12px }
     .collection-item-modes button { flex:1; border:1px solid var(--line); background:#061f18; color:var(--muted); border-radius:8px; padding:10px 12px; font-weight:700 }
     .collection-item-modes button.active { color:var(--ink); border-color:var(--accent); background:#164334; box-shadow:inset 0 0 0 1px var(--accent) }
@@ -1261,14 +1262,7 @@
       const results = document.querySelector('#collection-sight-options');
       if (results) results.replaceChildren();
       form.dataset.collectionItemMode = 'sight';
-      fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', true);
-      fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = true);
-      fields.querySelectorAll('[data-item-mode]').forEach(button => {
-        const selected = button.dataset.itemMode === 'sight';
-        button.classList.toggle('active', selected);
-        button.setAttribute('aria-pressed', String(selected));
-      });
-      if (form.elements.sightId) form.elements.sightId.disabled = true;
+      updateCollectionItemMode();
       clearTimeout(sightSearchTimer);
       if (value.trim().length < 2) return;
       sightSearchTimer = setTimeout(async () => {
@@ -1305,54 +1299,41 @@
       sightField.querySelector('label').textContent = 'Find a Top sight';
       const help = sightField.querySelector('.collection-sight-help');
       if (help) help.textContent = 'Search by sight name, city, or country, then select a result.';
-      const customTitle = form.elements.title.closest('.field');
-      customTitle.before(Object.assign(document.createElement('div'), { className: 'field wide collection-custom-heading', innerHTML: '<strong>Custom place details</strong><small>Add a place that is not already in Top sights.</small>' }));
       for (const key of ['title', 'countryId', 'state', 'cityId', 'location', 'imageUrl', 'detail']) {
         form.elements[key]?.closest('.field')?.classList.add('collection-custom-field');
       }
       form.elements.access.closest('.field').classList.add('wide');
       form.elements.id.closest('.field').classList.add('collection-id-field');
+      form.elements.id.closest('.field').hidden = true;
       form.elements.title.required = !linked;
       setCollectionItemMode(linked ? 'sight' : 'custom');
     }
     function setCollectionItemMode(mode) {
-      if (mode === 'sight' && !form.elements.sightId?.value) {
-        form.dataset.collectionItemMode = 'sight';
-        fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', true);
-        fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = true);
-        const picker = form.elements.sightSearch?.closest('.field');
-        if (picker) picker.hidden = false;
-        if (form.elements.sightSearch) { form.elements.sightSearch.disabled = false; form.elements.sightSearch.focus(); }
-        fields.querySelectorAll('[data-item-mode]').forEach(button => {
-          const selected = button.dataset.itemMode === 'sight';
-          button.classList.toggle('active', selected);
-          button.setAttribute('aria-pressed', String(selected));
-        });
-        if (form.elements.sightId) form.elements.sightId.disabled = true;
-        return;
-      }
       form.dataset.collectionItemMode = mode;
       updateCollectionItemMode();
+      if (mode === 'sight' && form.elements.sightSearch) form.elements.sightSearch.focus();
     }
     function updateCollectionItemMode() {
-      const linked = form.dataset.collectionItemMode === 'sight' && Boolean(form.elements.sightId?.value);
+      const sightMode = form.dataset.collectionItemMode === 'sight';
+      const linked = sightMode && Boolean(form.elements.sightId?.value);
       const sightField = form.elements.sightSearch?.closest('.field');
-      if (sightField) sightField.hidden = !linked;
-      if (form.elements.sightSearch) form.elements.sightSearch.disabled = !linked;
-      fields.querySelector('.collection-custom-heading')?.toggleAttribute('hidden', linked);
-      fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = linked);
+      if (sightField) sightField.hidden = !sightMode;
+      if (form.elements.sightSearch) form.elements.sightSearch.disabled = !sightMode;
+      fields.querySelectorAll('.collection-custom-field').forEach(field => field.hidden = sightMode);
       const choice = fields.querySelector('.collection-item-choice');
       choice?.querySelectorAll('[data-item-mode]').forEach(button => {
-        const selected = button.dataset.itemMode === (linked ? 'sight' : 'custom');
+        const selected = button.dataset.itemMode === (sightMode ? 'sight' : 'custom');
         button.classList.toggle('active', selected);
         button.setAttribute('aria-pressed', String(selected));
       });
       for (const key of ['title', 'countryId', 'state', 'cityId', 'location', 'imageUrl', 'detail']) {
         const input = form.elements[key];
-        if (input) input.disabled = linked;
+        if (input) input.disabled = sightMode;
       }
-      if (form.elements.title) form.elements.title.required = !linked;
+      if (form.elements.title) form.elements.title.required = !sightMode;
       if (form.elements.sightId) form.elements.sightId.disabled = !linked;
+      const saveButton = form.querySelector('button[type="submit"]');
+      if (saveButton) saveButton.disabled = sightMode && !linked;
       const access = form.elements.access?.closest('.field');
       if (access) access.querySelector('label').textContent = linked ? 'Who can view this sight?' : 'Who can view this place?';
     }
@@ -1452,7 +1433,7 @@
         card.querySelectorAll('textarea, input[type=number]').forEach(control => { control.required = visible && !control.name.endsWith('Image'); });
       });
     }
-    function closeEditor() { if (form.dataset.generating === 'true') return; modal.classList.add('hidden'); form.querySelector('.dialogfoot').prepend(document.querySelector('#aiDraftTools')); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource }
+    function closeEditor() { if (form.dataset.generating === 'true') return; modal.classList.add('hidden'); form.querySelector('button[type="submit"]').disabled = false; form.querySelector('.dialogfoot').prepend(document.querySelector('#aiDraftTools')); form.reset(); fields.replaceChildren(); formNotice.innerHTML = ''; state.edit = null; delete form.dataset.editId; delete form.dataset.resource; delete form.dataset.collectionItemMode }
     function aiImageSubject(resource, field) {
       const fieldValue = name => form.elements[name]?.value?.trim() || '';
       const country = state.meta.countries.find(item => item.id === fieldValue('countryId'))?.name || '';
