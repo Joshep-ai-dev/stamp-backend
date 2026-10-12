@@ -41,6 +41,8 @@ Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function 
     Route::post('/ai/{id}/pause', [AdminAiController::class, 'pause']);
     Route::post('/ai/{id}/resume', [AdminAiController::class, 'resume']);
     Route::get('/meta', [AdminController::class, 'meta']);
+    Route::get('/collection-sights', [AdminController::class, 'collectionSights']);
+    Route::get('/collection-states', [AdminController::class, 'collectionStates']);
     Route::get('/states', [AdminController::class, 'states']);
     Route::post('/states', [AdminController::class, 'storeState']);
     Route::get('/us-states', [AdminController::class, 'stateList']);

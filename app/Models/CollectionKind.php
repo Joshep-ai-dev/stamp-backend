@@ -26,6 +26,22 @@ class CollectionKind extends Model
         return $this->belongsTo(Country::class, 'country_code', 'code');
     }
 
+    public function states(): BelongsToMany
+    {
+        return $this->belongsToMany(CountryState::class, 'collection_kind_states', 'collection_kind_id', 'country_state_id')
+            ->withPivot('display_order')
+            ->withTimestamps()
+            ->orderBy('country_states.name');
+    }
+
+    public function sights(): BelongsToMany
+    {
+        return $this->belongsToMany(Sight::class, 'collection_kind_sights', 'collection_kind_id', 'sight_id')
+            ->withPivot('display_order')
+            ->withTimestamps()
+            ->orderBy('sights.name');
+    }
+
     public function lists(): BelongsToMany
     {
         return $this->belongsToMany(

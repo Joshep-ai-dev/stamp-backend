@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\CollectionList;
+use App\Models\CollectionKind;
+use App\Models\Sight;
 use App\Models\User;
 
 class CollectionAccess
@@ -26,6 +28,16 @@ class CollectionAccess
         if ($linked->isNotEmpty()) {
             $hasFreeAccess = $linked->contains(fn ($item) => $item->access !== 'pro' && $item->kinds->contains(fn ($kind) => $kind->is_published && $kind->access !== 'pro'));
             abort_unless($hasFreeAccess, 403, 'Kroo+ membership is required.');
+
+            return;
         }
+
+        $directKinds = CollectionKind::where('is_published', true)
+            ->whereHas('sights', fn ($query) => $query->where('sights.id', $target))
+            ->get(['id', 'access']);
+        $sight = Sight::find($target);
+        $hasFreeAccess = $directKinds->contains(fn ($kind) => $kind->access !== 'pro');
+        abort_if($sight?->is_premium && ! $hasFreeAccess, 403, 'Kroo+ membership is required.');
+        abort_if($directKinds->isNotEmpty() && ! $hasFreeAccess, 403, 'Kroo+ membership is required.');
     }
 }

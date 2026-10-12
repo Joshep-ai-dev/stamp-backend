@@ -6,6 +6,7 @@ use App\Models\City;
 use App\Models\CollectionKind;
 use App\Models\CollectionList;
 use App\Models\Country;
+use App\Models\CountryState;
 use App\Models\User;
 use App\Services\UsStates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,6 +23,7 @@ class CompleteUsStateCollectionTest extends TestCase
         $kind = CollectionKind::create(['id' => 'usa', 'title' => 'United States Explorer', 'is_published' => true]);
         foreach (UsStates::NAMES as $code => $name) {
             City::create(['geoname_id' => $code, 'name' => $name.' City', 'normalized_name' => strtolower($name).' city', 'country_code' => 'US', 'subcountry' => $name]);
+            CountryState::create(['country_code' => 'US', 'name' => $name, 'normalized_name' => UsStates::normalize($name)]);
         }
         $ny = City::where('subcountry', 'New York')->firstOrFail();
         CollectionList::create(['id' => 'original-ny', 'collectionkind_id' => $kind->id, 'title' => 'New York', 'city_id' => $ny->id]);
@@ -29,7 +31,8 @@ class CompleteUsStateCollectionTest extends TestCase
         $this->assertDatabaseCount('collectionlist', 1);
         $this->artisan('collections:complete-us-states', ['--apply' => true])->assertSuccessful();
         $this->artisan('collections:complete-us-states', ['--apply' => true])->assertSuccessful();
-        $this->assertSame(50, $kind->lists()->count());
+        $this->assertSame(1, $kind->lists()->count());
+        $this->assertSame(50, $kind->states()->count());
         $this->assertDatabaseHas('collectionlist', ['id' => 'original-ny']);
         $user = User::factory()->create();
         $user->visits()->create(['city_id' => $ny->id, 'city_name' => $ny->name, 'country' => 'United States', 'country_code' => 'US', 'continent_code' => 'NA', 'subcountry' => 'US-NY', 'visited_at' => '2026-09-15', 'places' => []]);

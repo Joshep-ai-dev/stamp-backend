@@ -10,6 +10,7 @@ use App\Models\DailyDestination;
 use App\Models\Sight;
 use App\Services\AirportLookup;
 use App\Services\CityAliases;
+use App\Services\CollectionSourcePlaces;
 use App\Services\ImageUrl;
 use App\Services\NearbyCatalogLookup;
 use Illuminate\Http\JsonResponse;
@@ -29,12 +30,15 @@ class ContentController extends Controller
     {
         $country = Country::findOrFail(strtoupper($code));
         $sights = Sight::with(['country', 'city'])->where('country_code', $country->code)->orderBy('name')->get();
-        $collections = CollectionKind::with(['country', 'lists.city.country'])
+        $collections = CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->where(fn ($query) => $query
                 ->where('country_code', $country->code)
                 ->orWhere(fn ($global) => $global->whereNull('country_code')
-                    ->whereHas('lists.city', fn ($city) => $city->where('country_code', $country->code))))
+                    ->where(fn ($visible) => $visible
+                        ->whereHas('lists.city', fn ($city) => $city->where('country_code', $country->code))
+                        ->orWhereHas('states', fn ($states) => $states->where('country_code', $country->code))
+                        ->orWhereHas('sights', fn ($sights) => $sights->where('country_code', $country->code)))))
             ->orderBy('title')->get();
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', $country->code)->get() ?? collect();
@@ -115,12 +119,13 @@ class ContentController extends Controller
         $user = $request->user('sanctum');
         $visits = $user?->visits()->where('country_code', 'US')->where('subcountry', $stateName)->get() ?? collect();
         $completed = $user?->completions()->pluck('sight_id') ?? collect();
-        $collections = CollectionKind::with(['country', 'lists.city.country'])
+        $collections = CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->whereNull('country_code')
-            ->whereHas('lists.city', fn ($query) => $query
-                ->where('country_code', $country->code)
-                ->where('subcountry', $stateName))
+            ->where(fn ($query) => $query
+                ->whereHas('lists.city', fn ($city) => $city->where('country_code', $country->code)->where('subcountry', $stateName))
+                ->orWhereHas('states', fn ($states) => $states->where('country_code', $country->code)->where('normalized_name', Str::of($stateName)->ascii()->lower()->squish()->toString()))
+                ->orWhereHas('sights.city', fn ($city) => $city->where('country_code', $country->code)->where('subcountry', $stateName)))
             ->orderBy('title')->get();
 
         return response()->json([
@@ -153,14 +158,14 @@ class ContentController extends Controller
 
     public function collection(Request $request, string $id): JsonResponse
     {
-        $item = CollectionKind::with(['country', 'lists.city.country'])->where('is_published', true)->findOrFail($id);
+        $item = CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])->where('is_published', true)->findOrFail($id);
 
         return response()->json($this->collectionItem($item));
     }
 
     public function collections(): JsonResponse
     {
-        $items = CollectionKind::with(['country', 'lists.city.country'])
+        $items = CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->whereNull('country_code')
             ->orderBy('display_order')
@@ -182,10 +187,12 @@ class ContentController extends Controller
     public function city(Request $request, string $id): JsonResponse
     {
         $city = $this->findCatalogCity($id, ['country']);
-        $collections = CollectionKind::with(['country', 'lists.city.country'])
+        $collections = CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->whereNull('country_code')
-            ->whereHas('lists.city', fn ($query) => $query->where('cities.id', $city->id))
+            ->where(fn ($query) => $query
+                ->whereHas('lists.city', fn ($cityQuery) => $cityQuery->where('cities.id', $city->id))
+                ->orWhereHas('sights', fn ($sights) => $sights->where('city_id', $city->id)))
             ->orderBy('title')->get();
 
         return response()->json([
@@ -291,13 +298,22 @@ class ContentController extends Controller
 
     public function collectionItem(CollectionKind $item, bool $admin = false): array
     {
-        $item->loadMissing('country', 'lists.city.country', 'lists.sight');
+        $item->loadMissing('country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country');
 
         $hasAccess = $admin || request()->user('sanctum')?->plan === 'pro';
 
         $heroImage = $item->hero_image ?: $item->image;
+        $sourceBuilder = app(CollectionSourcePlaces::class);
+        $places = $sourceBuilder->lists($item)->map(fn ($list) => ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'content' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $item->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $item->access === 'pro' || $list->access === 'pro']);
+        $places = $places->concat($sourceBuilder->extras($item, $hasAccess))->values();
+        $result = ['access' => $item->access ?? 'free', 'id' => $item->id, 'title' => $item->title, 'countryId' => $item->country_code, 'country' => $item->country?->name, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($item->explorer_image ?: $heroImage), 'places' => $places, 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
 
-        return ['access' => $item->access ?? 'free', 'id' => $item->id, 'title' => $item->title, 'countryId' => $item->country_code, 'country' => $item->country?->name, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($item->explorer_image ?: $heroImage), 'places' => $item->lists->sortBy('title')->values()->map(fn ($list) => ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'content' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $item->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $item->access === 'pro' || $list->access === 'pro']), 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
+        if ($admin) {
+            $result['stateIds'] = $item->states->pluck('id')->map(fn ($id) => (string) $id)->values();
+            $result['sightIds'] = $item->sights->pluck('id')->map(fn ($id) => (string) $id)->values();
+        }
+
+        return $result;
     }
 
     public function daily(DailyDestination $item): array

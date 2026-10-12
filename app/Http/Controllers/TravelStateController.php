@@ -9,6 +9,7 @@ use App\Models\Sight;
 use App\Models\User;
 use App\Services\CollectionAccess;
 use App\Services\CollectionCatalog;
+use App\Services\CollectionSourcePlaces;
 use App\Services\ImageUrl;
 use App\Services\UsStates;
 use Illuminate\Http\JsonResponse;
@@ -68,7 +69,7 @@ class TravelStateController extends Controller
         $progress = $request->validate(['progress' => ['required', 'integer', 'between:0,100']])['progress'];
         $record = $request->user()->collectionProgress()->updateOrCreate(['collection_id' => $collectionId], ['progress' => $progress]);
 
-        $definition = CollectionKind::with('lists.city.country', 'lists.sight')->find($collectionId);
+        $definition = CollectionKind::with(['lists.city.country', 'lists.sight', 'states', 'sights.city.country'])->find($collectionId);
 
         return response()->json($this->collection(
             $collectionId,
@@ -159,7 +160,7 @@ class TravelStateController extends Controller
         $progress = $user->collectionProgress()->get();
         $completionIds = $user->completions()->pluck('sight_id');
         $visitedStates = $this->visitedStates($user);
-        $managed = CollectionKind::with('lists.city.country', 'lists.sight')
+        $managed = CollectionKind::with(['lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->whereNull('country_code')
             ->orderBy('title')->get();
@@ -175,7 +176,9 @@ class TravelStateController extends Controller
         $completionIds ??= collect();
         $visitedStates ??= collect();
         $legacy = CollectionCatalog::ITEMS[$id] ?? [];
-        $places = $definition?->lists?->sortBy('title')->values()->map(function ($list) use ($completionIds, $id, $visitedStates, $definition) {
+        $sourceBuilder = app(CollectionSourcePlaces::class);
+        $listedPlaces = $definition ? $sourceBuilder->lists($definition) : collect();
+        $places = $listedPlaces->map(function ($list) use ($completionIds, $id, $visitedStates, $definition) {
             $completionId = $list->sight_id ? (string) $list->sight_id : "collection-{$id}-{$list->id}";
             $state = UsStates::normalize($list->city?->subcountry);
             $isStateChecklistItem = $list->city?->country_code === 'US'
@@ -184,8 +187,19 @@ class TravelStateController extends Controller
             $completed = $completionIds->contains($completionId)
                 || ($isStateChecklistItem && $visitedStates->contains($state));
 
-            return ['id' => $list->id, 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $definition->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $definition->access === 'pro' || $list->access === 'pro', 'completed' => $completed];
+            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $definition->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $definition->access === 'pro' || $list->access === 'pro', 'completed' => $completed];
         }) ?? collect();
+        $hasAccess = request()->user()?->plan === 'pro';
+        $sourcePlaces = $definition
+            ? $sourceBuilder->extras($definition, $hasAccess)->map(function (array $place) use ($completionIds, $visitedStates): array {
+            $place['completed'] = $place['type'] === 'state'
+                ? $visitedStates->contains(UsStates::normalize($place['name']))
+                : $completionIds->contains((string) $place['sightId']);
+
+            return $place;
+            })
+            : collect();
+        $places = $places->concat($sourcePlaces)->values();
         $value = $definition
             ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
             : ($progress?->progress ?? 0);

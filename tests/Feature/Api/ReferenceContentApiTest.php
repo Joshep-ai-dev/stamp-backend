@@ -5,6 +5,8 @@ namespace Tests\Feature\Api;
 use App\Models\City;
 use App\Models\CollectionKind;
 use App\Models\Country;
+use App\Models\CountryState;
+use App\Models\Sight;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -40,8 +42,16 @@ class ReferenceContentApiTest extends TestCase
         $this->withHeaders($headers)->putJson('/admin/api/collections/'.$id, ['title' => 'Edited once', 'detail' => 'Second'])->assertOk();
         $this->withHeaders($headers)->putJson('/admin/api/collections/'.$id, ['title' => 'Edited twice', 'detail' => 'Third'])->assertOk()->assertJsonPath('title', 'Edited twice');
 
-        $this->assertSame(1, CollectionKind::count());
+        $this->assertSame(1, CollectionKind::whereKey($id)->count());
         $this->assertDatabaseHas('collectionkind', ['id' => $id, 'title' => 'Edited twice', 'detail' => 'Third']);
+    }
+
+    public function test_us_explorer_is_available_in_the_admin_collection_list(): void
+    {
+        $this->withHeaders($this->adminHeaders())
+            ->getJson('/admin/api/collections')
+            ->assertOk()
+            ->assertJsonFragment(['id' => 'usa', 'title' => 'United States Explorer']);
     }
 
     public function test_country_targeted_collections_only_appear_on_their_country_page(): void
@@ -116,6 +126,41 @@ class ReferenceContentApiTest extends TestCase
         ])->assertOk()->assertJsonPath('countryId', null);
 
         $this->assertDatabaseHas('collectionkind', ['id' => 'targeted', 'country_code' => null]);
+    }
+
+    public function test_collection_can_include_existing_us_states_and_sights_without_duplicating_list_items(): void
+    {
+        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA']);
+        $state = CountryState::create(['country_code' => 'US', 'name' => 'California', 'normalized_name' => 'california']);
+        $city = City::create(['geoname_id' => '5368361', 'name' => 'Los Angeles', 'normalized_name' => 'los angeles', 'country_code' => 'US', 'subcountry' => 'California']);
+        $sight = Sight::create(['country_code' => 'US', 'city_id' => $city->id, 'name' => 'Griffith Observatory', 'slug' => 'griffith-observatory', 'description' => 'A Los Angeles landmark.']);
+        $directSight = Sight::create(['country_code' => 'US', 'city_id' => $city->id, 'name' => 'Hollywood Sign', 'slug' => 'hollywood-sign', 'description' => 'A hillside landmark.']);
+        $headers = $this->adminHeaders();
+
+        $this->withHeaders($headers)->postJson('/admin/api/collections', [
+            'id' => 'usa',
+            'title' => 'United States Explorer',
+            'stateIds' => [(string) $state->id],
+            'sightIds' => [(string) $sight->id, (string) $directSight->id],
+        ])->assertCreated()
+            ->assertJsonPath('stateIds.0', (string) $state->id)
+            ->assertJsonPath('sightIds.0', (string) $sight->id);
+
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindId' => 'usa',
+            'title' => 'Griffith Observatory',
+            'cityId' => $city->geoname_id,
+            'sightId' => (string) $sight->id,
+        ])->assertCreated();
+
+        $collection = collect($this->getJson('/api/v1/collection-kinds')->assertOk()->json())->firstWhere('id', 'usa');
+        $this->assertCount(3, $collection['places']);
+        $this->assertSame(1, collect($collection['places'])->where('sightId', (string) $sight->id)->count());
+        $this->assertSame('state', collect($collection['places'])->firstWhere('stateId', (string) $state->id)['type']);
+        $this->assertSame('sight', collect($collection['places'])->firstWhere('sightId', (string) $directSight->id)['type']);
+        $this->getJson('/api/v1/catalog/countries/US')->assertOk()->assertJsonFragment(['id' => 'usa']);
+        $this->getJson('/api/v1/catalog/countries/US/states/California')->assertOk()->assertJsonFragment(['id' => 'usa']);
+        $this->getJson('/api/v1/catalog/cities/5368361')->assertOk()->assertJsonFragment(['id' => 'usa']);
     }
 
     public function test_collection_kind_saves_local_image_paths_without_the_site_domain(): void

@@ -12,6 +12,7 @@ use App\Models\Sight;
 use App\Services\ImageStorage;
 use App\Services\CityAliases;
 use App\Services\ImageUrl;
+use App\Services\UsStates;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,25 @@ class AdminController extends Controller
             'countries' => Country::orderBy('name')->get(['code', 'name'])->map(fn ($x) => ['id' => $x->code, 'code' => $x->code, 'name' => $x->name]),
             'collectionKinds' => CollectionKind::orderBy('title')->get(['id', 'title']),
         ]);
+    }
+
+    public function collectionSights(): JsonResponse
+    {
+        return response()->json(Sight::with('city:id,name,subcountry')
+            ->where('country_code', 'US')
+            ->orderBy('name')
+            ->get(['id', 'city_id', 'name'])
+            ->map(fn (Sight $sight) => ['id' => $sight->id, 'name' => $sight->name, 'city' => $sight->city?->name, 'state' => $sight->city?->subcountry]));
+    }
+
+    public function collectionStates(): JsonResponse
+    {
+        $stateNames = array_map(UsStates::normalize(...), array_values(UsStates::NAMES));
+
+        return response()->json(CountryState::where('country_code', 'US')
+            ->whereIn('normalized_name', $stateNames)
+            ->orderBy('name')->get()
+            ->map(fn (CountryState $state) => $this->adminState($state)));
     }
 
     public function cities(Request $request): JsonResponse
@@ -194,7 +214,7 @@ class AdminController extends Controller
                 ->orderBy('sights.name')
                 ->get()
                 ->map(fn ($x) => $this->adminSight($x)),
-            'collections', 'collection-kinds' => CollectionKind::with(['country', 'lists.city.country'])->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x, true)),
+            'collections', 'collection-kinds' => CollectionKind::with(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country'])->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x, true)),
             'collection-lists' => CollectionList::with(['kinds', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
             'daily-destinations' => DailyDestination::orderBy('lesson_number')->orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
             default => abort(404),
@@ -321,7 +341,12 @@ class AdminController extends Controller
             $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => false];
             $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'countryId' => ['sometimes', 'nullable', 'exists:countries,code'], 'explorerImageUrl' => ['nullable', 'string'], 'heroImageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])]]);
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'countryId' => ['sometimes', 'nullable', 'exists:countries,code'], 'stateIds' => ['sometimes', 'array'], 'stateIds.*' => ['integer', 'exists:country_states,id'], 'sightIds' => ['sometimes', 'array'], 'sightIds.*' => ['integer', 'exists:sights,id'], 'explorerImageUrl' => ['nullable', 'string'], 'heroImageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])]]);
+            $stateIds = collect($data['stateIds'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+            $sightIds = collect($data['sightIds'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+            $usStateNames = array_map(UsStates::normalize(...), array_values(UsStates::NAMES));
+            abort_if($stateIds->isNotEmpty() && CountryState::where('country_code', 'US')->whereIn('normalized_name', $usStateNames)->whereIn('id', $stateIds)->count() !== $stateIds->count(), 422, 'Only the 50 listed US states can be added to a collection.');
+            abort_if($sightIds->isNotEmpty() && Sight::where('country_code', 'US')->whereIn('id', $sightIds)->count() !== $sightIds->count(), 422, 'Only US top sights can be added directly to a collection.');
             $heroImage = ImageUrl::stored($data['heroImageUrl'] ?? $model?->hero_image ?? $model?->image);
             $explorerImage = ImageUrl::stored($data['explorerImageUrl'] ?? $model?->explorer_image);
             $values = ['access' => $data['access'] ?? $model?->access ?? 'free', 'title' => $data['title'], 'detail' => $data['detail'] ?? '', 'country_code' => array_key_exists('countryId', $data) ? $data['countryId'] : $model?->country_code, 'explorer_image' => $explorerImage, 'hero_image' => $heroImage, 'image' => $heroImage, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
@@ -394,6 +419,14 @@ class AdminController extends Controller
             abort(404);
         }
         $model->fill($values)->save();
+        if (in_array($type, ['collections', 'collection-kinds'], true)) {
+            if (array_key_exists('stateIds', $data)) {
+                $model->states()->sync($stateIds->all());
+            }
+            if (array_key_exists('sightIds', $data)) {
+                $model->sights()->sync($sightIds->all());
+            }
+        }
         if ($type === 'collection-lists') {
             $model->kinds()->sync($kindIds);
         }
@@ -436,7 +469,7 @@ class AdminController extends Controller
     private function present(string $type, Model $model): array
     {
         return match ($type) {
-            'countries' => $this->adminCountry($model), 'cities' => $this->adminCity($model->load('country')), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model->load('country'), true), 'collection-lists' => $this->collectionList($model->load(['kinds', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
+            'countries' => $this->adminCountry($model), 'cities' => $this->adminCity($model->load('country')), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model->load(['country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country']), true), 'collection-lists' => $this->collectionList($model->load(['kinds', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
         };
     }
 

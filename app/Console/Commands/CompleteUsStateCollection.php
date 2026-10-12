@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\City;
 use App\Models\CollectionKind;
-use App\Models\CollectionList;
+use App\Models\CountryState;
 use App\Services\UsStates;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -17,21 +16,21 @@ class CompleteUsStateCollection extends Command
 
     public function handle(): int
     {
-        $kind = CollectionKind::with('lists')->findOrFail($this->argument('collection'));
-        $existing = $kind->lists->map(fn ($item) => UsStates::normalize($item->title));
-        $cities = City::where('country_code', 'US')->orderByDesc('population')->orderBy('id')->get();
+        $kind = CollectionKind::with('states')->findOrFail($this->argument('collection'));
+        $existing = $kind->states->pluck('normalized_name');
         $missing = [];
-        foreach (UsStates::NAMES as $code => $name) {
-            if ($existing->contains(UsStates::normalize($name))) {
+        foreach (UsStates::NAMES as $name) {
+            $normalized = UsStates::normalize($name);
+            if ($existing->contains($normalized)) {
                 continue;
             }
-            $city = $cities->first(fn ($city) => UsStates::normalize($city->subcountry) === UsStates::normalize($name));
-            if (! $city) {
-                $this->error("No catalog city for {$name}. Import its city data before applying this repair.");
+            $state = CountryState::where('country_code', 'US')->where('normalized_name', $normalized)->first();
+            if (! $state) {
+                $this->error("No US state record for {$name}. Add it to the US states listing before applying this repair.");
 
                 return self::FAILURE;
             }
-            $missing[] = ['code' => $code, 'name' => $name, 'city' => $city];
+            $missing[] = ['code' => $code, 'name' => $name, 'state' => $state];
         }
         foreach ($missing as $entry) {
             $this->line('Missing: '.$entry['name']);
@@ -44,17 +43,10 @@ class CompleteUsStateCollection extends Command
         }
         DB::transaction(function () use ($kind, $missing): void {
             foreach ($missing as $entry) {
-                $item = CollectionList::firstOrCreate(['id' => $kind->id.'-state-'.strtolower($entry['code'])], [
-                    'collectionkind_id' => $kind->id,
-                    'title' => $entry['name'],
-                    'city_id' => $entry['city']->id,
-                    'location' => $entry['name'].', United States',
-                    'access' => 'free',
-                ]);
-                $kind->lists()->syncWithoutDetaching([$item->id]);
+                $kind->states()->syncWithoutDetaching([$entry['state']->id]);
             }
         });
-        $this->info('State checklist updated. Existing entries were preserved.');
+        $this->info('US state sources updated. Existing collection-list entries were preserved.');
 
         return self::SUCCESS;
     }
