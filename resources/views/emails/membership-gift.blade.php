@@ -5,10 +5,21 @@
 <div style="display:none;max-height:0;overflow:hidden;">{{ $isBuyer ? 'Your Kroo+ gift is ready to make someone’s day.' : 'You’ve been gifted one year of Kroo+!' }}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dce5e1;border-radius:12px;overflow:hidden;">
+<tr><td style="background:#f7faf8;padding:9px 18px;color:#526b62;font-size:11px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="font-size:11px;">{{ $isBuyer ? 'Your Kroo+ gift is ready to make someone’s day' : 'You’ve been gifted Kroo+!' }} <span aria-hidden="true">{!! $isBuyer ? '&#127873;' : '&#127881;' !!}</span></td>
+<td align="right" style="font-size:11px;padding-left:12px;">{{ $isBuyer ? 'Gift confirmation' : 'Your gift awaits' }}</td>
+</tr></table>
+</td></tr>
 <tr><td align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;">kroo</td></tr>
 <tr><td style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43,#0d8274,#82b7a5);color:#ffffff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" style="width:70%;">
 <h1 style="font-size:32px;line-height:1.1;margin:0 0 12px;">{{ $isBuyer ? 'A gift that goes places.' : 'Your next adventure starts here.' }}</h1>
 <p style="margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
+</td>
+<td align="right" valign="middle" style="width:30%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
+</tr></table>
 </td></tr>
 <tr><td style="padding:26px 28px;">
 @if ($isBuyer)
@@ -17,9 +28,9 @@
 <p>Thanks for gifting Kroo+! You’ve given someone a little more freedom to explore, travel, and make unforgettable memories.</p>
 @else
 <p>Hi there,</p>
-<p><strong>{{ $sender }} just gifted you Kroo+!</strong><br>This means more ways to explore, travel, and experience the world.</p>
+<p><strong>{{ $sender }} just gifted you Kroo+! <span aria-hidden="true">&#127873;</span></strong><br>This means more ways to explore, travel, and experience the world.</p>
 @endif
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td style="padding:18px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e8f5ef;border-radius:9px;margin:20px 0;"><tr><td valign="top" width="28" aria-hidden="true" style="padding:20px 0 18px 18px;font-size:28px;line-height:1;color:#087f5b;">&#9831;</td><td style="padding:18px;">
 <h3 style="margin:0 0 10px;color:#042219;font-size:17px;">Your Kroo+ gift</h3>
 <p style="margin:6px 0;"><strong>{{ $isBuyer ? 'Recipient:' : 'Gift from:' }}</strong> {{ $isBuyer ? $recipientName : $sender }}</p>
 <p style="margin:6px 0;"><strong>Gift:</strong> Kroo+ 1 Year</p>

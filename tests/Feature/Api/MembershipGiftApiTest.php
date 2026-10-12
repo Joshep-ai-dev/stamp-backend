@@ -101,6 +101,10 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringContainsString('Safe &lt;note&gt;<br', $html);
             $this->assertStringContainsString('Happy travels!', $html);
             $this->assertStringNotContainsString('Clipboard', $html);
+            $this->assertStringContainsString('src="data:image/png;base64,', $html);
+            $this->assertStringNotContainsString('&#9992;', $html);
+            $this->assertStringContainsString('&#9831;', $html);
+            $this->assertStringContainsString('background:#f7faf8', $html);
             $this->assertStringNotContainsString('&#128203;', $html);
         }
         $this->assertStringContainsString('Gift code:</strong> <span style="font-family:monospace;font-weight:normal;', $recipientHtml);
