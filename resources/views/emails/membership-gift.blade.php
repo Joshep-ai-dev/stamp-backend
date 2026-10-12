@@ -20,9 +20,9 @@ table { border-collapse:collapse; }
     .hero-layout { display:block !important; position:relative !important; min-height:132px !important; }
     .hero-layout tbody, .hero-layout tr { display:block !important; }
     .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; min-height:132px !important; padding:22px 94px 20px 14px !important; position:relative !important; z-index:2 !important; }
-    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:-10px !important; width:112px !important; padding:0 !important; transform:translateY(-50%) !important; z-index:1 !important; }
+    .hero-plane { display:block !important; position:absolute !important; top:20px !important; right:10px !important; width:112px !important; padding:0 !important; z-index:1 !important; }
     .hero-plane img { width:112px !important; max-width:112px !important; height:auto !important; }
-    .hero-title { font-size:20px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-title { font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
     .hero-line { white-space:normal !important; }
     .hero-subtitle { font-size:11px !important; line-height:1.35 !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
