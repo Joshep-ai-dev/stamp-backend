@@ -10,16 +10,19 @@ class CollectionSourcePlaces
 {
     public function lists(CollectionKind $kind): Collection
     {
-        $kind->loadMissing(['lists.city.country', 'lists.sight']);
+        $kind->loadMissing(['lists.city.country', 'lists.sight.city.country']);
         $seenStates = [];
         $seenSights = [];
         $normalize = fn (?string $value): string => Str::of($value ?? '')->ascii()->lower()->squish()->toString();
         $normalizeState = fn (?string $value): string => UsStates::normalize($value);
 
-        return $kind->lists->sortBy('title')->filter(function ($list) use (&$seenStates, &$seenSights, $normalize, $normalizeState): bool {
-            if ($list->city?->country_code === 'US' && $list->city?->subcountry
-                && $normalizeState($list->title) === $normalizeState($list->city->subcountry)) {
-                $key = $normalizeState($list->title);
+        return $kind->lists->sortBy(fn ($list) => $list->sight?->name ?? $list->title ?? '')
+            ->filter(function ($list) use (&$seenStates, &$seenSights, $normalize, $normalizeState): bool {
+            $title = $list->sight?->name ?? $list->title;
+            $city = $list->sight?->city ?? $list->city;
+            if ($city?->country_code === 'US' && $city?->subcountry
+                && $normalizeState($title) === $normalizeState($city->subcountry)) {
+                $key = $normalizeState($title);
                 if (isset($seenStates[$key])) {
                     return false;
                 }
@@ -30,7 +33,7 @@ class CollectionSourcePlaces
 
             $sightKey = $list->sight_id
                 ? (string) $list->sight_id
-                : ($list->city_id && $list->title ? $list->city_id.'|'.$normalize($list->title) : null);
+                : ($list->city_id && $title ? $list->city_id.'|'.$normalize($title) : null);
             if ($sightKey !== null && isset($seenSights[$sightKey])) {
                 return false;
             }
@@ -44,15 +47,19 @@ class CollectionSourcePlaces
 
     public function extras(CollectionKind $kind, bool $hasAccess = false): Collection
     {
-        $kind->loadMissing(['lists.city.country', 'lists.sight', 'states', 'sights.city.country']);
+        $kind->loadMissing(['lists.city.country', 'lists.sight.city.country', 'states', 'sights.city.country']);
         $lists = $this->lists($kind);
         $normalize = fn (?string $value): string => Str::of($value ?? '')->ascii()->lower()->squish()->toString();
         $normalizeState = fn (?string $value): string => UsStates::normalize($value);
 
-        $listedStates = $lists->filter(fn ($list) => $list->city?->country_code === 'US'
-            && $list->city?->subcountry
-            && $normalizeState($list->title) === $normalizeState($list->city->subcountry))
-            ->map(fn ($list) => $normalizeState($list->title))->all();
+        $listedStates = $lists->filter(function ($list) use ($normalizeState): bool {
+            $city = $list->sight?->city ?? $list->city;
+            $title = $list->sight?->name ?? $list->title;
+
+            return $city?->country_code === 'US'
+                && $city?->subcountry
+                && $normalizeState($title) === $normalizeState($city->subcountry);
+        })->map(fn ($list) => $normalizeState($list->sight?->name ?? $list->title))->all();
 
         $statePlaces = $kind->states
             ->reject(fn ($state) => in_array($normalizeState($state->name), $listedStates, true))
@@ -74,8 +81,9 @@ class CollectionSourcePlaces
         $listedSightIds = $lists->pluck('sight_id')->filter()->map(fn ($id) => (string) $id)->all();
         $stateSightPlaces = $kind->sights
             ->reject(fn ($sight) => in_array((string) $sight->id, $listedSightIds, true)
-                || $lists->contains(fn ($list) => $list->city_id === $sight->city_id
-                    && $normalize($list->title) === $normalize($sight->name)))
+                || $lists->contains(fn ($list) => ($list->sight?->id === $sight->id)
+                    || (($list->sight?->city_id ?? $list->city_id) === $sight->city_id
+                        && $normalize($list->sight?->name ?? $list->title) === $normalize($sight->name))))
             ->map(fn ($sight) => [
                 'id' => (string) $sight->id,
                 'sightId' => (string) $sight->id,

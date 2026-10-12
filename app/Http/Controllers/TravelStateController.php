@@ -69,7 +69,7 @@ class TravelStateController extends Controller
         $progress = $request->validate(['progress' => ['required', 'integer', 'between:0,100']])['progress'];
         $record = $request->user()->collectionProgress()->updateOrCreate(['collection_id' => $collectionId], ['progress' => $progress]);
 
-        $definition = CollectionKind::with(['lists.city.country', 'lists.sight', 'states', 'sights.city.country'])->find($collectionId);
+        $definition = CollectionKind::with(['lists.city.country', 'lists.sight.city.country', 'states', 'sights.city.country'])->find($collectionId);
 
         return response()->json($this->collection(
             $collectionId,
@@ -160,7 +160,7 @@ class TravelStateController extends Controller
         $progress = $user->collectionProgress()->get();
         $completionIds = $user->completions()->pluck('sight_id');
         $visitedStates = $this->visitedStates($user);
-        $managed = CollectionKind::with(['lists.city.country', 'lists.sight', 'states', 'sights.city.country'])
+        $managed = CollectionKind::with(['lists.city.country', 'lists.sight.city.country', 'states', 'sights.city.country'])
             ->where('is_published', true)
             ->whereNull('country_code')
             ->orderBy('title')->get();
@@ -179,15 +179,21 @@ class TravelStateController extends Controller
         $sourceBuilder = app(CollectionSourcePlaces::class);
         $listedPlaces = $definition ? $sourceBuilder->lists($definition) : collect();
         $places = $listedPlaces->map(function ($list) use ($completionIds, $id, $visitedStates, $definition) {
+            $sight = $list->sight;
+            $city = $sight?->city ?? $list->city;
+            $country = $sight?->country ?? $city?->country;
+            $name = $sight?->name ?? $list->title;
+            $detail = $sight?->description ?? $list->detail;
+            $isPremium = $definition->access === 'pro' || $list->access === 'pro' || (bool) $sight?->is_premium;
             $completionId = $list->sight_id ? (string) $list->sight_id : "collection-{$id}-{$list->id}";
-            $state = UsStates::normalize($list->city?->subcountry);
-            $isStateChecklistItem = $list->city?->country_code === 'US'
+            $state = UsStates::normalize($city?->subcountry);
+            $isStateChecklistItem = $city?->country_code === 'US'
                 && $state !== ''
-                && UsStates::normalize($list->title) === $state;
+                && UsStates::normalize($name) === $state;
             $completed = $completionIds->contains($completionId)
                 || ($isStateChecklistItem && $visitedStates->contains($state));
 
-            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $list->title, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'imageUrl' => $list->image, 'location' => $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $definition->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $definition->access === 'pro' || $list->access === 'pro', 'completed' => $completed];
+            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'name' => $name, 'state' => $city?->subcountry, 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'location' => $sight ? collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ') : $list->location, 'detail' => (request()->user()?->plan === 'pro' || ($definition->access !== 'pro' && ! $isPremium)) ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium, 'completed' => $completed];
         }) ?? collect();
         $hasAccess = request()->user()?->plan === 'pro';
         $sourcePlaces = $definition

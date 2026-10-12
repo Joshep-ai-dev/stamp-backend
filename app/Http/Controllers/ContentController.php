@@ -298,13 +298,23 @@ class ContentController extends Controller
 
     public function collectionItem(CollectionKind $item, bool $admin = false): array
     {
-        $item->loadMissing('country', 'lists.city.country', 'lists.sight', 'states', 'sights.city.country');
+        $item->loadMissing('country', 'lists.city.country', 'lists.sight.city.country', 'states', 'sights.city.country');
 
         $hasAccess = $admin || request()->user('sanctum')?->plan === 'pro';
 
         $heroImage = $item->hero_image ?: $item->image;
         $sourceBuilder = app(CollectionSourcePlaces::class);
-        $places = $sourceBuilder->lists($item)->map(fn ($list) => ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($list->image), 'name' => $list->title, 'title' => $list->title, 'cityId' => $list->city?->geoname_id, 'city' => $list->city?->name, 'state' => $list->city?->subcountry, 'countryId' => $list->city?->country_code, 'country' => $list->city?->country?->name, 'location' => $list->location, 'detail' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'content' => ($hasAccess || ($item->access !== 'pro' && $list->access !== 'pro')) ? $list->detail : '', 'access' => $item->access === 'pro' ? 'pro' : $list->access, 'isPremium' => $item->access === 'pro' || $list->access === 'pro']);
+        $places = $sourceBuilder->lists($item)->map(function ($list) use ($hasAccess, $item): array {
+            $sight = $list->sight;
+            $city = $sight?->city ?? $list->city;
+            $country = $sight?->country ?? $city?->country;
+            $detail = $sight?->description ?? $list->detail;
+            $isPremium = $item->access === 'pro' || $list->access === 'pro' || (bool) $sight?->is_premium;
+
+            $canViewDetail = $hasAccess || ($item->access !== 'pro' && ! $isPremium);
+
+            return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'name' => $sight?->name ?? $list->title, 'title' => $sight?->name ?? $list->title, 'cityId' => $city?->geoname_id, 'city' => $city?->name, 'state' => $city?->subcountry, 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'location' => $sight ? collect([$city?->name, $city?->subcountry, $country?->name])->filter()->join(', ') : $list->location, 'detail' => $canViewDetail ? $detail : '', 'content' => $canViewDetail ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium];
+        });
         $places = $places->concat($sourceBuilder->extras($item, $hasAccess))->values();
         $result = ['access' => $item->access ?? 'free', 'id' => $item->id, 'title' => $item->title, 'countryId' => $item->country_code, 'country' => $item->country?->name, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($item->explorer_image ?: $heroImage), 'places' => $places, 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
 

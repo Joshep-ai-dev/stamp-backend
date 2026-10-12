@@ -163,6 +163,61 @@ class ReferenceContentApiTest extends TestCase
         $this->getJson('/api/v1/catalog/cities/5368361')->assertOk()->assertJsonFragment(['id' => 'usa']);
     }
 
+    public function test_collection_list_sight_link_stores_only_the_sight_reference_and_deleting_it_preserves_the_sight(): void
+    {
+        Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
+        $city = City::create(['geoname_id' => '1609350', 'name' => 'Bangkok', 'normalized_name' => 'bangkok', 'country_code' => 'TH']);
+        $sight = Sight::create(['country_code' => 'TH', 'city_id' => $city->id, 'name' => 'Wat Arun', 'slug' => 'wat-arun', 'description' => 'Temple of Dawn', 'image_url' => '/images/sights/wat-arun.jpg']);
+        $otherSight = Sight::create(['country_code' => 'TH', 'city_id' => $city->id, 'name' => 'Grand Palace', 'slug' => 'grand-palace', 'description' => 'Royal palace complex.']);
+        $headers = $this->adminHeaders();
+        $this->withHeaders($headers)->getJson('/admin/api/sight-options?query=Wat')->assertOk()
+            ->assertJsonFragment(['id' => (string) $sight->id, 'name' => 'Wat Arun']);
+        $kind = $this->withHeaders($headers)->postJson('/admin/api/collections', ['id' => 'bangkok-icons', 'title' => 'Bangkok Icons'])->assertCreated();
+
+        $entry = $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindId' => $kind->json('id'),
+            'sightId' => (string) $sight->id,
+        ])->assertCreated()
+            ->assertJsonPath('sightId', (string) $sight->id)
+            ->assertJsonPath('title', 'Wat Arun')
+            ->assertJsonPath('detail', 'Temple of Dawn');
+
+        $this->assertDatabaseHas('collectionlist', [
+            'id' => $entry->json('id'),
+            'sight_id' => $sight->id,
+            'title' => null,
+            'image' => null,
+            'city_id' => null,
+            'location' => null,
+            'detail' => null,
+        ]);
+        $places = collect($this->getJson('/api/v1/collection-kinds')->assertOk()->json())
+            ->firstWhere('id', $kind->json('id'))['places'];
+        $this->assertSame('Wat Arun', collect($places)->firstWhere('sightId', (string) $sight->id)['name']);
+
+        $this->withHeaders($headers)->putJson('/admin/api/collection-lists/'.$entry->json('id'), [
+            'collectionKindId' => $kind->json('id'),
+            'sightId' => (string) $otherSight->id,
+        ])->assertOk()
+            ->assertJsonPath('sightId', (string) $otherSight->id)
+            ->assertJsonPath('title', 'Grand Palace');
+        $this->assertDatabaseHas('collectionlist', ['id' => $entry->json('id'), 'sight_id' => $otherSight->id, 'title' => null]);
+
+        $this->withHeaders($headers)->putJson('/admin/api/collection-lists/'.$entry->json('id'), [
+            'collectionKindId' => $kind->json('id'),
+            'sightId' => null,
+        ])->assertOk()
+            ->assertJsonPath('sightId', null)
+            ->assertJsonPath('title', 'Grand Palace');
+        $this->assertDatabaseHas('collectionlist', ['id' => $entry->json('id'), 'sight_id' => null, 'title' => 'Grand Palace']);
+
+        $this->withHeaders($headers)->deleteJson('/admin/api/collection-lists/'.$entry->json('id'))->assertNoContent();
+        $this->assertDatabaseMissing('collectionlist', ['id' => $entry->json('id')]);
+        $this->assertDatabaseMissing('collection_kind_lists', ['collection_list_id' => $entry->json('id')]);
+        $this->assertDatabaseHas('sights', ['id' => $sight->id, 'name' => 'Wat Arun']);
+        $this->assertDatabaseHas('sights', ['id' => $otherSight->id, 'name' => 'Grand Palace']);
+    }
+
     public function test_collection_kind_saves_local_image_paths_without_the_site_domain(): void
     {
         $this->withHeaders($this->adminHeaders())->postJson('/admin/api/collections', [
