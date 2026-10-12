@@ -44,6 +44,80 @@ class ReferenceContentApiTest extends TestCase
         $this->assertDatabaseHas('collectionkind', ['id' => $id, 'title' => 'Edited twice', 'detail' => 'Third']);
     }
 
+    public function test_country_targeted_collections_only_appear_on_their_country_page(): void
+    {
+        Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
+        Country::create(['code' => 'FR', 'name' => 'France', 'normalized_name' => 'france', 'continent_code' => 'EU']);
+        City::create(['geoname_id' => '1609350', 'name' => 'Bangkok', 'normalized_name' => 'bangkok', 'country_code' => 'TH']);
+        City::create(['geoname_id' => '2988507', 'name' => 'Paris', 'normalized_name' => 'paris', 'country_code' => 'FR']);
+        $headers = $this->adminHeaders();
+
+        $this->withHeaders($headers)->postJson('/admin/api/collections', [
+            'id' => 'thailand-temples',
+            'title' => 'Temples of Thailand',
+            'countryId' => 'TH',
+        ])->assertCreated()
+            ->assertJsonPath('countryId', 'TH')
+            ->assertJsonPath('country', 'Thailand');
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindId' => 'thailand-temples',
+            'title' => 'Wat Arun',
+            'cityId' => '1609350',
+        ])->assertCreated();
+
+        $this->withHeaders($headers)->postJson('/admin/api/collections', [
+            'id' => 'unesco-sites',
+            'title' => 'UNESCO World Heritage Sites',
+        ])->assertCreated()->assertJsonPath('countryId', null);
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindId' => 'unesco-sites',
+            'title' => 'Ayutthaya Historical Park',
+            'cityId' => '1609350',
+        ])->assertCreated();
+        $this->withHeaders($headers)->postJson('/admin/api/collection-lists', [
+            'collectionKindId' => 'unesco-sites',
+            'title' => 'Palace of Versailles',
+            'cityId' => '2988507',
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/collection-kinds')->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', 'unesco-sites');
+        $this->getJson('/api/v1/catalog/countries/TH')->assertOk()
+            ->assertJsonCount(2, 'collections')
+            ->assertJsonFragment(['id' => 'thailand-temples'])
+            ->assertJsonFragment(['id' => 'unesco-sites']);
+        $this->getJson('/api/v1/catalog/countries/FR')->assertOk()
+            ->assertJsonCount(1, 'collections')
+            ->assertJsonPath('collections.0.id', 'unesco-sites')
+            ->assertJsonMissing(['id' => 'thailand-temples']);
+        $this->getJson('/api/v1/catalog/cities/1609350')->assertOk()
+            ->assertJsonCount(1, 'collections')
+            ->assertJsonPath('collections.0.id', 'unesco-sites');
+
+        Sanctum::actingAs(User::factory()->create());
+        $this->getJson('/api/v1/collections')->assertOk()
+            ->assertJsonMissing(['id' => 'thailand-temples']);
+    }
+
+    public function test_country_target_can_be_cleared_when_editing_a_collection(): void
+    {
+        Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
+        $headers = $this->adminHeaders();
+        $this->withHeaders($headers)->postJson('/admin/api/collections', [
+            'id' => 'targeted',
+            'title' => 'Targeted collection',
+            'countryId' => 'TH',
+        ])->assertCreated();
+
+        $this->withHeaders($headers)->putJson('/admin/api/collections/targeted', [
+            'title' => 'Targeted collection',
+            'countryId' => null,
+        ])->assertOk()->assertJsonPath('countryId', null);
+
+        $this->assertDatabaseHas('collectionkind', ['id' => 'targeted', 'country_code' => null]);
+    }
+
     public function test_collection_kind_saves_local_image_paths_without_the_site_domain(): void
     {
         $this->withHeaders($this->adminHeaders())->postJson('/admin/api/collections', [

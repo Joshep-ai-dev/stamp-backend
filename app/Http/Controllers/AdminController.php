@@ -194,7 +194,7 @@ class AdminController extends Controller
                 ->orderBy('sights.name')
                 ->get()
                 ->map(fn ($x) => $this->adminSight($x)),
-            'collections', 'collection-kinds' => CollectionKind::with('lists.city.country')->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x, true)),
+            'collections', 'collection-kinds' => CollectionKind::with(['country', 'lists.city.country'])->orderBy('title')->get()->map(fn ($x) => (new ContentController)->collectionItem($x, true)),
             'collection-lists' => CollectionList::with(['kinds', 'city.country'])->orderBy('title')->get()->map(fn ($x) => $this->collectionList($x)),
             'daily-destinations' => DailyDestination::orderBy('lesson_number')->orderBy('name')->get()->map(fn ($x) => (new ContentController)->daily($x)),
             default => abort(404),
@@ -321,10 +321,10 @@ class AdminController extends Controller
             $values = ['country_code' => $data['countryId'], 'city_id' => $city->id, 'name' => $data['name'], 'slug' => Str::slug($data['name']), 'description' => $data['content'] ?? '', 'image_url' => $data['image'] ?? $model?->image_url ?? '', 'display_order' => 0, 'is_featured' => $data['isFeatured'] ?? true, 'is_premium' => false];
             $model ??= new Sight;
         } elseif (in_array($type, ['collections', 'collection-kinds'], true)) {
-            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'explorerImageUrl' => ['nullable', 'string'], 'heroImageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])]]);
+            $data = $request->validate(['id' => ['sometimes', 'string', Rule::unique('collectionkind')->ignore($model)], 'title' => ['required', 'string'], 'detail' => ['nullable', 'string'], 'countryId' => ['sometimes', 'nullable', 'exists:countries,code'], 'explorerImageUrl' => ['nullable', 'string'], 'heroImageUrl' => ['nullable', 'string'], 'isPublished' => ['boolean'], 'access' => ['sometimes', Rule::in(['free', 'pro'])]]);
             $heroImage = ImageUrl::stored($data['heroImageUrl'] ?? $model?->hero_image ?? $model?->image);
             $explorerImage = ImageUrl::stored($data['explorerImageUrl'] ?? $model?->explorer_image);
-            $values = ['access' => $data['access'] ?? $model?->access ?? 'free', 'title' => $data['title'], 'detail' => $data['detail'] ?? '', 'explorer_image' => $explorerImage, 'hero_image' => $heroImage, 'image' => $heroImage, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
+            $values = ['access' => $data['access'] ?? $model?->access ?? 'free', 'title' => $data['title'], 'detail' => $data['detail'] ?? '', 'country_code' => array_key_exists('countryId', $data) ? $data['countryId'] : $model?->country_code, 'explorer_image' => $explorerImage, 'hero_image' => $heroImage, 'image' => $heroImage, 'display_order' => 0, 'is_published' => $data['isPublished'] ?? true];
             $model ??= new CollectionKind(['id' => $data['id'] ?? (string) Str::uuid()]);
         } elseif ($type === 'collection-lists') {
             $data = $request->validate([
@@ -436,7 +436,7 @@ class AdminController extends Controller
     private function present(string $type, Model $model): array
     {
         return match ($type) {
-            'countries' => $this->adminCountry($model), 'cities' => $this->adminCity($model->load('country')), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model, true), 'collection-lists' => $this->collectionList($model->load(['kinds', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
+            'countries' => $this->adminCountry($model), 'cities' => $this->adminCity($model->load('country')), 'sights' => $this->adminSight($model->load(['country', 'city'])), 'collections', 'collection-kinds' => (new ContentController)->collectionItem($model->load('country'), true), 'collection-lists' => $this->collectionList($model->load(['kinds', 'city.country'])), 'daily-destinations' => (new ContentController)->daily($model), default => abort(404)
         };
     }
 

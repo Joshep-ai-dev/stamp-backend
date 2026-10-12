@@ -159,7 +159,10 @@ class TravelStateController extends Controller
         $progress = $user->collectionProgress()->get();
         $completionIds = $user->completions()->pluck('sight_id');
         $visitedStates = $this->visitedStates($user);
-        $managed = CollectionKind::with('lists.city.country', 'lists.sight')->where('is_published', true)->orderBy('title')->get();
+        $managed = CollectionKind::with('lists.city.country', 'lists.sight')
+            ->where('is_published', true)
+            ->whereNull('country_code')
+            ->orderBy('title')->get();
         $legacy = collect(CollectionCatalog::ITEMS)
             ->except($managed->pluck('id'))
             ->map(fn ($definition, $id) => $this->collection($id, $progress->firstWhere('collection_id', $id)));

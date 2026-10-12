@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['id', 'image', 'explorer_image', 'hero_image', 'title', 'detail', 'access', 'is_published', 'display_order'])]
+#[Fillable(['id', 'image', 'explorer_image', 'hero_image', 'title', 'detail', 'country_code', 'access', 'is_published', 'display_order'])]
 class CollectionKind extends Model
 {
     protected $table = 'collectionkind';
@@ -18,6 +19,11 @@ class CollectionKind extends Model
     protected function casts(): array
     {
         return ['is_published' => 'boolean', 'display_order' => 'integer'];
+    }
+
+    public function country(): BelongsTo
+    {
+        return $this->belongsTo(Country::class, 'country_code', 'code');
     }
 
     public function lists(): BelongsToMany
