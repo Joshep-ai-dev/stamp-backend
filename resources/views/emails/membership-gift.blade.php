@@ -11,36 +11,37 @@ table { border-collapse:collapse; }
 @media only screen and (max-width:480px) {
     .email-outer { padding:0 !important; }
     .email-shell { border:0 !important; border-radius:0 !important; }
-    .preheader { padding:7px 10px !important; }
-    .preheader-left, .preheader-right { font-size:9px !important; line-height:1.3 !important; }
+    .preheader { padding:6px 8px !important; }
+    .preheader-left, .preheader-right { font-size:8px !important; line-height:1.25 !important; }
     .preheader-left { width:66% !important; }
     .preheader-right { width:34% !important; padding-left:8px !important; }
-    .brand-cell { padding:11px !important; font-size:30px !important; }
-    .hero-cell { padding:18px 12px !important; }
-    .hero-layout { display:block !important; position:relative !important; }
+    .brand-cell { padding:9px !important; font-size:27px !important; }
+    .hero-cell { padding:0 !important; position:relative !important; overflow:hidden !important; }
+    .hero-layout { display:block !important; position:relative !important; min-height:132px !important; }
     .hero-layout tbody, .hero-layout tr { display:block !important; }
-    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; padding-right:52px !important; }
-    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:0 !important; width:48px !important; padding:0 !important; transform:translateY(-50%) !important; }
-    .hero-plane img { width:48px !important; max-width:48px !important; }
-    .hero-title { font-size:24px !important; line-height:1.1 !important; }
+    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; min-height:132px !important; padding:22px 94px 20px 14px !important; position:relative !important; z-index:2 !important; }
+    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:-10px !important; width:112px !important; padding:0 !important; transform:translateY(-50%) !important; z-index:1 !important; }
+    .hero-plane img { width:112px !important; max-width:112px !important; height:auto !important; }
+    .hero-title { font-size:20px !important; line-height:1.08 !important; margin-bottom:8px !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { font-size:13px !important; line-height:1.4 !important; }
-    .content-cell { padding:16px 10px !important; font-size:14px !important; line-height:1.5 !important; }
-    .confirmation-title { font-size:19px !important; line-height:1.2 !important; margin-bottom:14px !important; }
-    .gift-icon { width:16px !important; padding:15px 0 12px 8px !important; font-size:19px !important; }
-    .gift-details { padding:12px 8px !important; }
-    .gift-details h3 { font-size:16px !important; margin-bottom:6px !important; }
-    .gift-table { font-size:13px !important; }
+    .hero-subtitle { font-size:11px !important; line-height:1.35 !important; }
+    .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
+    .content-cell p { margin:0 0 10px !important; }
+    .confirmation-title { font-size:17px !important; line-height:1.2 !important; margin-bottom:12px !important; }
+    .gift-icon { width:15px !important; padding:12px 0 10px 8px !important; font-size:17px !important; }
+    .gift-details { padding:10px 8px !important; }
+    .gift-details h3 { font-size:14px !important; margin-bottom:5px !important; }
+    .gift-table { font-size:11px !important; line-height:1.35 !important; }
     .gift-label, .gift-value { display:block !important; width:auto !important; }
-    .gift-label { padding:7px 0 0 !important; }
+    .gift-label { padding:5px 0 0 !important; }
     .gift-value { padding:0 0 2px !important; overflow-wrap:anywhere !important; word-break:normal !important; }
     .gift-code { word-break:break-all !important; }
-    .notice { padding:11px !important; }
-    .footer-cell { padding:13px 10px !important; }
-    .footer-logo { font-size:19px !important; }
-    .footer-tagline { font-size:8px !important; }
-    .footer-social { font-size:10px !important; }
-    .fine-print { padding:11px 8px !important; font-size:9px !important; line-height:1.45 !important; }
+    .notice { padding:9px !important; font-size:11px !important; line-height:1.4 !important; }
+    .footer-cell { padding:11px 8px !important; }
+    .footer-logo { font-size:17px !important; }
+    .footer-tagline { font-size:7px !important; }
+    .footer-social { font-size:9px !important; }
+    .fine-print { padding:9px 7px !important; font-size:8px !important; line-height:1.4 !important; }
 }
 </style>
 </head>
