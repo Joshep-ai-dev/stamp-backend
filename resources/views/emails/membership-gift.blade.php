@@ -17,19 +17,20 @@ table { border-collapse:collapse; }
     .preheader-right { width:34% !important; padding-left:8px !important; }
     .brand-cell { padding:9px !important; font-size:27px !important; }
     .hero-cell { padding:0 !important; position:relative !important; overflow:hidden !important; }
-    .hero-layout { display:block !important; position:relative !important; min-height:132px !important; }
+    .hero-layout { display:block !important; position:relative !important; min-height:120px !important; }
     .hero-layout tbody, .hero-layout tr { display:block !important; }
-    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; min-height:132px !important; padding:22px 94px 20px 14px !important; position:relative !important; z-index:2 !important; }
-    .hero-plane { display:block !important; position:absolute !important; top:20px !important; right:10px !important; width:112px !important; padding:0 !important; z-index:1 !important; }
-    .hero-plane img { width:112px !important; max-width:112px !important; height:auto !important; }
-    .hero-title { font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-copy { display:block !important; box-sizing:border-box !important; width:100% !important; min-height:120px !important; padding:16px 84px 14px 14px !important; position:relative !important; z-index:2 !important; }
+    .hero-plane { display:block !important; position:absolute !important; top:50% !important; right:4px !important; width:108px !important; padding:0 !important; transform:translateY(-50%) !important; z-index:1 !important; }
+    .hero-plane img { width:108px !important; max-width:108px !important; height:auto !important; }
+    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { font-size:11px !important; line-height:1.35 !important; }
+    .hero-subtitle { font-family:Arial,Helvetica,sans-serif !important; font-size:11px !important; line-height:1.35 !important; }
+    .hero-copy, .hero-title, .hero-subtitle { text-align:left !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
     .content-cell p { margin:0 0 10px !important; }
     .confirmation-title { font-size:17px !important; line-height:1.2 !important; margin-bottom:12px !important; }
-    .gift-icon { width:15px !important; padding:12px 0 10px 8px !important; font-size:17px !important; }
-    .gift-details { padding:10px 8px !important; }
+    .gift-icon { width:15px !important; padding:12px 0 10px 4px !important; font-size:17px !important; }
+    .gift-details { padding:10px 8px 10px 2px !important; }
     .gift-details h3 { font-size:14px !important; margin-bottom:5px !important; }
     .gift-table { font-size:11px !important; line-height:1.35 !important; }
     .gift-label, .gift-value { display:block !important; width:auto !important; }
@@ -58,9 +59,9 @@ table { border-collapse:collapse; }
 <tr><td class="brand-cell" align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;line-height:1.2;">kroo</td></tr>
 <tr><td class="hero-cell" style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
 <table class="hero-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td class="hero-copy" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;">
-<h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif!important;font-size:32px!important;font-weight:700!important;letter-spacing:0!important;line-height:1.1!important;margin:0 0 12px!important;">@if ($isBuyer)<span class="hero-line" style="white-space:nowrap;">A gift that goes</span><br>places.@else<span class="hero-line" style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
-<p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
+<td class="hero-copy" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;text-align:left;">
+<h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:700;letter-spacing:0;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)<span class="hero-line" style="white-space:nowrap;">A gift that goes</span><br>places.@else<span class="hero-line" style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
+<p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
 <td class="hero-plane" align="right" valign="middle" style="width:28%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
 </tr></table>
