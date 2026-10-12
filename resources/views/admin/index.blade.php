@@ -294,6 +294,7 @@
     .collection-sight-field input { margin-top:2px }
     .collection-sight-results { display:grid; gap:6px; max-height:220px; overflow:auto }
     .collection-sight-results:empty { display:none }
+    .collection-sight-empty { padding:10px 12px; color:var(--muted); font-size:12px }
     .collection-sight-result { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:10px 12px; text-align:left; border:1px solid var(--line); border-radius:8px; background:#061f18; color:var(--ink) }
     .collection-sight-result:hover, .collection-sight-result:focus-visible { border-color:var(--accent); background:#164334 }
     .collection-sight-result span { color:var(--muted); font-size:12px }
@@ -1261,9 +1262,14 @@
       }
     }
     let sightSearchTimer;
+    let sightSearchVersion = 0;
     function renderSightOptions() {
       const list = document.querySelector('#collection-sight-options');
-      if (list) list.innerHTML = (state.meta.sightOptions || []).map(sight => `<button type="button" class="collection-sight-result" onclick="chooseCollectionSight('${esc(sight.id)}')"><strong>${esc(sight.name)}</strong><span>${esc(sight.location || '')}</span></button>`).join('');
+      if (!list) return;
+      const sights = state.meta.sightOptions || [];
+      list.innerHTML = sights.length
+        ? sights.map(sight => `<button type="button" class="collection-sight-result" onclick="chooseCollectionSight('${esc(sight.id)}')"><strong>${esc(sight.name)}</strong><span>${esc(sight.location || '')}</span></button>`).join('')
+        : '<div class="collection-sight-empty">No matching Top sights. Try another name or location.</div>';
     }
     function renderSelectedCollectionSight(sight) {
       const selected = document.querySelector('#collection-sight-selected');
@@ -1281,10 +1287,17 @@
       form.dataset.collectionItemMode = 'sight';
       updateCollectionItemMode();
       clearTimeout(sightSearchTimer);
-      if (value.trim().length < 2) return;
+      const version = ++sightSearchVersion;
+      if (value.trim().length < 2) {
+        if (results && value.trim()) results.innerHTML = '<div class="collection-sight-empty">Type at least 2 characters to search.</div>';
+        return;
+      }
+      if (results) results.innerHTML = '<div class="collection-sight-empty">Searching Top sights…</div>';
       sightSearchTimer = setTimeout(async () => {
         try {
-          state.meta.sightOptions = await call(`/admin/api/sight-options?query=${encodeURIComponent(value.trim())}`);
+          const sights = await call(`/admin/api/sight-options?query=${encodeURIComponent(value.trim())}`);
+          if (version !== sightSearchVersion || form.dataset.collectionItemMode !== 'sight' || form.elements.sightSearch.value.trim() !== value.trim()) return;
+          state.meta.sightOptions = sights;
           renderSightOptions();
         } catch (error) { note(error.message, true); }
       }, 250);
@@ -1309,6 +1322,7 @@
       if (results) results.replaceChildren();
     }
     function clearCollectionSightSelection() {
+      sightSearchVersion++;
       form.elements.sightId.value = '';
       form.elements.sightSearch.value = '';
       renderSelectedCollectionSight(null);
@@ -1325,6 +1339,7 @@
     }
     function chooseCollectionItemMode(mode) {
       clearCollectionSightSelection();
+      form.elements.sightSearch.value = '';
       form.dataset.collectionItemMode = mode;
       updateCollectionItemMode();
       if (mode === 'sight') form.elements.sightSearch?.focus();
