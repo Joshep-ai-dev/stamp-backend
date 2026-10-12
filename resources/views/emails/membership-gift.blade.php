@@ -16,15 +16,15 @@ table { border-collapse:collapse; }
     .preheader-left { width:66% !important; }
     .preheader-right { width:34% !important; padding-left:8px !important; }
     .brand-cell { padding:9px !important; font-size:27px !important; }
-    .hero-cell { padding:8px 12px !important; position:relative !important; overflow:hidden !important; }
+    .hero-cell { padding:8px 12px !important; position:relative !important; }
     .hero-layout { display:table !important; width:100% !important; table-layout:fixed !important; height:152px !important; }
     .hero-layout tbody { display:table-row-group !important; }
     .hero-layout tr { display:table-row !important; }
     .hero-copy { display:table-cell !important; box-sizing:border-box !important; width:72% !important; padding:0 4px 0 2px !important; vertical-align:middle !important; position:relative !important; z-index:2 !important; }
     .hero-plane { display:table-cell !important; position:relative !important; width:28% !important; padding:0 !important; vertical-align:middle !important; }
-    .hero-plane img { position:absolute !important; top:50% !important; right:0 !important; width:108px !important; max-width:118px !important; height:auto !important; transform:translateY(-50%) !important; }
-    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:21px !important; line-height:1.08 !important; margin-bottom:8px !important; }
-    .hero-line { white-space:normal !important; }
+    .hero-plane img { position:absolute !important; top:32px !important; right:0 !important; width:100% !important; max-width:88px !important; height:auto !important; transform:none !important; }
+    .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:20px !important; line-height:1.08 !important; margin-bottom:8px !important; }
+    .hero-line { white-space:nowrap !important; }
     .hero-subtitle { font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; }
     .hero-copy, .hero-title, .hero-subtitle { text-align:left !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
@@ -59,12 +59,12 @@ table { border-collapse:collapse; }
 </td></tr>
 <tr><td class="brand-cell" align="center" style="padding:17px;color:#042219;font-size:36px;font-weight:bold;letter-spacing:-2px;line-height:1.2;">kroo</td></tr>
 <tr><td class="hero-cell" style="padding:32px 28px;background:#034a43;background-image:linear-gradient(110deg,#034a43 0%,#087068 62%,#348d80 100%);color:#ffffff;">
-<table class="hero-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td class="hero-copy" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;text-align:left;">
+<table class="hero-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;height:152px;"><tr>
+<td class="hero-copy" width="72%" valign="middle" style="width:72%;font-family:Arial,Helvetica,sans-serif;text-align:left;">
 <h1 class="hero-title" style="font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:700;letter-spacing:0;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)<span class="hero-line" style="white-space:nowrap;">A gift that goes</span><br>places.@else<span class="hero-line" style="white-space:nowrap;">Your next adventure</span><br>starts here.@endif</h1>
 <p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
-<td class="hero-plane" align="right" valign="middle" style="width:28%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
+<td class="hero-plane" width="28%" align="right" valign="middle" style="width:28%;padding-left:8px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
 </tr></table>
 </td></tr>
 <tr><td class="content-cell" style="padding:26px 28px;">
