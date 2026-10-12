@@ -1274,8 +1274,10 @@
     function renderSelectedCollectionSight(sight) {
       const selected = document.querySelector('#collection-sight-selected');
       if (!selected) return;
-      selected.querySelector('[data-selected-name]').textContent = sight?.name || '';
-      selected.querySelector('[data-selected-location]').textContent = sight?.location || '';
+      const name = selected.querySelector('[data-selected-name]');
+      const location = selected.querySelector('[data-selected-location]');
+      if (name) name.textContent = sight?.name || '';
+      if (location) location.textContent = sight?.location || '';
       selected.hidden = !sight;
     }
     function searchCollectionSights(value) {
@@ -1331,6 +1333,8 @@
       clearTimeout(sightSearchTimer);
     }
     function changeCollectionSight() {
+      sightSearchVersion++;
+      clearTimeout(sightSearchTimer);
       form.elements.sightId.value = '';
       renderSelectedCollectionSight(null);
       form.elements.sightSearch.value = '';
@@ -1361,7 +1365,8 @@
       selected.className = 'collection-sight-selected';
       selected.hidden = true;
       selected.innerHTML = '<div><strong data-selected-name></strong><span data-selected-location></span></div><button type="button" onclick="changeCollectionSight()">Change</button>';
-      sightField.querySelector('#collection-sight-options').before(selected);
+      const results = sightField.querySelector('#collection-sight-options');
+      if (results) results.before(selected);
       const sightId = form.elements.sightId.value;
       if (sightId) {
         const selectedSight = state.meta.sightOptions?.find(sight => String(sight.id) === String(sightId));
