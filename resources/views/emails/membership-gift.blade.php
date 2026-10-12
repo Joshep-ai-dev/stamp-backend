@@ -25,11 +25,12 @@ table { border-collapse:collapse; }
     .hero-copy { display:table-cell !important; box-sizing:border-box !important; width:72% !important; padding:0 4px 0 2px !important; vertical-align:middle !important; }
     .hero-plane { display:table-cell !important; width:28% !important; padding:0 0 0 4px !important; vertical-align:middle !important; }
     .hero-plane img { display:block !important; position:static !important; width:100% !important; max-width:none !important; height:auto !important; transform:none !important; }
+    .hero-subtitle-cell { padding:4px 2px 0 !important; vertical-align:top !important; }
     .hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important; line-height:1.08 !important; margin-bottom:8px !important; }
     .hero-title-desktop { display:none !important; }
     .hero-title-mobile { display:block !important; }
     .hero-line { white-space:normal !important; }
-    .hero-subtitle { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; white-space:nowrap !important; }
+    .hero-subtitle { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; white-space:normal !important; }
     .hero-copy, .hero-title, .hero-subtitle { text-align:left !important; }
     .content-cell { padding:14px 10px !important; font-size:12px !important; line-height:1.45 !important; }
     .content-cell p { margin:0 0 10px !important; }
@@ -67,10 +68,10 @@ table { border-collapse:collapse; }
 <td class="hero-copy" width="78%" valign="middle" style="width:78%;font-family:Arial,Helvetica,sans-serif;text-align:left;">
 <h1 class="hero-title hero-title-desktop" style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;letter-spacing:0;line-height:1.1;margin:0 0 12px;">@if ($isBuyer)A gift that goes<br>places.@else Your next adventure<br>starts here.@endif</h1>
 <h1 class="hero-title hero-title-mobile" style="display:none;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;letter-spacing:0;line-height:1.08;margin:0 0 8px;">@if ($isBuyer)A gift that<br>goes places.@else Your next<br>adventure<br>starts here.@endif</h1>
-<p class="hero-subtitle{{ $isBuyer ? '' : ' hero-subtitle-recipient' }}" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone Kroo+!' : 'You’ve been gifted Kroo+!' }}</p>
 </td>
 <td class="hero-plane" width="22%" align="right" valign="middle" style="width:22%;padding-left:4px;"><img src="{{ $message->embed(resource_path('views/emails/assets/gift-plane.png')) }}" width="140" alt="" role="presentation" style="display:block;width:100%;max-width:140px;height:auto;border:0;"></td>
 </tr></table>
+<table class="hero-subtitle-layout" role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="hero-subtitle-cell" style="padding-top:8px;font-family:Arial,Helvetica,sans-serif;text-align:left;"><p class="hero-subtitle" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.45;margin:0;text-align:left;">{{ $isBuyer ? 'You’ve gifted someone a world of possibilities with Kroo+.' : 'You’ve been gifted Kroo+!' }}</p></td></tr></table>
 </td></tr>
 <tr><td class="content-cell" style="padding:26px 28px;">
 @if ($isBuyer)

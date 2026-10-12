@@ -118,7 +118,8 @@ class MembershipGiftApiTest extends TestCase
             $this->assertStringContainsString('.hero-title { width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:18px !important;', $html);
             $this->assertStringContainsString('.hero-title-desktop { display:none !important; }', $html);
             $this->assertStringContainsString('.hero-title-mobile { display:block !important; }', $html);
-            $this->assertStringContainsString('width:100% !important; font-family:Arial,Helvetica,sans-serif !important; font-size:13px !important; line-height:1.35 !important; white-space:nowrap !important;', $html);
+            $this->assertStringContainsString('.hero-subtitle-cell { padding:4px 2px 0 !important; vertical-align:top !important; }', $html);
+            $this->assertStringContainsString('font-size:13px !important; line-height:1.35 !important; white-space:normal !important;', $html);
             $this->assertStringContainsString('padding:10px 8px 10px 2px !important;', $html);
             $this->assertStringContainsString('height:152px !important;', $html);
             $this->assertStringContainsString('.content-cell { padding:14px 10px !important; font-size:12px !important;', $html);
