@@ -315,7 +315,8 @@ class ContentController extends Controller
 
             return ['id' => $list->id, 'type' => 'collection-list', 'sightId' => $list->sight_id ? (string) $list->sight_id : null, 'collectionKindId' => $list->collectionkind_id, 'imageUrl' => ImageUrl::public($sight?->image_url ?? $list->image), 'name' => $sight?->name ?? $list->title, 'title' => $sight?->name ?? $list->title, 'cityId' => $city?->geoname_id, 'city' => $city?->englishName(), 'state' => $city?->englishSubcountry(), 'countryId' => $sight?->country_code ?? $city?->country_code, 'country' => $country?->name, 'location' => $sight ? collect([$city?->englishName(), $city?->englishSubcountry(), $country?->name])->filter()->join(', ') : $list->location, 'detail' => $canViewDetail ? $detail : '', 'content' => $canViewDetail ? $detail : '', 'access' => $isPremium ? 'pro' : 'free', 'isPremium' => $isPremium];
         });
-        $places = $places->concat($sourceBuilder->extras($item, $hasAccess))->values();
+        $places = $places->concat($sourceBuilder->extras($item, $hasAccess))
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $result = ['access' => $item->access ?? 'free', 'id' => $item->id, 'title' => $item->title, 'countryId' => $item->country_code, 'country' => $item->country?->name, 'detail' => $item->detail, 'imageUrl' => ImageUrl::public($heroImage), 'heroImageUrl' => ImageUrl::public($heroImage), 'explorerImageUrl' => ImageUrl::public($item->explorer_image ?: $heroImage), 'places' => $places, 'isPublished' => $item->is_published, 'displayOrder' => $item->display_order, 'createdAt' => $item->created_at?->toISOString(), 'updatedAt' => $item->updated_at?->toISOString()];
 
         if ($admin) {

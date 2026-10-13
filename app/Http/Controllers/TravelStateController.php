@@ -205,7 +205,8 @@ class TravelStateController extends Controller
             return $place;
             })
             : collect();
-        $places = $places->concat($sourcePlaces)->values();
+        $places = $places->concat($sourcePlaces)
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $value = $definition
             ? ($places->count() ? (int) round(($places->where('completed', true)->count() / $places->count()) * 100) : 0)
             : ($progress?->progress ?? 0);

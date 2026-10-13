@@ -163,6 +163,33 @@ class ReferenceContentApiTest extends TestCase
         $this->getJson('/api/v1/catalog/cities/5368361')->assertOk()->assertJsonFragment(['id' => 'usa']);
     }
 
+    public function test_collection_places_are_alphabetical_across_all_sources(): void
+    {
+        Country::create(['code' => 'US', 'name' => 'United States', 'normalized_name' => 'united states', 'continent_code' => 'NA']);
+        $kind = CollectionKind::create(['id' => 'mixed-sources', 'title' => 'Mixed sources', 'is_published' => true, 'access' => 'free']);
+        foreach (['Wyoming', 'Alabama', 'Nevada'] as $name) {
+            $state = CountryState::create(['country_code' => 'US', 'name' => $name, 'normalized_name' => strtolower($name)]);
+            $kind->states()->attach($state);
+        }
+        $sight = Sight::create(['country_code' => 'US', 'name' => 'denali', 'slug' => 'denali']);
+        $kind->sights()->attach($sight);
+        foreach (['California', 'Utah'] as $name) {
+            $this->withHeaders($this->adminHeaders())->postJson('/admin/api/collection-lists', [
+                'collectionKindId' => $kind->id,
+                'title' => $name,
+            ])->assertCreated();
+        }
+
+        $expected = ['Alabama', 'California', 'denali', 'Nevada', 'Utah', 'Wyoming'];
+        $this->assertSame($expected, array_column($this->getJson('/api/v1/collections/'.$kind->id)->assertOk()->json('places'), 'name'));
+        $catalog = collect($this->getJson('/api/v1/collection-kinds')->assertOk()->json())->firstWhere('id', $kind->id);
+        $this->assertSame($expected, array_column($catalog['places'], 'name'));
+
+        Sanctum::actingAs(User::factory()->create());
+        $collection = collect($this->getJson('/api/v1/collections')->assertOk()->json())->firstWhere('id', $kind->id);
+        $this->assertSame($expected, array_column($collection['places'], 'name'));
+    }
+
     public function test_collection_list_sight_link_stores_only_the_sight_reference_and_deleting_it_preserves_the_sight(): void
     {
         Country::create(['code' => 'TH', 'name' => 'Thailand', 'normalized_name' => 'thailand', 'continent_code' => 'AS']);
