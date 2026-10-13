@@ -41,7 +41,9 @@ class DreamVacationChallenge
             'krooScore' => $score,
             'krooScoreTarget' => 5,
             'krooScoreQualified' => $score >= 5,
-            'krooIqScore' => $iq,
+            // Mobile clients display the lifetime IQ here; eligibility uses the window total.
+            'krooIqScore' => (float) ($user->kroo_iq_score ?? 0),
+            'krooIqChallengeScore' => $iq,
             'krooIqTarget' => 85,
             'krooIqQualified' => $iq >= 85,
             'referralCount' => $referrals,

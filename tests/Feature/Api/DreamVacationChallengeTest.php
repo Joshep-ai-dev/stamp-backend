@@ -42,7 +42,7 @@ class DreamVacationChallengeTest extends TestCase
         ]);
         Sanctum::actingAs($user);
         $this->getJson('/api/v1/me/home')->assertOk()
-            ->assertJsonPath('challengeProgress.krooIqScore', 84.99)
+            ->assertJsonPath('challengeProgress.krooIqChallengeScore', 84.99)
             ->assertJsonPath('challengeProgress.krooIqQualified', false);
         $attempt->update(['score_after' => 185]);
         $this->getJson('/api/v1/me/home')->assertOk()->assertJsonPath('challengeProgress.krooIqQualified', true);
@@ -98,6 +98,29 @@ class DreamVacationChallengeTest extends TestCase
             ->assertJsonPath('challengeProgress.krooScoreQualified', false)
             ->assertJsonPath('challengeProgress.krooIqQualified', false)
             ->assertJsonPath('challengeProgress.referralCount', 0)
+            ->assertJsonPath('challengeProgress.qualified', false);
+    }
+
+    public function test_plus_page_shows_saved_iq_without_paid_membership(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['kroo_iq_score' => 2.5]));
+
+        $this->getJson('/api/v1/me/home')->assertOk()
+            ->assertJsonPath('challengeProgress.krooIqScore', 2.5)
+            ->assertJsonPath('challengeProgress.krooIqChallengeScore', 0)
+            ->assertJsonPath('challengeProgress.krooIqQualified', false);
+    }
+
+    public function test_saved_iq_does_not_qualify_points_earned_before_membership(): void
+    {
+        $user = $this->member(now()->subMonth());
+        $user->forceFill(['kroo_iq_score' => 90.25])->save();
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/me/home')->assertOk()
+            ->assertJsonPath('challengeProgress.krooIqScore', 90.25)
+            ->assertJsonPath('challengeProgress.krooIqChallengeScore', 0)
+            ->assertJsonPath('challengeProgress.krooIqQualified', false)
             ->assertJsonPath('challengeProgress.qualified', false);
     }
 
