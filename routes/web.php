@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminAiController;
+use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPageController;
 use App\Http\Controllers\ContentController;
@@ -25,6 +26,8 @@ Route::get('/images/{folder}/{filename}', [LegacyImageController::class, 'public
 Route::get('/storage/images/{filename}', [LegacyImageController::class, 'show'])->name('images.legacy');
 Route::get('/admin', [AdminPageController::class, 'index'])->name('admin.page');
 Route::middleware(RequireAdminKey::class)->prefix('/admin/api')->group(function (): void {
+    Route::get('/accounts', [AdminAccountController::class, 'index']);
+    Route::delete('/accounts/{user}', [AdminAccountController::class, 'destroy']);
     Route::get('/ai', [AdminAiController::class, 'index']);
     Route::post('/ai', [AdminAiController::class, 'start']);
     Route::post('/ai/image', [AdminAiController::class, 'generateImage']);

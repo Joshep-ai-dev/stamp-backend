@@ -611,7 +611,7 @@
     <aside class="side">
       <div class="brand">Kroo Admin</div>
       <nav class="nav"><button data-tab="countries" class="active">Country</button><button onclick="withButtonLoading(this, &quot;Loading...&quot;, () => showUsStates(this))">US state images</button><button data-tab="cities">Cities</button><button data-tab="sights">Top sights</button><button
-          data-tab="collections">Collection kinds</button><button data-tab="collection-lists">Collection list</button><button data-tab="daily-destinations">Kroo IQ</button><button data-tab="ai">AI automation</button><button class="logout" onclick="logout()">Lock</button></nav>
+          data-tab="collections">Collection kinds</button><button data-tab="collection-lists">Collection list</button><button data-tab="daily-destinations">Kroo IQ</button><button data-tab="ai">AI automation</button><button data-tab="accounts">Accounts</button><button class="logout" onclick="logout()">Lock</button></nav>
     </aside>
     <main>
       <div class="top">
@@ -749,6 +749,7 @@
       const version = ++loadVersion;
       const tab = state.tab;
       try {
+        if (tab === 'accounts') { await loadAccounts(version); return }
         if (tab === 'ai') { await loadAi(); return }
         table.classList.remove('ai-workspace');
         summary.style.display = '';
@@ -788,6 +789,37 @@
         render();
         note('');
       } catch (e) { if (version === loadVersion) note(e.message, true) }
+    }
+    let accountQuery = '', accountPage = 1;
+    async function loadAccounts(version) {
+      const result = await call('/admin/api/accounts?' + new URLSearchParams({ query: accountQuery, page: accountPage }));
+      if (version !== loadVersion || state.tab !== 'accounts') return;
+      state.rows = result.data;
+      table.classList.remove('ai-workspace');
+      title.textContent = 'Accounts';
+      document.querySelector('#addButton').style.display = 'none';
+      document.querySelector('.page-description').textContent = 'Find an account and permanently delete it and its travel data. Deleting an account does not cancel an App Store or Google Play subscription.';
+      summary.style.display = '';
+      summary.innerHTML = `<form id="accountSearch" class="summarybar"><input name="query" type="search" maxlength="200" aria-label="Search accounts" placeholder="Name, email, or Kroo ID" value="${esc(accountQuery)}"><button type="submit">Search</button><span>${result.total} accounts · Page ${result.current_page} of ${result.last_page}</span><button type="button" id="accountPrevious" ${result.current_page <= 1 ? 'disabled' : ''}>Previous</button><button type="button" id="accountNext" ${result.current_page >= result.last_page ? 'disabled' : ''}>Next</button></form>`;
+      document.querySelector('#accountSearch').onsubmit = event => { event.preventDefault(); accountQuery = event.currentTarget.elements.query.value.trim(); accountPage = 1; load(); };
+      document.querySelector('#accountPrevious').onclick = () => { accountPage = result.current_page - 1; load(); };
+      document.querySelector('#accountNext').onclick = () => { accountPage = result.current_page + 1; load(); };
+      table.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Kroo ID</th><th>Created</th><th>Actions</th></tr></thead><tbody>${result.data.map((user, index) => `<tr><td>${esc([user.name, user.family_name].filter(Boolean).join(' '))}</td><td>${esc(user.email)}</td><td>${esc(user.kroo_id)}</td><td>${esc(user.created_at?.slice(0, 10))}</td><td><button class="danger" data-delete-account="${index}">Delete account</button></td></tr>`).join('') || '<tr><td colspan="5">No accounts found.</td></tr>'}</tbody></table>`;
+      table.querySelectorAll('[data-delete-account]').forEach(button => {
+        const user = result.data[Number(button.dataset.deleteAccount)];
+        button.onclick = () => withButtonLoading(button, 'Deleting...', async () => {
+          const name = [user.name, user.family_name].filter(Boolean).join(' ').trim();
+          const confirmation = prompt(`Permanently delete ${name} (Kroo ID: ${user.kroo_id})? This removes their account and travel data and cannot be undone. Type their name to confirm: ${name}`);
+          if (confirmation === null) return;
+          if (confirmation.trim() !== name) { note('The name did not match. Account was not deleted.', true); return; }
+          try {
+            await call('/admin/api/accounts/' + encodeURIComponent(user.id), { method: 'DELETE', body: JSON.stringify({ confirmation }) });
+            if (state.tab === 'accounts') { if (result.data.length === 1 && accountPage > 1) accountPage--; await load(); }
+            note('Account deleted successfully.');
+          } catch (error) { note(error.message, true); }
+        });
+      });
+      note('');
     }
     const aiKinds = [
       { id: 'countries', icon: '?', label: 'Countries', detail: 'National stamp images' },
