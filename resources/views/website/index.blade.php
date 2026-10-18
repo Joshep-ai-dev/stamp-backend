@@ -969,7 +969,14 @@
         <h1 id="hero-title">Collect<br><span>the world.</span></h1>
         <p>Track your travels, discover new places, and collect a lifetime of memories.</p>
         <div class="hero-actions">
-          <div class="store-badges"><a class="store-badge" href="#download" aria-label="App Store download information"><img src="{{ route('website.page-image', ['filename' => 'apple.png']) }}" alt="Download on the App Store"></a><a class="store-badge" href="https://play.google.com/store/apps/details?id=com.krootravel.app" aria-label="Download on Google Play"><img src="{{ route('website.page-image', ['filename' => 'google.png']) }}" alt="Get it on Google Play"></a></div>
+          <div class="store-badges">
+            <a class="store-badge" href="#download" aria-label="App Store download information">
+              <img src="{{ route('website.page-image', ['filename' => 'apple.png']) }}" alt="Download on the App Store">
+            </a>
+            <a class="store-badge" href="https://play.google.com/store/apps/details?id=com.krootravel.app" aria-label="Download on Google Play">
+              <img src="{{ route('website.page-image', ['filename' => 'google.png']) }}" alt="Get it on Google Play">
+            </a>
+          </div>
         </div>
       </div>
     </section>
