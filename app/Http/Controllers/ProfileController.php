@@ -8,6 +8,8 @@ use App\Services\ImageStorage;
 use App\Services\KrooId;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
@@ -79,6 +81,25 @@ class ProfileController extends Controller
         $images->delete($oldPhoto);
 
         return response()->json(['photoUri' => $photoUri], 201);
+    }
+
+    public function destroy(Request $request, ImageStorage $images): Response
+    {
+        $user = $request->user();
+        $photoUri = $user->photo_uri;
+
+        DB::transaction(function () use ($user): void {
+            $user->tokens()->delete();
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+            if (filled($user->email)) {
+                DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            }
+            $user->delete();
+        });
+
+        $images->delete($photoUri);
+
+        return response()->noContent();
     }
 
     private function profile(Request $request): array

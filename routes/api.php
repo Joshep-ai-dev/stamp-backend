@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/members/email', [ProfileController::class, 'connectEmail']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
+        Route::delete('/profile', [ProfileController::class, 'destroy']);
         Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
         Route::apiResource('visits', VisitController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('/me/sync/visits', [VisitController::class, 'sync']);

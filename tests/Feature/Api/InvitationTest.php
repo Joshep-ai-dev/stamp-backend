@@ -125,6 +125,24 @@ class InvitationTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $current->id, 'email' => 'new@example.com']);
     }
 
+    public function test_member_can_permanently_delete_their_account(): void
+    {
+        $member = User::factory()->create(['email' => 'delete-me@example.com']);
+        $token = $member->createToken('Kroo mobile app')->plainTextToken;
+
+        $this->withToken($token)->deleteJson('/api/v1/profile')->assertNoContent();
+
+        $this->assertDatabaseMissing('users', ['id' => $member->id]);
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $member->id,
+        ]);
+    }
+
+    public function test_account_deletion_requires_authentication(): void
+    {
+        $this->deleteJson('/api/v1/profile')->assertUnauthorized();
+    }
+
     public function test_registration_and_code_account_creation_require_an_invitation(): void
     {
         $this->postJson('/api/v1/auth/register', ['name' => 'Guest', 'email' => 'guest@example.com',
