@@ -57,7 +57,7 @@ class MembershipGifts
 
     public function verify(MembershipGift $gift): MembershipGift
     {
-        if ($gift->paid_at || $gift->cancelled_at) {
+        if ($gift->cancelled_at) {
             return $gift;
         }
         $transactions = $this->transactions(User::findOrFail($gift->buyer_id), $gift->product_id);
@@ -66,14 +66,23 @@ class MembershipGifts
             // Serialize claims for this buyer, including concurrent retries and the scheduler.
             User::whereKey($gift->buyer_id)->lockForUpdate()->firstOrFail();
             $gift = MembershipGift::whereKey($gift->id)->lockForUpdate()->firstOrFail();
-            if ($gift->paid_at || $gift->cancelled_at) {
+            if ($gift->cancelled_at) {
+                return $gift;
+            }
+            if ($gift->paid_at) {
+                foreach ($transactions as $transaction) {
+                    if (($transaction['id'] ?? null) === $gift->transaction_id && ! empty($transaction['refunded_at'])) {
+                        $gift->forceFill(['cancelled_at' => now()])->save();
+                        break;
+                    }
+                }
                 return $gift;
             }
             foreach ($transactions as $transaction) {
                 $id = $transaction['id'] ?? null;
                 if (! is_string($id) || in_array($id, $gift->baseline_transactions, true)
                     || ! empty($transaction['refunded_at'])
-                    || (($transaction['is_sandbox'] ?? true) && ! config('services.revenuecat.gift_allow_sandbox'))
+                    || (($transaction['is_sandbox'] ?? true) && ! $this->sandboxAllowed($gift))
                     || ! in_array($transaction['store'] ?? '', ['app_store', 'play_store'], true)
                     || empty($transaction['purchase_date'])
                     || CarbonImmutable::parse($transaction['purchase_date'])->lt($gift->created_at->copy()->subSeconds(5))
@@ -90,6 +99,12 @@ class MembershipGifts
 
             return $gift;
         });
+    }
+
+    private function sandboxAllowed(MembershipGift $gift): bool
+    {
+        $buyers = array_filter(array_map('trim', explode(',', (string) config('services.revenuecat.gift_sandbox_buyer_ids'))));
+        return config('services.revenuecat.gift_allow_sandbox') && in_array($gift->buyer_id, $buyers, true);
     }
 
     public function send(MembershipGift $gift): void
@@ -114,6 +129,10 @@ class MembershipGifts
     public function redeem(User $user, string $code): MembershipGift
     {
         $hash = hash('sha256', strtoupper(preg_replace('/[\s-]+/', '', $code)));
+        $candidate = MembershipGift::where('code_hash', $hash)->first();
+        if ($candidate && ! $candidate->cancelled_at) {
+            $this->verify($candidate);
+        }
 
         return DB::transaction(function () use ($user, $hash) {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
@@ -133,6 +152,18 @@ class MembershipGifts
 
     public function deliverPending(): void
     {
+        MembershipGift::whereNotNull('paid_at')->whereNull('cancelled_at')
+            ->where(fn ($query) => $query->whereNull('redeemed_at')->orWhere('expires_at', '>', now()))
+            ->each(function ($gift): void {
+                try {
+                    $verified = $this->verify($gift);
+                    if ($verified->cancelled_at && $verified->redeemed_by) {
+                        app(RevenueCatBilling::class)->status(User::findOrFail($verified->redeemed_by), false);
+                    }
+                } catch (\Throwable $error) {
+                    report($error);
+                }
+            });
         MembershipGift::whereNull('cancelled_at')->whereNull('email_sent_at')
             ->where('created_at', '>=', now()->subDays(30))->each(function ($gift): void {
                 try {

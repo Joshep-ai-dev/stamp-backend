@@ -16,6 +16,9 @@ class GiftInvitationTest extends TestCase
 
     private function gift(User $buyer, array $attributes = []): MembershipGift
     {
+        config(['services.revenuecat.secret_api_key' => 'test-secret']);
+        \Illuminate\Support\Facades\Http::fake(['api.revenuecat.com/*' =>
+            \Illuminate\Support\Facades\Http::response(['subscriber' => ['non_subscriptions' => []]])]);
         return MembershipGift::create(array_merge([
             'buyer_id' => $buyer->id, 'recipient_email' => 'friend@example.com',
             'product_id' => 'gift.year', 'baseline_transactions' => [],

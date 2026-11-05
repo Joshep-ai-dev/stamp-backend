@@ -228,6 +228,37 @@ class MembershipGiftApiTest extends TestCase
         $this->assertNotNull(MembershipGift::findOrFail($id)->email_sent_at);
         $this->assertNotNull(MembershipGift::findOrFail($id)->paid_at);
     }
+    public function test_refund_blocks_claim_and_removes_existing_gift_access(): void
+    {
+        Mail::fake();
+        $this->subscriber();
+        $id = $this->draft(User::factory()->create());
+        $this->subscriber([$this->purchase()]);
+        $this->postJson('/api/v1/me/membership-gifts/'.$id.'/verify')->assertOk();
+        $code = MembershipGift::findOrFail($id)->encrypted_code;
+        $recipient = User::factory()->create();
+        Sanctum::actingAs($recipient);
+        $this->postJson('/api/v1/me/membership-gifts/redeem', ['code' => $code])->assertOk();
+        $this->subscriber([$this->purchase(['refunded_at' => now()->toIso8601String()])]);
+        app(MembershipGifts::class)->deliverPending();
+        $this->assertNotNull(MembershipGift::findOrFail($id)->cancelled_at);
+        $this->getJson('/api/v1/me/subscription')->assertOk()->assertJsonPath('isKrooPlus', false);
+        $this->postJson('/api/v1/me/membership-gifts/redeem', ['code' => $code])->assertUnprocessable();
+    }
+
+    public function test_sandbox_requires_explicit_review_buyer_allowlist(): void
+    {
+        Mail::fake();
+        $this->subscriber();
+        $buyer = User::factory()->create();
+        $id = $this->draft($buyer);
+        $this->subscriber([$this->purchase(['store' => 'app_store', 'is_sandbox' => true])]);
+        config(['services.revenuecat.gift_allow_sandbox' => true]);
+        $this->postJson('/api/v1/me/membership-gifts/'.$id.'/verify')->assertOk()->assertJsonPath('status', 'pending');
+        config(['services.revenuecat.gift_sandbox_buyer_ids' => $buyer->id]);
+        $this->postJson('/api/v1/me/membership-gifts/'.$id.'/verify')->assertOk()->assertJsonPath('status', 'paid');
+    }
+
     public function test_validation_and_ownership(): void
     {
         $this->postJson('/api/v1/me/membership-gifts/redeem', ['code' => 'guess'])->assertUnauthorized();

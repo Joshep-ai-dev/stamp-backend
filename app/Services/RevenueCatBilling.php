@@ -138,7 +138,7 @@ class RevenueCatBilling
 
     private function giftExpiry(User $user): ?CarbonImmutable
     {
-        $date = MembershipGift::where('redeemed_by', $user->id)->where('expires_at', '>', now())->max('expires_at');
+        $date = MembershipGift::where('redeemed_by', $user->id)->whereNotNull('paid_at')->whereNull('cancelled_at')->where('expires_at', '>', now())->max('expires_at');
         return $date ? CarbonImmutable::parse($date) : null;
     }
 
