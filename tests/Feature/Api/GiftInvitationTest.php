@@ -27,21 +27,9 @@ class GiftInvitationTest extends TestCase
         ], $attributes));
     }
 
-    public function test_ios_rejects_custom_gift_signup_and_claims(): void
-    {
-        $gift = $this->gift(User::factory()->create());
-        $this->withHeader('X-Kroo-Platform', 'ios');
-        $this->postJson('/api/v1/invitations/validate', ['code' => $gift->encrypted_code])->assertUnprocessable();
-        $this->postJson('/api/v1/invitations/join', ['name' => 'Review', 'code' => $gift->encrypted_code])->assertUnprocessable();
-        \Laravel\Sanctum\Sanctum::actingAs(User::factory()->create());
-        $this->postJson('/api/v1/me/membership-gifts/redeem', ['code' => $gift->encrypted_code])->assertForbidden();
-        $this->postJson('/api/v1/me/membership-gifts', [])->assertForbidden();
-        $this->assertNull($gift->fresh()->redeemed_at);
-    }
-
     public function test_welcome_gift_code_creates_account_and_starts_prepaid_year(): void
     {
-        $this->withHeader('X-Kroo-Platform', 'android');
+        $this->withHeader('X-Kroo-Platform', 'ios');
         $this->travelTo(now()->startOfSecond());
         $buyer = User::factory()->create();
         $gift = $this->gift($buyer);

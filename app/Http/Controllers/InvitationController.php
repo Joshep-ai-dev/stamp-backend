@@ -24,7 +24,6 @@ class InvitationController extends Controller
         $code = preg_replace('#^stampo://friend/#', '', $code);
         $gift = $this->giftFor($code);
         if ($gift) {
-            abort_if($request->header('X-Kroo-Platform') === 'ios', 422, 'Use a referral code to join. Redeem Apple offer codes from Kroo+.');
             $this->requireUnusedGift($gift);
 
             return response()->json(['accessToken' => Crypt::encryptString(json_encode([
@@ -47,7 +46,6 @@ class InvitationController extends Controller
         ]);
         $gift = $this->giftFor($data['code']);
         if ($gift) {
-            abort_if($request->header('X-Kroo-Platform') === 'ios', 422, 'Use a referral code to join. Redeem Apple offer codes from Kroo+.');
             return $this->joinWithGift($gift->id, trim($data['name']));
         }
         $member = $this->memberFor(trim($data['code']));
@@ -63,7 +61,6 @@ class InvitationController extends Controller
         $member = InvitationAccess::invitingMember($request);
         $grant = json_decode(Crypt::decryptString((string) $request->header('X-Kroo-Invitation')), true);
         if (isset($grant['giftId'])) {
-            abort_if($request->header('X-Kroo-Platform') === 'ios', 422, 'Use a referral code to join. Redeem Apple offer codes from Kroo+.');
             return $this->joinWithGift($grant['giftId'], trim($data['name']));
         }
 
