@@ -29,6 +29,7 @@ class GiftInvitationTest extends TestCase
 
     public function test_welcome_gift_code_creates_account_and_starts_prepaid_year(): void
     {
+        $this->withHeader('X-Kroo-Platform', 'ios');
         $this->travelTo(now()->startOfSecond());
         $buyer = User::factory()->create();
         $gift = $this->gift($buyer);
