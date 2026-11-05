@@ -11,6 +11,7 @@ class MembershipGiftController extends Controller
 {
     public function store(Request $request, MembershipGifts $gifts)
     {
+        abort_if($request->header('X-Kroo-Platform') === 'ios', 403, 'Use App Store offer-code redemption on iOS.');
         $data = $request->validate([
             'recipientEmail' => ['required', 'email:rfc', 'max:254'],
             'message' => ['nullable', 'string', 'max:240'], 'productId' => ['required', 'string', 'max:255'],
@@ -19,6 +20,7 @@ class MembershipGiftController extends Controller
     }
     public function verify(Request $request, MembershipGift $gift, MembershipGifts $gifts)
     {
+        abort_if($request->header('X-Kroo-Platform') === 'ios', 403, 'Use App Store offer-code redemption on iOS.');
         abort_unless($gift->buyer_id === $request->user()->id, 404);
         $gift = $gifts->verify($gift);
         try { $gifts->send($gift); } catch (\Throwable $error) { report($error); }
@@ -26,6 +28,7 @@ class MembershipGiftController extends Controller
     }
     public function destroy(Request $request, MembershipGift $gift, MembershipGifts $gifts)
     {
+        abort_if($request->header('X-Kroo-Platform') === 'ios', 403, 'Use App Store offer-code redemption on iOS.');
         abort_unless($gift->buyer_id === $request->user()->id, 404);
         $gift = $gifts->verify($gift);
         // Conditional update avoids racing with a verified payment.
@@ -34,6 +37,7 @@ class MembershipGiftController extends Controller
     }
     public function redeem(Request $request, MembershipGifts $gifts, RevenueCatBilling $billing)
     {
+        abort_if($request->header('X-Kroo-Platform') === 'ios', 403, 'Use App Store offer-code redemption on iOS.');
         $data = $request->validate(['code' => ['required', 'string', 'max:64']]);
         $gifts->redeem($request->user(), $data['code']);
         return response()->json($billing->status($request->user()->fresh(), false));
